@@ -16,7 +16,7 @@
 ## Метки
 - `who:gpt1|gpt2|gpt3|claude|owner`: чья очередь сейчас.
 - `status:ready` (можно брать), `status:doing` (в работе), `status:review` (на проверке), `status:blocked` (вопрос или ждёт зависимостей), `status:waiting-owner`.
-- `phase:1`, `phase:2`, …: этап плана (`docs/spec/11-implementation-plan.md`). Диспетчер берёт только активные этапы.
+- `phase:1` (выпуск 1 «Ручной день»), `phase:2` (выпуск 2 «Помощник и расписание»), `phase:3` (P1 после В2): выпуск плана (`docs/spec/11-implementation-plan.md`). Диспетчер берёт только активные метки.
 - `bug`, `chore`, `enhancement`, `decision`.
 
 ## Жизнь задачи
