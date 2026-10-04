@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Личный планировщик дел для macOS",
-"main": ".vite/build/index.cjs",
+  "main": ".vite/build/index.cjs",
   "scripts": {
     "start": "electron-forge start",
     "typecheck": "tsc --noEmit",

@@ -10,7 +10,10 @@ module.exports = {
       name: 'domain-only-approved-packages',
       severity: 'error',
       from: { path: '^src/domain' },
-      to: { dependencyTypes: ['npm'], pathNot: '^(temporal-polyfill|zod)(/|$)' },
+      to: {
+        dependencyTypes: ['npm'],
+        pathNot: '^(temporal-polyfill|zod)(/|$)',
+      },
     },
     {
       name: 'renderer-no-main-or-storage',
@@ -28,6 +31,8 @@ module.exports = {
   options: {
     doNotFollow: { path: 'node_modules' },
     tsConfig: { fileName: 'tsconfig.json' },
-    enhancedResolveOptions: { extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'] },
+    enhancedResolveOptions: {
+      extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+    },
   },
 };

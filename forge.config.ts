@@ -9,8 +9,16 @@ const config: ForgeConfig = {
   plugins: [
     new VitePlugin({
       build: [
-        { entry: 'src/main/index.ts', config: 'vite.main.config.ts', target: 'main' },
-        { entry: 'src/preload/index.ts', config: 'vite.preload.config.ts', target: 'preload' },
+        {
+          entry: 'src/main/index.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
+        {
+          entry: 'src/preload/index.ts',
+          config: 'vite.preload.config.ts',
+          target: 'preload',
+        },
       ],
       renderer: [{ name: 'main_window', config: 'vite.renderer.config.ts' }],
       hotRestart: true,

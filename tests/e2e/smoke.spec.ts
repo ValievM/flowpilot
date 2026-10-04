@@ -16,9 +16,19 @@ test.afterEach(async () => {
 });
 
 test('opens the app without exposing Node globals', async () => {
-  await expect(page.getByText('Ваш день начинается с ясного плана.')).toBeVisible();
-  expect(await page.evaluate(() => typeof (window as Window & { require?: unknown }).require)).toBe('undefined');
-  expect(await page.evaluate(() => typeof (window as Window & { process?: unknown }).process)).toBe('undefined');
+  await expect(
+    page.getByText('Ваш день начинается с ясного плана.'),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => typeof (window as Window & { require?: unknown }).require,
+    ),
+  ).toBe('undefined');
+  expect(
+    await page.evaluate(
+      () => typeof (window as Window & { process?: unknown }).process,
+    ),
+  ).toBe('undefined');
 });
 
 for (const theme of ['light', 'dark'] as const) {
@@ -26,6 +36,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.evaluate((selectedTheme) => {
       document.documentElement.dataset.theme = selectedTheme;
     }, theme);
-    await expect(page).toHaveScreenshot(`welcome-${theme}.png`, { fullPage: true });
+    await expect(page).toHaveScreenshot(`welcome-${theme}.png`, {
+      fullPage: true,
+    });
   });
 }
