@@ -4,7 +4,7 @@
 
 Главный сценарий: открыть приложение и увидеть доступное дело сейчас. Mac первый; телефон позже. Занятия из Modeus, задания из чата, AI по запросу. Приблизительный объём нужен для раннего риска, а не обязательного бюджета часов.
 
-Читать по порядку: [видение](01-vision.md) → [функционал](02-calendar-spec.md) → [границы](03-out-of-scope.md) → [приёмка](04-acceptance-scenarios.md) → [стек](07-stack-options.md) → [план](11-implementation-plan.md).
+Читать по порядку: [видение](01-vision.md) → [функционал](02-calendar-spec.md) → [границы](03-out-of-scope.md) → [приёмка](04-acceptance-scenarios.md) → [стек](07-stack-options.md) → [план и выпуски](11-implementation-plan.md) → [карта экранов](12-screen-map.md) → [пробы интеграций](13-integration-probes.md).
 
 Правила: [формат](10-rules-format.md). Цитаты/допущения: [журнал](05-decisions-log.md), [неизвестные](06-open-questions.md). Доказательства: [разведка](00-recon.md), [self-review](08-self-review.md), [независимое ревью](09-review-brief.md).
 

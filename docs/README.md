@@ -9,7 +9,9 @@
 | Решения владельца (цитаты) | [spec/05-decisions-log.md](spec/05-decisions-log.md), [05a](spec/05a-decisions-origin.md), [05b](spec/05b-decisions-workflow.md) |
 | Открытые вопросы и допущения | [spec/06-open-questions.md](spec/06-open-questions.md) |
 | Формат правил важности | [spec/10-rules-format.md](spec/10-rules-format.md) |
-| План этапов | [spec/11-implementation-plan.md](spec/11-implementation-plan.md) |
+| План этапов и выпуски (В1, В2) | [spec/11-implementation-plan.md](spec/11-implementation-plan.md) |
+| Карта экранов: что P0/P1, какой выпуск | [spec/12-screen-map.md](spec/12-screen-map.md) |
+| Пробы интеграций (Codex, Modeus) | [spec/13-integration-probes.md](spec/13-integration-probes.md) |
 | Стек | [adr/0001-stack.md](adr/0001-stack.md) (решение Claude), [spec/07-stack-options.md](spec/07-stack-options.md) (сравнение) |
 | Дизайн-система | [design/c-system/](design/c-system/) (токены, компоненты, движение, доступность, клавиши, macOS) |
 | Экраны | [design/d-screens/index.html](design/d-screens/index.html), передача [design/e-handoff.md](design/e-handoff.md) |
