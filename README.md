@@ -2,10 +2,26 @@
 
 Личный планировщик дел для macOS: открыл приложение и видишь, что делать сейчас, сегодня и позже.
 
-- Продукт и требования: [docs/spec/01-vision.md](docs/spec/01-vision.md)
-- Дизайн (Signal Document): [docs/design/d-screens/index.html](docs/design/d-screens/index.html)
-- Стек и архитектура: [docs/adr/0001-stack.md](docs/adr/0001-stack.md)
-- Правила для агентов: [AGENTS.md](AGENTS.md)
-- Процесс: [docs/process/pipeline.md](docs/process/pipeline.md)
+## Запуск
 
-Статус: окружение и документы готовы, код начинается с задачи «Каркас проекта» (этап 1).
+Требуются Node.js 22 и npm.
+
+```sh
+npm ci
+npm start
+```
+
+## Проверки
+
+```sh
+npm run check
+npm run e2e
+```
+
+`npm run check` выполняет typecheck, ESLint, Stylelint, dependency-cruiser и Vitest по порядку. `npm run e2e` запускает Electron acceptance-тесты Playwright.
+
+## Упаковка
+
+`npm run package` собирает приложение для macOS arm64; `npm run make` создаёт артефакт выпуска.
+
+Документация: [спецификация](docs/spec/01-vision.md), [дизайн](docs/design/d-screens/index.html), [ADR стека](docs/adr/0001-stack.md), [правила для агентов](AGENTS.md), [процесс](docs/process/pipeline.md).
