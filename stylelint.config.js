@@ -1,0 +1,7 @@
+export default {
+  extends: ['stylelint-config-standard'],
+  rules: {
+    'color-no-hex': true,
+    'function-disallowed-list': ['rgb', 'rgba', 'hsl', 'hsla'],
+  },
+};

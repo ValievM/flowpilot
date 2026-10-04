@@ -1,0 +1,56 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.welcome {
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-16);
+  padding: var(--space-48);
+  text-align: center;
+}
+
+.welcome-eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.welcome h1 {
+  margin: 0;
+  font-family: var(--hybrid-display);
+  font-size: var(--hybrid-title);
+  font-weight: 400;
+}
+
+.welcome-copy {
+  margin: 0;
+  font-size: var(--type-body);
+}
+
+.theme-toggle {
+  min-height: var(--control-height);
+  padding-inline: var(--space-16);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.theme-toggle:focus-visible {
+  outline: var(--selection-stroke) solid var(--accent);
+  outline-offset: var(--space-4);
+}
