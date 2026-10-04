@@ -1,0 +1,16 @@
+node_modules/
+out/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+.prompts/
+**/bin/

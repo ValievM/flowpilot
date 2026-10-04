@@ -1,0 +1,178 @@
+[
+  {
+    "id": "today",
+    "title": "Сегодня",
+    "priority": "P0",
+    "html": "today.html",
+    "light": "today-light.png",
+    "dark": "today-dark.png"
+  },
+  {
+    "id": "now",
+    "title": "Сейчас / Фокус",
+    "priority": "P0",
+    "html": "now.html",
+    "light": "now-light.png",
+    "dark": "now-dark.png"
+  },
+  {
+    "id": "week",
+    "title": "Неделя",
+    "priority": "обзор",
+    "html": "week.html",
+    "light": "week-light.png",
+    "dark": "week-dark.png"
+  },
+  {
+    "id": "day",
+    "title": "День",
+    "priority": "P0",
+    "html": "day.html",
+    "light": "day-light.png",
+    "dark": "day-dark.png"
+  },
+  {
+    "id": "inbox",
+    "title": "Все задачи / Inbox",
+    "priority": "P0",
+    "html": "inbox.html",
+    "light": "inbox-light.png",
+    "dark": "inbox-dark.png"
+  },
+  {
+    "id": "board",
+    "title": "Доска",
+    "priority": "P0",
+    "html": "board.html",
+    "light": "board-light.png",
+    "dark": "board-dark.png"
+  },
+  {
+    "id": "task",
+    "title": "Задача: детали и редактирование",
+    "priority": "P0",
+    "html": "task.html",
+    "light": "task-light.png",
+    "dark": "task-dark.png"
+  },
+  {
+    "id": "quick-add",
+    "title": "Cmd+K",
+    "priority": "P0",
+    "html": "quick-add.html",
+    "light": "quick-add-light.png",
+    "dark": "quick-add-dark.png"
+  },
+  {
+    "id": "ai-suggestion",
+    "title": "AI-подсказка",
+    "priority": "P0",
+    "html": "ai-suggestion.html",
+    "light": "ai-suggestion-light.png",
+    "dark": "ai-suggestion-dark.png"
+  },
+  {
+    "id": "ai-confirm",
+    "title": "Подтверждение создания",
+    "priority": "P0",
+    "html": "ai-confirm.html",
+    "light": "ai-confirm-light.png",
+    "dark": "ai-confirm-dark.png"
+  },
+  {
+    "id": "chat",
+    "title": "Чат с AI",
+    "priority": "P0",
+    "html": "chat.html",
+    "light": "chat-light.png",
+    "dark": "chat-dark.png"
+  },
+  {
+    "id": "replan",
+    "title": "Перестройка: до и после",
+    "priority": "P0",
+    "html": "replan.html",
+    "light": "replan-light.png",
+    "dark": "replan-dark.png"
+  },
+  {
+    "id": "replan-stale",
+    "title": "Устаревшее предложение",
+    "priority": "P0",
+    "html": "replan-stale.html",
+    "light": "replan-stale-light.png",
+    "dark": "replan-stale-dark.png"
+  },
+  {
+    "id": "settings",
+    "title": "Настройки",
+    "priority": "P0",
+    "html": "settings.html",
+    "light": "settings-light.png",
+    "dark": "settings-dark.png"
+  },
+  {
+    "id": "rules",
+    "title": "Правила и привязки",
+    "priority": "P0",
+    "html": "rules.html",
+    "light": "rules-light.png",
+    "dark": "rules-dark.png"
+  },
+  {
+    "id": "empty",
+    "title": "Пустой день",
+    "priority": "P0",
+    "html": "empty.html",
+    "light": "empty-light.png",
+    "dark": "empty-dark.png"
+  },
+  {
+    "id": "blocked",
+    "title": "Нет доступных задач",
+    "priority": "P0",
+    "html": "blocked.html",
+    "light": "blocked-light.png",
+    "dark": "blocked-dark.png"
+  },
+  {
+    "id": "loading",
+    "title": "Обновление без потери контекста",
+    "priority": "P0",
+    "html": "loading.html",
+    "light": "loading-light.png",
+    "dark": "loading-dark.png"
+  },
+  {
+    "id": "error-source",
+    "title": "Ошибка Modeus",
+    "priority": "P0",
+    "html": "error-source.html",
+    "light": "error-source-light.png",
+    "dark": "error-source-dark.png"
+  },
+  {
+    "id": "error-ai",
+    "title": "AI недоступен",
+    "priority": "P0",
+    "html": "error-ai.html",
+    "light": "error-ai-light.png",
+    "dark": "error-ai-dark.png"
+  },
+  {
+    "id": "error-rule",
+    "title": "Ошибка правила",
+    "priority": "P0",
+    "html": "error-rule.html",
+    "light": "error-rule-light.png",
+    "dark": "error-rule-dark.png"
+  },
+  {
+    "id": "menu-bar",
+    "title": "Меню-бар",
+    "priority": "P1-концепт",
+    "html": "menu-bar.html",
+    "light": "menu-bar-light.png",
+    "dark": "menu-bar-dark.png"
+  }
+]
