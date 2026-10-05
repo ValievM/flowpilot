@@ -52,6 +52,27 @@ afterEach(() => {
 });
 
 describe('Repository history and undo', () => {
+  it('keeps history pages bounded for negative, zero, and positive limits', () => {
+    const { repository } = openRepository();
+    repository.apply([{ kind: 'task.create', task: task('task-1', 'A') }], 0);
+    repository.apply([{ kind: 'task.create', task: task('task-2', 'B') }], 1);
+    repository.apply([{ kind: 'task.create', task: task('task-3', 'C') }], 2);
+    const newest = repository.history(1).entries[0];
+    if (!newest) throw new Error('Expected newest history entry');
+
+    expect(repository.history(-1).entries).toEqual([]);
+    expect(repository.history(-1, newest.id).entries).toEqual([]);
+    expect(repository.history(0).entries).toEqual([]);
+    expect(repository.history(0, newest.id).entries).toEqual([]);
+    expect(repository.history(1).entries).toMatchObject([
+      { revision: 3, entities: [{ id: 'task-3' }] },
+    ]);
+    expect(repository.history(1, newest.id).entries).toMatchObject([
+      { revision: 2, entities: [{ id: 'task-2' }] },
+    ]);
+    expect(repository.history(10).entries).toHaveLength(3);
+    repository.close();
+  });
   it('records a task creation and undoes it as a new persistent entry', () => {
     const { repository, path } = openRepository();
     expect(

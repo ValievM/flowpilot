@@ -43,17 +43,18 @@ export function readHistory(
   limit: number,
   before?: string,
 ): readonly HistoryEntry[] {
+  const pageSize = Math.max(0, limit);
   const rows = before
     ? database
         .prepare(
           'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log WHERE revision < (SELECT revision FROM change_log WHERE id = ?) ORDER BY revision DESC LIMIT ?',
         )
-        .all(before, limit)
+        .all(before, pageSize)
     : database
         .prepare(
           'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT ?',
         )
-        .all(limit);
+        .all(pageSize);
   return (
     rows as {
       id: string;
