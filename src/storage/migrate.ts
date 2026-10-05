@@ -1,0 +1,40 @@
+import { copyFileSync } from 'node:fs';
+import type Database from 'better-sqlite3';
+import initialSchema from './migrations/0001_init.sql?raw';
+
+const MIGRATIONS = [{ version: 1, sql: initialSchema }] as const;
+
+export function migrate(database: Database.Database, path: string): void {
+  const current = readUserVersion(database);
+  const latest = MIGRATIONS.at(-1)?.version ?? 0;
+  if (current > latest)
+    throw new Error(
+      `Database version ${String(current)} is newer than supported version ${String(latest)}`,
+    );
+  if (current === latest) return;
+  if (hasUserTables(database)) {
+    database.pragma('wal_checkpoint(FULL)');
+    copyFileSync(path, `${path}.bak-v${String(current)}`);
+  }
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= current) continue;
+    database.transaction(() => {
+      database.exec(migration.sql);
+      database.pragma(`user_version = ${String(migration.version)}`);
+    })();
+  }
+}
+
+function readUserVersion(database: Database.Database): number {
+  const rows = database.pragma('user_version') as { user_version: number }[];
+  return rows[0]?.user_version ?? 0;
+}
+
+function hasUserTables(database: Database.Database): boolean {
+  const row = database
+    .prepare(
+      "SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1",
+    )
+    .get() as { present?: number } | undefined;
+  return row !== undefined;
+}
