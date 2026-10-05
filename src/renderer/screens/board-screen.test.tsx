@@ -28,9 +28,7 @@ describe('board task movement', () => {
   it('moves a selected task through the move menu using the current revision', async () => {
     const value = renderBoard();
     await screen.findByText('Написать отчёт');
-    fireEvent.change(screen.getByRole('combobox', { name: /Переместить в/ }), {
-      target: { value: 'doing' },
-    });
+    await selectMove('Делаю');
     await waitFor(() => {
       expect(value.applyMock).toHaveBeenCalledWith({
         commands: [
@@ -49,9 +47,10 @@ describe('board task movement', () => {
   it('allows keyboard selection in the move menu', async () => {
     const value = renderBoard();
     await screen.findByText('Написать отчёт');
-    const menu = screen.getByRole('combobox', { name: /Переместить в/ });
+    const menu = screen.getByRole('button', { name: 'Переместить в…' });
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    fireEvent.change(menu, { target: { value: 'done' } });
+    const target = await screen.findByRole('menuitem', { name: 'Готово' });
+    fireEvent.keyDown(target, { key: 'Enter' });
     await waitFor(() => {
       expect(value.applyMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -81,9 +80,7 @@ describe('board task movement', () => {
   it('requires a non-empty reason before moving into waiting', async () => {
     const value = renderBoard();
     await screen.findByText('Написать отчёт');
-    fireEvent.change(screen.getByRole('combobox', { name: /Переместить в/ }), {
-      target: { value: 'waiting' },
-    });
+    await selectMove('Ожидание');
     const move = await screen.findByRole('button', { name: 'Переместить' });
     expect(move).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/Причина/), {
@@ -185,9 +182,7 @@ describe('board task movement', () => {
     value.applyMock.mockResolvedValue({ ok: false, error: 'StaleRevision' });
     renderBoard(value);
     await screen.findByText('Написать отчёт');
-    fireEvent.change(screen.getByRole('combobox', { name: /Переместить в/ }), {
-      target: { value: 'doing' },
-    });
+    await selectMove('Делаю');
     expect(
       await screen.findByText(/Показаны актуальные данные/),
     ).toBeInTheDocument();
@@ -207,9 +202,7 @@ describe('board task movement', () => {
     value.applyMock.mockResolvedValue({ ok: false, error: 'StaleRevision' });
     renderBoard(value);
     await screen.findByText('Написать отчёт');
-    fireEvent.change(screen.getByRole('combobox', { name: /Переместить в/ }), {
-      target: { value: 'doing' },
-    });
+    await selectMove('Делаю');
     expect(
       await screen.findByText(/Актуальные данные загрузить не удалось/),
     ).toBeInTheDocument();
@@ -218,3 +211,11 @@ describe('board task movement', () => {
     );
   });
 });
+
+async function selectMove(columnName: string): Promise<void> {
+  const trigger = screen.getByRole('button', { name: 'Переместить в…' });
+  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+  fireEvent.pointerUp(trigger, { button: 0 });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole('menuitem', { name: columnName }));
+}

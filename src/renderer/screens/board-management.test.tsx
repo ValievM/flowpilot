@@ -19,6 +19,29 @@ describe('board columns and empty states', () => {
     expect(await screen.findByRole('article')).toHaveTextContent(title);
   });
 
+  it('moves a task from the Radix menu to the selected column', async () => {
+    const api = createBoardApi();
+    renderBoard(api);
+    const menu = await screen.findByRole('button', { name: 'Переместить в…' });
+    fireEvent.pointerDown(menu, { button: 0, ctrlKey: false });
+    fireEvent.pointerUp(menu, { button: 0 });
+    fireEvent.click(menu);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Делаю' }));
+    await waitFor(() => {
+      expect(api.applyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commands: [
+            expect.objectContaining({
+              kind: 'task.move',
+              id: 'task',
+              columnId: 'doing',
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
   it('gives task cards and move controls accessible names', async () => {
     renderBoard();
     expect(
@@ -28,8 +51,8 @@ describe('board columns and empty states', () => {
       screen.getByRole('button', { name: 'Добавить колонку' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('combobox', { name: /Переместить в/ }),
-    ).toBeInTheDocument();
+      screen.getAllByRole('button', { name: 'Переместить в…' }),
+    ).toHaveLength(1);
   });
 
   it('shows empty hints for columns without tasks', async () => {

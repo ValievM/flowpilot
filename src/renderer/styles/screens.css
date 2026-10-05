@@ -125,13 +125,43 @@
   line-height: var(--type-line-body);
 }
 
-.board-move-label,
 .board-removal label {
   color: var(--muted);
   font-size: var(--type-secondary);
 }
 
-.board-screen select,
+.board-move-trigger {
+  min-height: var(--control-height);
+  padding: var(--space-8);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.board-move-menu {
+  z-index: 3;
+  min-width: var(--panel-min);
+  padding: var(--space-4);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.board-move-item {
+  padding: var(--space-8);
+  border-radius: var(--r1);
+  cursor: pointer;
+}
+
+.board-move-item[data-highlighted] {
+  outline: var(--stroke) solid var(--accent);
+  background: var(--subtle);
+}
+
 .board-dialog input,
 .board-dialog textarea {
   width: 100%;

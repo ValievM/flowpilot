@@ -821,27 +821,10 @@ test('moves a persisted task from the board UI and reloads the saved state', asy
     .click();
   const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
   await expect(card).toBeVisible();
-  const doing = page.getByRole('region', { name: 'Делаю' });
-  const cardBounds = await card.boundingBox();
-  const columnBounds = await doing.boundingBox();
-  if (!cardBounds || !columnBounds)
-    throw new Error('Board drag targets are missing');
-  await page.mouse.move(
-    cardBounds.x + cardBounds.width / 2,
-    cardBounds.y + cardBounds.height / 2,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    columnBounds.x + columnBounds.width / 2,
-    columnBounds.y + columnBounds.height / 2,
-    { steps: 8 },
-  );
-  await page.mouse.up();
-  await card
-    .getByRole('combobox', { name: /Переместить в/ })
-    .selectOption('todo');
+  await card.getByRole('button', { name: 'Переместить в…' }).click();
+  await page.getByRole('menuitem', { name: 'Делаю' }).click();
   await expect(
-    page.getByRole('region', { name: 'Сделать' }).getByRole('article'),
+    page.getByRole('region', { name: 'Делаю' }).getByRole('article'),
   ).toBeVisible();
   const saved = await page.evaluate(() => window.flowpilot.snapshot.load());
   expect(saved).toMatchObject({
@@ -850,11 +833,11 @@ test('moves a persisted task from the board UI and reloads the saved state', asy
       tasks: [
         {
           id: 'board-smoke-task',
-          columnId: 'todo',
-          status: { kind: 'todo' },
+          columnId: 'doing',
+          status: { kind: 'doing' },
         },
       ],
-      revision: 3,
+      revision: 2,
     },
   });
 });

@@ -1,3 +1,4 @@
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import React from 'react';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardRiskMark } from './board-risk-mark';
@@ -201,27 +202,31 @@ function BoardMoveMenu({
   onMove: (taskId: string, column: Column) => void;
 }): React.JSX.Element {
   return (
-    <>
-      <label className="board-move-label" htmlFor={`move-${task.id}`}>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger className="board-move-trigger">
         Переместить в…
-      </label>
-      <select
-        id={`move-${task.id}`}
-        value=""
-        onChange={(event) => {
-          const target = columns.find((item) => item.id === event.target.value);
-          if (target) onMove(task.id, target);
-        }}
-      >
-        <option value="">Выберите колонку</option>
-        {columns
-          .filter((item) => item.id !== column.id)
-          .map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-      </select>
-    </>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="board-move-menu"
+          aria-label={`Переместить задачу «${task.title}» в`}
+          align="start"
+        >
+          {columns
+            .filter((item) => item.id !== column.id)
+            .map((item) => (
+              <DropdownMenu.Item
+                key={item.id}
+                className="board-move-item"
+                onSelect={() => {
+                  onMove(task.id, item);
+                }}
+              >
+                {item.name}
+              </DropdownMenu.Item>
+            ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
