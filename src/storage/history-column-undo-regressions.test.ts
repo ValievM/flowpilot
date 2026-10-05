@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Database from 'better-sqlite3';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Repository } from './repository';
@@ -63,6 +64,38 @@ function createTask(
 }
 
 describe('column undo regressions', () => {
+  it('undoes a legacy v5 column deletion after reopening the database', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-column-undo-v5-'));
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    let repository = new Repository(path, clock);
+    createColumn(repository, 'custom', 0);
+    repository.apply([{ kind: 'column.delete', id: 'custom' }], 1);
+    const deletion = repository
+      .history(10)
+      .entries.find(({ revision }) => revision === 2);
+    if (!deletion) throw new Error('Expected column deletion history');
+    repository.close();
+
+    const legacyDatabase = new Database(path);
+    legacyDatabase
+      .prepare(
+        "UPDATE change_log_entities SET version_after = NULL WHERE entry_id = ? AND entity_kind = 'column'",
+      )
+      .run(deletion.id);
+    legacyDatabase.close();
+
+    repository = new Repository(path, clock);
+    expect(repository.undo(deletion.id)).toEqual({
+      ok: true,
+      value: { revision: 3 },
+    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'custom' }),
+    );
+    repository.close();
+  });
+
   it('distinguishes tombstones after deleting a reused column id', () => {
     const repository = openRepository();
     createColumn(repository, 'custom', 0);

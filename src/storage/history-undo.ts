@@ -215,17 +215,28 @@ function readEntryEntities(
   return rows.map((row) => {
     const kind = entityKind(row.entity_kind);
     const ref = { kind, id: row.entity_id, state: null, version: null };
+    const beforeVersion = versionFromState(
+      row.entity_kind,
+      row.state_before_json,
+    );
+    const afterVersion =
+      row.version_after ??
+      (kind === 'column' &&
+      row.state_after_json === null &&
+      beforeVersion !== null
+        ? beforeVersion + 1
+        : null);
     return {
       ref,
       before: {
         ...ref,
         state: row.state_before_json,
-        version: versionFromState(row.entity_kind, row.state_before_json),
+        version: beforeVersion,
       },
       after: {
         ...ref,
         state: row.state_after_json,
-        version: row.version_after,
+        version: afterVersion,
       },
     };
   });
