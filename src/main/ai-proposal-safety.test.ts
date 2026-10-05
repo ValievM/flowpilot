@@ -126,6 +126,134 @@ describe('AI task safety contract', () => {
     expect(result.rejectedCommands[0]?.reason).toBe('waiting-reason-required');
   });
 
+  it('accepts commands that reference a task created earlier in the proposal', () => {
+    const create = {
+      kind: 'task.create',
+      task: { id: 'created', title: 'Created', columnId: 'todo', subtasks: [] },
+    };
+    const update = {
+      kind: 'task.update',
+      id: 'created',
+      changes: { title: 'Updated' },
+    };
+    const result = validateProposal(proposal([create, update]), snapshot);
+
+    expect(result.validCommands).toEqual([create, update]);
+    expect(result.rejectedCommands).toEqual([]);
+  });
+  it('rejects nested IDs repeated within a proposal while preserving independent commands', () => {
+    const commands = [
+      {
+        kind: 'subtask.add',
+        taskId: 'task-1',
+        subtask: { id: 'new-subtask', title: 'First', completed: false },
+      },
+      {
+        kind: 'subtask.add',
+        taskId: 'task-1',
+        subtask: { id: 'new-subtask', title: 'Duplicate', completed: false },
+      },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'new-comment', text: 'First' },
+      },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'new-comment', text: 'Duplicate' },
+      },
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ];
+    const result = validateProposal(proposal(commands), snapshot);
+
+    expect(result.validCommands).toEqual([
+      commands[0],
+      commands[2],
+      commands[4],
+    ]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 1, kind: 'subtask.add', reason: 'subtask-id-conflict' },
+      { index: 3, kind: 'comment.add', reason: 'comment-id-conflict' },
+    ]);
+  });
+
+  it('rejects duplicate nested ids while preserving independent commands', () => {
+    const currentSnapshot = {
+      ...snapshot,
+      tasks: [
+        {
+          ...task,
+          subtasks: [
+            { id: 'sub-existing', title: 'Existing', completed: false },
+          ],
+          comments: [{ id: 'comment-existing', text: 'Existing' }],
+        },
+      ],
+    };
+    const commands = [
+      {
+        kind: 'subtask.add',
+        taskId: 'task-1',
+        subtask: { id: 'sub-existing', title: 'Duplicate', completed: false },
+      },
+      {
+        kind: 'subtask.add',
+        taskId: 'task-1',
+        subtask: { id: 'sub-new', title: 'New', completed: false },
+      },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'comment-existing', text: 'Duplicate' },
+      },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'comment-new', text: 'New' },
+      },
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ];
+    const result = validateProposal(proposal(commands), currentSnapshot);
+
+    expect(result.validCommands).toEqual([
+      commands[1],
+      commands[3],
+      commands[4],
+    ]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'subtask.add', reason: 'subtask-id-conflict' },
+      { index: 2, kind: 'comment.add', reason: 'comment-id-conflict' },
+    ]);
+  });
+
+  it('rejects duplicate nested ids within a task creation', () => {
+    const create = {
+      kind: 'task.create',
+      task: {
+        id: 'created',
+        title: 'Created',
+        columnId: 'todo',
+        subtasks: [
+          { id: 'same-subtask', title: 'One', completed: false },
+          { id: 'same-subtask', title: 'Two', completed: false },
+        ],
+        comment: { id: 'same-comment', text: 'Comment' },
+      },
+    };
+    const independent = {
+      kind: 'task.setAiRank',
+      taskId: 'task-1',
+      rank: 2,
+    };
+    const result = validateProposal(proposal([create, independent]), snapshot);
+
+    expect(result.validCommands).toEqual([independent]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'task.create', reason: 'subtask-id-conflict' },
+    ]);
+  });
+
   it('rejects duplicate task ids in one proposal without changing snapshot tasks', () => {
     const beforeTasks = structuredClone(snapshot.tasks);
     const commands = [

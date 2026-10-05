@@ -1,11 +1,4 @@
-import type {
-  Discipline,
-  RulesDocument,
-  Task,
-  TaskColumn,
-  TaskType,
-} from '../domain';
-import { parseRulesJson, validateRulesDocument } from '../domain';
+import type { Task } from '../domain';
 import {
   aiCommandSchema,
   proposalSchema,
@@ -15,16 +8,13 @@ import {
   type AiTaskCreation,
   type Proposal,
 } from '../shared/ai-commands';
-
-export interface AiSnapshot {
-  readonly revision: number;
-  readonly ruleVersions: Readonly<Record<string, string>>;
-  readonly tasks: readonly Task[];
-  readonly columns: readonly TaskColumn[];
-  readonly taskTypes: readonly TaskType[];
-  readonly disciplines: readonly Discipline[];
-  readonly rules: readonly RulesDocument[];
-}
+import {
+  createValidationState,
+  recordCommandIds,
+  validateCommand,
+  type AiSnapshot,
+} from './ai-proposal-validation';
+export type { AiSnapshot } from './ai-proposal-validation';
 
 export interface RejectedAiCommand {
   readonly index: number;
@@ -79,7 +69,7 @@ export function validateProposal(
   }
   const validCommands: AiCommand[] = [];
   const rejectedCommands: RejectedAiCommand[] = [];
-  const knownTaskIds = new Set(snapshot.tasks.map((task) => task.id));
+  const state = createValidationState(snapshot);
   parsed.data.commands.forEach((candidate, index) => {
     const parsedCommand = aiCommandSchema.safeParse(candidate);
     if (!parsedCommand.success) {
@@ -91,13 +81,13 @@ export function validateProposal(
       return;
     }
     const command = parsedCommand.data;
-    const reason = validateCommand(command, snapshot, knownTaskIds);
+    const reason = validateCommand(command, state);
     if (reason) {
       rejectedCommands.push({ index, kind: command.kind, reason });
       return;
     }
     validCommands.push(command);
-    if (command.kind === 'task.create') knownTaskIds.add(command.task.id);
+    recordCommandIds(command, state);
   });
   return { validCommands, rejectedCommands };
 }
@@ -106,15 +96,6 @@ function commandKind(command: unknown): string {
   if (typeof command !== 'object' || command === null || !('kind' in command))
     return 'unknown';
   return typeof command.kind === 'string' ? command.kind : 'unknown';
-}
-function validateCommand(
-  command: AiCommand,
-  snapshot: AiSnapshot,
-  knownTaskIds: ReadonlySet<string>,
-): string | undefined {
-  return hasMissingTask(command, snapshot)
-    ? 'task-not-found'
-    : validateCommandKind(command, snapshot, knownTaskIds);
 }
 
 export function toStorageCommands(
@@ -135,89 +116,6 @@ export function toStorageCommands(
   return { commands: plannedCommands, source: 'ai' };
 }
 
-function hasMissingTask(command: AiCommand, snapshot: AiSnapshot): boolean {
-  const taskId = taskIdFor(command);
-  return (
-    taskId !== undefined && !snapshot.tasks.some((task) => task.id === taskId)
-  );
-}
-
-function validateCommandKind(
-  command: AiCommand,
-  snapshot: AiSnapshot,
-  knownTaskIds: ReadonlySet<string>,
-): string | undefined {
-  switch (command.kind) {
-    case 'task.create':
-      return validateCreatedTask(command.task, snapshot, knownTaskIds);
-    case 'task.update':
-      return undefined;
-    case 'task.move':
-      return validateMove(command, snapshot.columns);
-    case 'subtask.add':
-    case 'comment.add':
-    case 'task.setAiRank':
-      return undefined;
-    case 'task.classify':
-      return validateClassification(command, snapshot);
-    case 'rule.import':
-      return validateRuleImport(command.documentJson, snapshot);
-    case 'rule.activate':
-      return validateRuleActivation(command.ruleId, snapshot.rules);
-  }
-}
-
-function validateRuleActivation(
-  ruleId: string,
-  rules: readonly RulesDocument[],
-): string | undefined {
-  return rules.some((rule) => rule.id === ruleId)
-    ? undefined
-    : 'rule-not-found';
-}
-
-function taskIdFor(command: AiCommand): string | undefined {
-  switch (command.kind) {
-    case 'task.create':
-    case 'rule.import':
-    case 'rule.activate':
-      return undefined;
-    case 'task.update':
-    case 'task.move':
-      return command.id;
-    case 'subtask.add':
-    case 'comment.add':
-    case 'task.classify':
-    case 'task.setAiRank':
-      return command.taskId;
-  }
-}
-
-function validateCreatedTask(
-  task: AiTaskCreation,
-  snapshot: AiSnapshot,
-  knownTaskIds: ReadonlySet<string>,
-): string | undefined {
-  if (knownTaskIds.has(task.id)) return 'task-id-conflict';
-  const column = snapshot.columns.find(
-    (candidate) => candidate.id === task.columnId,
-  );
-  if (!column) return 'column-not-found';
-  if (
-    task.typeId &&
-    !snapshot.taskTypes.some((type) => type.id === task.typeId)
-  )
-    return 'type-not-found';
-  if (
-    task.disciplineId &&
-    !snapshot.disciplines.some(
-      (discipline) => discipline.id === task.disciplineId,
-    )
-  )
-    return 'discipline-not-found';
-  return column.state === 'waiting' ? 'waiting-reason-required' : undefined;
-}
-
 function buildTask(
   task: AiTaskCreation,
   snapshot: AiSnapshot,
@@ -236,63 +134,4 @@ function buildTask(
     attachments: [],
     addedOrder,
   };
-}
-
-function validateMove(
-  command: Extract<AiCommand, { kind: 'task.move' }>,
-  columns: readonly TaskColumn[],
-): string | undefined {
-  const column = columns.find((candidate) => candidate.id === command.columnId);
-  if (!column) return 'column-not-found';
-  const status = command.status;
-  if (
-    column.state === 'waiting' &&
-    (!status || status.kind !== 'waiting' || !status.reason.trim())
-  )
-    return 'waiting-reason-required';
-  if (status && status.kind !== column.state) return 'status-column-mismatch';
-  return undefined;
-}
-
-function validateClassification(
-  command: Extract<AiCommand, { kind: 'task.classify' }>,
-  snapshot: AiSnapshot,
-): string | undefined {
-  if (
-    command.typeId &&
-    !snapshot.taskTypes.some((type) => type.id === command.typeId)
-  )
-    return 'type-not-found';
-  if (
-    command.disciplineId &&
-    !snapshot.disciplines.some(
-      (discipline) => discipline.id === command.disciplineId,
-    )
-  )
-    return 'discipline-not-found';
-  return undefined;
-}
-
-function validateRuleImport(
-  documentJson: string,
-  snapshot: AiSnapshot,
-): string | undefined {
-  const parsed = parseRulesJson(documentJson);
-  if (!parsed.ok) return 'invalid-rule-document';
-  const validated = validateRulesDocument(parsed.value);
-  if (!validated.ok) return 'invalid-rule-document';
-  const document = validated.document;
-  if (
-    document.scope.task_type_ids.some(
-      (id) => !snapshot.taskTypes.some((type) => type.id === id),
-    )
-  )
-    return 'type-not-found';
-  if (
-    (document.scope.discipline_ids ?? []).some(
-      (id) => !snapshot.disciplines.some((discipline) => discipline.id === id),
-    )
-  )
-    return 'discipline-not-found';
-  return undefined;
 }
