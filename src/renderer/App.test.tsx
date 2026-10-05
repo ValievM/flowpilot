@@ -206,6 +206,7 @@ describe('persisted today and now screens', () => {
     mockSystemTheme(false);
     const fake = fakeApi();
     fake.setLoadFailure();
+    const load = vi.spyOn(fake.api.snapshot, 'load');
     Object.defineProperty(window, 'flowpilot', {
       configurable: true,
       value: fake.api,
@@ -217,6 +218,9 @@ describe('persisted today and now screens', () => {
     );
     fake.setLoadFailure(false);
     fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(2);
+    });
     expect(
       await screen.findByRole('heading', { name: 'Сегодня пока пусто' }),
     ).toBeVisible();
