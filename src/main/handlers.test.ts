@@ -64,6 +64,10 @@ describe('IPC handlers', () => {
       ok: false,
       error: 'ValidationFailed',
     });
+    expect(
+      applyCommands({ commands: [], expectedRevision: 0 }, { repository }),
+    ).toMatchObject({ ok: true, value: { revision: 0 } });
+    expect(repository.load().revision).toBe(0);
     repository.close();
   });
 

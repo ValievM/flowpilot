@@ -82,6 +82,15 @@ export class Repository {
     expectedRevision: number,
     options: { source?: 'user' | 'ai' } = {},
   ): ApplyResult {
+    if (commands.length === 0) {
+      const actual = readRevision(this.database);
+      if (actual !== expectedRevision)
+        return {
+          ok: false,
+          error: { kind: 'StaleRevision', expected: expectedRevision, actual },
+        };
+      return { ok: true, value: { revision: actual } };
+    }
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
     );

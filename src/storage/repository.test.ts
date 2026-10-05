@@ -109,6 +109,30 @@ describe('Repository', () => {
     repository.close();
   });
 
+  it('does not let an empty command batch intercept undo of a real change', () => {
+    const { repository } = openRepository();
+    expect(
+      repository.apply(
+        [{ kind: 'setting.set', key: 'workdays', value: [1, 2, 3] }],
+        0,
+      ),
+    ).toMatchObject({ ok: true, value: { revision: 1 } });
+    const historyAfterChange = repository.history(10).entries;
+
+    const emptyBatch = repository.apply([], 1);
+    expect(emptyBatch).toEqual({ ok: true, value: { revision: 1 } });
+    expect(repository.load().revision).toBe(1);
+    expect(repository.history(10).entries).toEqual(historyAfterChange);
+
+    expect(repository.undo()).toMatchObject({
+      ok: true,
+      value: { revision: 2 },
+    });
+    expect(repository.load().settings.workdays).toEqual([1, 2, 3, 4, 5]);
+    expect(repository.history(10).entries).toHaveLength(2);
+    repository.close();
+  });
+
   it('requires a target to delete a non-empty column and moves its tasks when supplied', () => {
     const { repository } = openRepository();
     const task = {
