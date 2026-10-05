@@ -1,11 +1,63 @@
-import { app, BrowserWindow, nativeTheme } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { Repository } from '../storage';
+import { registerIpcHandlers } from './ipc-handlers';
+import { selectRuntimeOptions } from './runtime';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-const createWindow = (): void => {
-  const window = new BrowserWindow({
+let mainWindow: BrowserWindow | undefined;
+let repository: Repository | undefined;
+const runtime = selectRuntimeOptions(
+  app.isPackaged,
+  process.env,
+  app.getPath('userData'),
+);
+if (runtime.profilePath !== app.getPath('userData'))
+  app.setPath('userData', runtime.profilePath);
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+  void app
+    .whenReady()
+    .then(() => {
+      nativeTheme.themeSource = 'system';
+      mkdirSync(runtime.profilePath, { recursive: true });
+      repository = new Repository(
+        path.join(runtime.profilePath, 'flowpilot.db'),
+        runtime.clock,
+      );
+      registerIpcHandlers(ipcMain, {
+        repository,
+        appInfo: {
+          getName: () => app.getName(),
+          getVersion: () => app.getVersion(),
+        },
+      });
+      createWindow();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    })
+    .catch(() => {
+      app.quit();
+    });
+}
+
+app.on('will-quit', () => repository?.close());
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -18,27 +70,10 @@ const createWindow = (): void => {
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    void window.loadFile(
+    void mainWindow.loadFile(
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
-};
-
-void app
-  .whenReady()
-  .then(() => {
-    nativeTheme.themeSource = 'system';
-    createWindow();
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    });
-  })
-  .catch(() => {
-    app.quit();
-  });
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+}
