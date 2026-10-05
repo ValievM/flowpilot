@@ -149,7 +149,10 @@ describe('Repository attachment history', () => {
     const historyBefore = repository.history(10);
     rmSync(join(directory, 'attachments', attachment.id));
 
-    expect(repository.undo(entry.id)).toMatchObject({ ok: false });
+    expect(repository.undo(entry.id)).toMatchObject({
+      ok: false,
+      error: { kind: 'NotUndoable' },
+    });
     expect(repository.load()).toEqual(before);
     expect(repository.history(10)).toEqual(historyBefore);
     expect(existsSync(join(directory, 'attachments', attachment.id))).toBe(
