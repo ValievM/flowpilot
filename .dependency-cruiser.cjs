@@ -24,6 +24,16 @@ module.exports = {
       },
     },
     {
+      name: 'shared-type-only-approved-sources',
+      severity: 'error',
+      from: { path: '^src/shared' },
+      to: {
+        path: '^src',
+        pathNot: '^src/(shared|domain|storage)(/|$)',
+        dependencyTypes: ['type-only'],
+      },
+    },
+    {
       name: 'shared-only-approved-packages',
       severity: 'error',
       from: { path: '^src/shared' },
@@ -91,6 +101,7 @@ module.exports = {
   options: {
     doNotFollow: { path: 'node_modules' },
     tsConfig: { fileName: 'tsconfig.json' },
+    tsPreCompilationDeps: 'specify',
     enhancedResolveOptions: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     },

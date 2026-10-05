@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { commandSchema } from './command-schema';
+import {
+  ipcCommandSchema,
+  settingFields,
+  validateSettingValue,
+} from './command-schema';
 import type { Task, TaskStatus } from '../domain';
 import type { Snapshot } from '../storage';
 import type { Result } from './ipc-result';
@@ -31,31 +35,18 @@ export const ipcChannels = {
 export const snapshotLoadRequestSchema = z.object({}).strict();
 export const commandsApplyRequestSchema = z
   .object({
-    commands: z.array(commandSchema),
+    commands: z.array(ipcCommandSchema),
     expectedRevision: z.number().int().nonnegative(),
   })
   .strict();
 export const settingsGetRequestSchema = z.object({}).strict();
 export const settingsSetRequestSchema = z
   .object({
-    key: z.string().min(1),
-    value: z.unknown(),
+    ...settingFields,
     expectedRevision: z.number().int().nonnegative(),
   })
   .strict()
-  .superRefine((request, context) => {
-    if (
-      request.key === 'workdays' &&
-      !z
-        .array(z.number().int().min(1).max(7))
-        .min(1)
-        .max(7)
-        .refine((days) => new Set(days).size === days.length)
-        .safeParse(request.value).success
-    ) {
-      context.addIssue({ code: 'custom', message: 'Invalid workdays' });
-    }
-  });
+  .superRefine(validateSettingValue);
 export const appInfoRequestSchema = z.object({}).strict();
 
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;

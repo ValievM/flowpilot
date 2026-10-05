@@ -106,6 +106,94 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('rejects forged attachments without touching storage', () => {
+    const repository = openRepository();
+    const task = {
+      id: 'task-ipc',
+      title: 'Plan',
+      description: '',
+      status: { kind: 'todo' as const },
+      columnId: 'todo',
+      day: '2026-10-05',
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      addedOrder: 0,
+    };
+    applyCommands(
+      { commands: [{ kind: 'task.create', task }], expectedRevision: 0 },
+      { repository },
+    );
+    expect(
+      applyCommands(
+        {
+          commands: [
+            {
+              kind: 'attachment.add',
+              taskId: 'task-ipc',
+              attachment: {
+                id: 'attachment-ipc',
+                name: 'notes.txt',
+                mediaType: 'text/plain',
+                sizeBytes: 12,
+              },
+            },
+          ],
+          expectedRevision: 1,
+        },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(1);
+    expect(repository.load().tasks[0]?.attachments).toEqual([]);
+    repository.close();
+  });
+
+  it('rejects unapproved setting keys through both IPC channels', () => {
+    const repository = openRepository();
+    expect(
+      setSetting(
+        { key: 'theme', value: 'dark', expectedRevision: 0 },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(
+      applyCommands(
+        {
+          commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+          expectedRevision: 0,
+        },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(0);
+    expect(Object.hasOwn(repository.load().settings, 'theme')).toBe(false);
+    repository.close();
+  });
+
+  it('rejects duplicate and out-of-range workdays through both IPC channels', () => {
+    const repository = openRepository();
+    for (const value of [[], [1, 1], [8]]) {
+      expect(
+        setSetting(
+          { key: 'workdays', value, expectedRevision: 0 },
+          { repository },
+        ),
+      ).toEqual({ ok: false, error: 'ValidationFailed' });
+      expect(
+        applyCommands(
+          {
+            commands: [{ kind: 'setting.set', key: 'workdays', value }],
+            expectedRevision: 0,
+          },
+          { repository },
+        ),
+      ).toEqual({ ok: false, error: 'ValidationFailed' });
+    }
+    expect(repository.load().revision).toBe(0);
+    repository.close();
+  });
+
   it('rejects an empty workdays setting', () => {
     const repository = openRepository();
     expect(
