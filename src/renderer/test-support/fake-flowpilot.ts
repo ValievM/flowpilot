@@ -197,22 +197,12 @@ export interface FakeFlowPilot {
   snapshot(): IpcSnapshot;
 }
 
-export function fakeApi(tasks: readonly TestTask[] = []): FakeFlowPilot {
-  const state: FakeState = {
-    current: {
-      columns,
-      tasks,
-      settings: { workdays: [1, 2, 3, 4, 5] },
-      revision: 0,
-    },
-    calls: [],
-    staleOnce: false,
-    rejectAll: false,
-    rejectRetry: false,
-    loadFailure: false,
-    changedByConflict: false,
-  };
-  const api: FlowPilotApi = {
+function fakeApiFor(
+  state: FakeState,
+  clock: () => string | undefined,
+): FlowPilotApi {
+  return {
+    clock: { now: clock },
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
     settings: {
@@ -227,6 +217,27 @@ export function fakeApi(tasks: readonly TestTask[] = []): FakeFlowPilot {
         }),
     },
   };
+}
+
+export function fakeApi(
+  tasks: readonly TestTask[] = [],
+  clock: () => string | undefined = () => undefined,
+): FakeFlowPilot {
+  const state: FakeState = {
+    current: {
+      columns,
+      tasks,
+      settings: { workdays: [1, 2, 3, 4, 5] },
+      revision: 0,
+    },
+    calls: [],
+    staleOnce: false,
+    rejectAll: false,
+    rejectRetry: false,
+    loadFailure: false,
+    changedByConflict: false,
+  };
+  const api = fakeApiFor(state, clock);
   return {
     api,
     calls: state.calls,

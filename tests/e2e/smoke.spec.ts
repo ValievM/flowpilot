@@ -3,6 +3,11 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+const TEST_NOW = '2026-10-05T12:00:00Z';
+const TODAY_LABEL = `Сегодня, ${new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'long',
+}).format(new Date(TEST_NOW))}`;
 const SNAPSHOT_WINDOW = {
   width: 1280,
   height: 800,
@@ -24,7 +29,7 @@ test.beforeEach(async () => {
     env: {
       ...process.env,
       FLOWPILOT_TEST: '1',
-      FLOWPILOT_TEST_NOW: '2026-10-05T12:00:00Z',
+      FLOWPILOT_TEST_NOW: TEST_NOW,
       FLOWPILOT_TEST_PROFILE: profilePath,
     },
   });
@@ -37,7 +42,7 @@ test.beforeEach(async () => {
     height: SNAPSHOT_WINDOW.height,
   });
   await expect(
-    page.getByRole('heading', { name: 'Сегодня, 5 октября', exact: true }),
+    page.getByRole('heading', { name: TODAY_LABEL, exact: true }),
   ).toBeVisible();
 });
 

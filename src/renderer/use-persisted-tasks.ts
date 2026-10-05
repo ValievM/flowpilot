@@ -12,7 +12,8 @@ export interface PersistedState {
   readonly columns: IpcSnapshot['columns'];
   readonly revision: number;
   readonly workdays: ReadonlySet<number>;
-  readonly error: string | undefined;
+  readonly loadError: string | undefined;
+  readonly commandError: string | undefined;
   readonly isLoading: boolean;
   readonly isSaved: boolean;
   refresh(): Promise<IpcSnapshot | undefined>;
@@ -23,7 +24,12 @@ interface PersistenceControls {
   readonly setSnapshot: React.Dispatch<
     React.SetStateAction<IpcSnapshot | undefined>
   >;
-  readonly setError: React.Dispatch<React.SetStateAction<string | undefined>>;
+  readonly setLoadError: React.Dispatch<
+    React.SetStateAction<string | undefined>
+  >;
+  readonly setCommandError: React.Dispatch<
+    React.SetStateAction<string | undefined>
+  >;
   readonly setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setSaved: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -72,10 +78,10 @@ function useSnapshotRefresh(api: FlowPilotApi, controls: PersistenceControls) {
       const result = await api.snapshot.load();
       if (!result.ok) throw new Error('snapshot');
       controls.setSnapshot(result.value);
-      controls.setError(undefined);
+      controls.setLoadError(undefined);
       return result.value;
     } catch {
-      controls.setError(
+      controls.setLoadError(
         'Не удалось загрузить сохранённые задачи. Проверьте приложение и попробуйте снова.',
       );
       return undefined;
@@ -107,7 +113,7 @@ function useCommandApply(
   return React.useCallback(
     async (commands: CommandsApplyRequest['commands']): Promise<boolean> => {
       if (!snapshot) {
-        controls.setError(
+        controls.setCommandError(
           'Задачи ещё не загружены. Попробуйте снова после загрузки.',
         );
         return false;
@@ -123,16 +129,19 @@ function useCommandApply(
           : result.error === 'StaleRevision'
             ? await refresh()
             : undefined;
-        if (!fresh) throw new Error('apply');
+        if (!fresh) {
+          controls.setSaved(true);
+          return false;
+        }
         const saved = result.ok
           ? fresh
           : await applyAfterStale(api, commands, fresh);
         controls.setSnapshot(saved);
         controls.setSaved(true);
-        controls.setError(undefined);
+        controls.setCommandError(undefined);
         return true;
       } catch {
-        controls.setError(
+        controls.setCommandError(
           'Сохранение не удалось. Данные не изменены; попробуйте снова.',
         );
         return false;
@@ -163,12 +172,19 @@ export function usePersistedTasks(
   api: FlowPilotApi = window.flowpilot,
 ): PersistedState {
   const [snapshot, setSnapshot] = React.useState<IpcSnapshot>();
-  const [error, setError] = React.useState<string>();
+  const [loadError, setLoadError] = React.useState<string>();
+  const [commandError, setCommandError] = React.useState<string>();
   const [isLoading, setLoading] = React.useState(true);
   const [isSaved, setSaved] = React.useState(true);
   const controls = React.useMemo(
-    () => ({ setSnapshot, setError, setLoading, setSaved }),
-    [setError, setLoading, setSaved, setSnapshot],
+    () => ({
+      setSnapshot,
+      setLoadError,
+      setCommandError,
+      setLoading,
+      setSaved,
+    }),
+    [setCommandError, setLoadError, setLoading, setSaved, setSnapshot],
   );
   const refresh = useSnapshotRefresh(api, controls);
   const apply = useCommandApply(api, snapshot, refresh, controls);
@@ -176,5 +192,13 @@ export function usePersistedTasks(
     void refresh();
   }, [refresh]);
   const parsed = parsedTasks(snapshot);
-  return { ...parsed, error, isLoading, isSaved, refresh, apply };
+  return {
+    ...parsed,
+    loadError,
+    commandError,
+    isLoading,
+    isSaved,
+    refresh,
+    apply,
+  };
 }

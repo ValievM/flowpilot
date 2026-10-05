@@ -52,6 +52,7 @@ export const appInfoRequestSchema = z.object({}).strict();
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
 export type FlowPilotApi = {
+  clock: { now(): string | undefined };
   snapshot: { load(): Promise<Result<IpcSnapshot>> };
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;

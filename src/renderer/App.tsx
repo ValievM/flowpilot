@@ -79,6 +79,7 @@ function useAppModel(): AppModel {
 interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
+  readonly hasTasks: boolean;
   readonly today: TemporalTypes.PlainDate;
   readonly todayLabel: string;
   readonly available: readonly Task[];
@@ -95,6 +96,7 @@ function ScreenContent(props: ScreenProps): React.JSX.Element {
     return (
       <TodayScreen
         tasks={props.tasks}
+        hasTasks={props.hasTasks}
         available={props.available}
         workdays={props.workdays}
         today={props.today}
@@ -170,10 +172,10 @@ function MainContent({
 }): React.JSX.Element {
   const { state, view, views } = model;
   if (state.isLoading && state.tasks.length === 0) return <LoadingState />;
-  if (state.error && state.tasks.length === 0)
+  if (state.loadError && state.tasks.length === 0)
     return (
       <ErrorState
-        error={state.error}
+        error={state.loadError}
         onRetry={() => {
           void state.refresh();
         }}
@@ -192,9 +194,21 @@ function MainContent({
           Обновляем данные…
         </p>
       )}
-      {state.error && (
+      {state.loadError && (
+        <p className="load-error" role="alert">
+          {state.loadError}
+          <button
+            className="button"
+            type="button"
+            onClick={() => void state.refresh()}
+          >
+            Повторить загрузку
+          </button>
+        </p>
+      )}
+      {state.commandError && (
         <p className="save-error" role="alert">
-          {state.error}
+          {state.commandError}
         </p>
       )}
     </>
@@ -205,6 +219,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const { state, view, views } = model;
   const screenProps: ScreenProps = {
     view,
+    hasTasks: views.all.length > 0,
     tasks: views.todayTasks,
     today: views.today,
     todayLabel: localDateLabel(views.today),
@@ -229,7 +244,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
         <TopBar
           view={view}
           saved={state.isSaved}
-          error={state.error}
+          error={state.commandError}
           onAddTask={() => {
             model.setQuickAddOpen(true);
           }}

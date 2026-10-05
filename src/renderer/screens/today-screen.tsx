@@ -7,6 +7,7 @@ import type { View } from '../types';
 
 interface TodayScreenProps {
   readonly tasks: readonly Task[];
+  readonly hasTasks: boolean;
   readonly available: readonly Task[];
   readonly workdays: ReadonlySet<number>;
   readonly today: Temporal.PlainDate;
@@ -149,6 +150,7 @@ function TodayHeading({
 
 export function TodayScreen({
   tasks,
+  hasTasks,
   available,
   workdays,
   today,
@@ -165,7 +167,7 @@ export function TodayScreen({
     return (
       <>
         <TodayHeading todayLabel={todayLabel} onViewChange={onViewChange} />
-        <EmptyDay blocked={tasks.length > 0} />
+        <EmptyDay blocked={hasTasks} />
       </>
     );
   return (

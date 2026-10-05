@@ -138,7 +138,68 @@ describe('persisted today and now screens', () => {
       screen.queryByRole('button', { name: 'Взять в работу' }),
     ).not.toBeInTheDocument();
   });
+  it('shows the blocked state when every task is scheduled for the future', async () => {
+    const tomorrow = Temporal.Now.plainDateISO().add({ days: 1 }).toString();
+    renderApp([{ id: 'future-task', day: tomorrow }]);
+    expect(
+      await screen.findByRole('heading', { name: 'Нет доступных дел' }),
+    ).toBeVisible();
+    expect(screen.getByText(/назначены на будущее/i)).toBeVisible();
+  });
 
+  it('rolls yesterday work over at midnight without remounting', async () => {
+    mockSystemTheme(false);
+    const atLocalTime = (day: string, time: string): string =>
+      Temporal.PlainDate.from(day)
+        .toZonedDateTime({
+          timeZone: Temporal.Now.timeZoneId(),
+          plainTime: Temporal.PlainTime.from(time),
+        })
+        .toInstant()
+        .toString();
+    let now = atLocalTime('2026-10-05', '23:59');
+    const fake = fakeApi(
+      [
+        taskRecord({
+          id: 'midnight-task',
+          title: 'Вчерашнее дело',
+          day: '2026-10-05',
+          status: { kind: 'doing' },
+        }),
+      ],
+      () => now,
+    );
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    expect(
+      await screen.findByRole('heading', { name: /5 октября/i }),
+    ).toBeVisible();
+    now = atLocalTime('2026-10-06', '00:00');
+    fireEvent.focus(window);
+    expect(
+      await screen.findByRole('heading', { name: /6 октября/i }),
+    ).toBeVisible();
+    expect(screen.getByText('Перенесено со вчера.')).toBeVisible();
+  });
+
+  it('keeps snapshot-load failures separate from command-save status', async () => {
+    mockSystemTheme(false);
+    const fake = fakeApi();
+    fake.setLoadFailure();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /не удалось загрузить сохранённые задачи/i,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Сохранено');
+    expect(screen.queryByText('Ошибка сохранения')).not.toBeInTheDocument();
+  });
   it('shows loading then an honest source error with retry action', async () => {
     const fake = fakeApi();
     fake.setLoadFailure();
@@ -152,6 +213,20 @@ describe('persisted today and now screens', () => {
       /не удалось загрузить сохранённые задачи/i,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
+  });
+  it('shows a stale-retry load error without reporting a save failure', async () => {
+    const fake = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fake.setStaleOnce();
+    fake.setLoadFailure();
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Сохранить после конфликта' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    expect(await screen.findByText(/не удалось загрузить/i)).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Сохранено');
+    expect(screen.queryByText('Ошибка сохранения')).not.toBeInTheDocument();
   });
 
   it('creates through commands.apply using the current revision and default day/column', async () => {
