@@ -117,6 +117,37 @@ describe('parseIcs', () => {
     const event = parsed(text).events[0];
     expect(event?.end.since(event.start).total({ unit: 'minutes' })).toBe(90);
   });
+  it('uses DURATION for an all-day event without DTEND', () => {
+    const text = [
+      'BEGIN:VEVENT',
+      'UID:all-day-duration',
+      'DTSTART;VALUE=DATE:20261005',
+      'DURATION:P2D',
+      'END:VEVENT',
+    ].join('\n');
+    const event = parsed(text).events[0];
+    expect(event?.end.toPlainDate().toString()).toBe('2026-10-07');
+  });
+
+  it('expands old weekly recurrence only within the requested window', () => {
+    const text = [
+      'BEGIN:VEVENT',
+      'UID:old-series',
+      'DTSTART;TZID=America/New_York:20000103T100000',
+      'DURATION:PT1H',
+      'RRULE:FREQ=WEEKLY;BYDAY=MO',
+      'END:VEVENT',
+    ].join('\n');
+    const result = parseIcs(text, {
+      ...options,
+      from: Temporal.PlainDate.from('2026-10-05'),
+      to: Temporal.PlainDate.from('2026-10-18'),
+    });
+    expect(result.problems).toEqual([]);
+    expect(
+      result.events.map(({ start }) => start.toPlainDate().toString()),
+    ).toEqual(['2026-10-05', '2026-10-12']);
+  });
   it('applies weekly COUNT and INTERVAL limits', () => {
     const text = [
       'BEGIN:VEVENT',

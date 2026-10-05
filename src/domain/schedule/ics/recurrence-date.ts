@@ -82,16 +82,19 @@ function includeStartDate(
 export function recurrenceDates(
   start: TemporalTypes.ZonedDateTime,
   rule: ReadonlyMap<string, string>,
+  from: TemporalTypes.PlainDate,
   end: TemporalTypes.PlainDate,
 ): TemporalTypes.PlainDate[] {
   const interval = intervalOf(rule);
   const weekdays = weekdaysOf(rule, start);
   const firstDate = start.toPlainDate();
   const startWeek = firstDate.subtract({ days: start.dayOfWeek - 1 });
+  const scanStart =
+    Temporal.PlainDate.compare(firstDate, from) < 0 ? from : firstDate;
   const dates: TemporalTypes.PlainDate[] = [];
   let scanned = 0;
   for (
-    let date = firstDate;
+    let date = scanStart;
     Temporal.PlainDate.compare(date, end) <= 0;
     date = date.add({ days: 1 })
   ) {

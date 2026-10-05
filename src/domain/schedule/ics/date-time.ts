@@ -57,7 +57,12 @@ export function eventTimes(
   if (allDay) {
     const endDate = endProperty
       ? Temporal.PlainDate.from(endProperty.value)
-      : start.toPlainDate().add({ days: 1 });
+      : start
+          .toPlainDate()
+          .add(duration ? Temporal.Duration.from(duration) : { days: 1 });
+    if (Temporal.PlainDate.compare(endDate, start.toPlainDate()) <= 0) {
+      throw new RangeError('Время окончания должно быть позже начала.');
+    }
     return {
       start,
       end: endDate.toPlainDateTime().toZonedDateTime(start.timeZoneId),

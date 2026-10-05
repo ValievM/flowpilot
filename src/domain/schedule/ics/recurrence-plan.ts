@@ -105,7 +105,7 @@ export function createRecurrencePlan(
   const rule = parseRule(ruleProperty);
   const count = validateRule(ruleProperty, rule);
   const dates = ruleProperty
-    ? recurrenceDates(identity.start, rule, to)
+    ? recurrenceDates(identity.start, rule, from, to)
     : [identity.start.toPlainDate()];
   return {
     master,
