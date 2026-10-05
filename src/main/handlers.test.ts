@@ -379,7 +379,10 @@ describe('IPC handlers', () => {
       {} as IpcMainInvokeEvent,
       {
         operationId: 'startup-scripted',
-        context: { tasks: [{ id: 'task-1' }] },
+        context: {
+          tasks: [{ id: 'task-1' }],
+          columns: [{ id: 'todo' }],
+        },
         instruction: 'Return the scripted proposal',
         responseSchema: { type: 'object' },
       },

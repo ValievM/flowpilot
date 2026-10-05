@@ -17,7 +17,7 @@ const proposal: Proposal = {
 };
 const request = {
   operationId: 'operation-1',
-  context: { tasks: [{ id: 'task-1' }] },
+  context: { tasks: [{ id: 'task-1' }], columns: [{ id: 'todo' }] },
   instruction: 'Return a proposal',
   responseSchema: { type: 'object' },
 };

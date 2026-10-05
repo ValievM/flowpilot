@@ -22,6 +22,7 @@ const nestedContext = {
       comments: [{ id: 'context-comment' }],
     },
   ],
+  columns: [{ id: 'todo' }],
 };
 
 describe('AI provider boundary', () => {
@@ -145,13 +146,63 @@ describe('AI provider boundary', () => {
       ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
     }
   });
+  it('validates task column references against the request context', () => {
+    const validCommands = [
+      {
+        kind: 'task.create',
+        task: {
+          id: 'created-task',
+          title: 'Created task',
+          columnId: 'todo',
+          subtasks: [],
+        },
+      },
+      { kind: 'task.move', id: 'task-1', columnId: 'todo' },
+      { kind: 'task.move', id: 'created-task', columnId: 'todo' },
+    ];
+    expect(
+      validateProviderReply(
+        { ...proposal, commands: validCommands },
+        nestedContext,
+      ),
+    ).toEqual({
+      ok: true,
+      value: { ...proposal, commands: validCommands },
+    });
+
+    const invalidCommands = [
+      { kind: 'task.move', id: 'task-1', columnId: 'missing-column' },
+      {
+        kind: 'task.create',
+        task: {
+          id: 'another-task',
+          title: 'Another task',
+          columnId: 'missing-column',
+          subtasks: [],
+        },
+      },
+    ];
+    const invalidResults = invalidCommands.map((command) =>
+      validateProviderReply(
+        { ...proposal, commands: [command] },
+        nestedContext,
+      ),
+    );
+    expect(invalidResults).toEqual([
+      { ok: false, error: { kind: 'InvalidReply' } },
+      { ok: false, error: { kind: 'InvalidReply' } },
+    ]);
+  });
 
   it('returns parsed Temporal task fields from the runner for IPC serialization', async () => {
     const provider = new ManualExchangeProvider();
     const runner = new AiRunner(provider);
     const resultPromise = runner.run({
       operationId: 'operation-1',
-      context: { tasks: [{ id: 'task-1' }] },
+      context: {
+        tasks: [{ id: 'task-1' }],
+        columns: [{ id: 'todo' }],
+      },
       instruction: 'Return a proposal',
       responseSchema: { type: 'object' },
     });

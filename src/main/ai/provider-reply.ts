@@ -13,8 +13,13 @@ const contextTaskSchema = z.looseObject({
   subtasks: z.array(contextNestedSchema).optional(),
   comments: z.array(contextNestedSchema).optional(),
 });
-const contextSchema = z.looseObject({ tasks: z.array(contextTaskSchema) });
+const contextColumnSchema = z.looseObject({ id: z.string().min(1) });
+const contextSchema = z.looseObject({
+  tasks: z.array(contextTaskSchema),
+  columns: z.array(contextColumnSchema).optional(),
+});
 interface ValidationState {
+  readonly columnIds: Set<string>;
   readonly taskIds: Set<string>;
   readonly subtaskIds: Set<string>;
   readonly commentIds: Set<string>;
@@ -27,7 +32,10 @@ export function validateProviderReply(
   const parsed = proposalSchema.safeParse(value);
   const parsedContext = contextSchema.safeParse(context);
   if (!parsed.success || !parsedContext.success) return invalidReply();
-  const state = createValidationState(parsedContext.data.tasks);
+  const state = createValidationState(
+    parsedContext.data.tasks,
+    parsedContext.data.columns ?? [],
+  );
   const commands: AiCommand[] = [];
   for (const candidate of parsed.data.commands) {
     const command = aiCommandSchema.safeParse(candidate);
@@ -53,8 +61,10 @@ export function parseProviderText(
 
 function createValidationState(
   tasks: readonly z.infer<typeof contextTaskSchema>[],
+  columns: readonly z.infer<typeof contextColumnSchema>[],
 ): ValidationState {
   return {
+    columnIds: new Set(columns.map(({ id }) => id)),
     taskIds: new Set(tasks.map(({ id }) => id)),
     subtaskIds: new Set(
       tasks.flatMap(({ subtasks = [] }) => subtasks.map(({ id }) => id)),
@@ -67,6 +77,9 @@ function createValidationState(
 
 function isCommandValid(command: AiCommand, state: ValidationState): boolean {
   if (command.kind === 'task.create') return acceptCreatedTask(command, state);
+  if (command.kind === 'task.move' && !state.columnIds.has(command.columnId)) {
+    return false;
+  }
   const taskId = taskIdFor(command);
   if (taskId !== undefined && !state.taskIds.has(taskId)) return false;
   if (command.kind === 'subtask.add') {
@@ -90,6 +103,7 @@ function acceptCreatedTask(
   const subtaskIds = task.subtasks.map(({ id }) => id);
   const commentId = task.comment?.id;
   if (
+    !state.columnIds.has(task.columnId) ||
     state.taskIds.has(task.id) ||
     !areUniqueIds(subtaskIds, state.subtaskIds) ||
     (commentId !== undefined && state.commentIds.has(commentId))
