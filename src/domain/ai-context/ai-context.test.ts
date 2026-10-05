@@ -285,6 +285,24 @@ describe('AI context assembly (F-10)', () => {
     ).toBe('[путь скрыт]');
   });
 
+  it('redacts extensionless paths while preserving prose and web URLs', () => {
+    const examples: ReadonlyArray<readonly [string, string]> = [
+      ['/Users/Ada/My Documents/private report.txt', '[путь скрыт]'],
+      ['C:\\work\\My Documents\\private', '[путь скрыт]'],
+      ['\\\\server\\share\\My Documents\\private', '[путь скрыт]'],
+      ['file:///Users/Ada My Documents/private', '[путь скрыт]'],
+      ['config/secret', '[путь скрыт]'],
+      [
+        'ordinary prose and https://example.com/config/secret',
+        'ordinary prose and https://example.com/config/secret',
+      ],
+    ];
+
+    for (const [text, expected] of examples) {
+      expect(sanitizeUntrustedText(text)).toBe(expected);
+    }
+  });
+
   it('redacts Windows and UNC paths in context while preserving complete web URLs', () => {
     const result = buildContext(
       input({
@@ -309,17 +327,17 @@ describe('AI context assembly (F-10)', () => {
       'Use https://example.com/config/secret.json, not a local path.',
     );
   });
-  it('redacts spaced, file URI, and relative paths in all untrusted text fields', () => {
+  it('redacts spaced paths in every untrusted text field', () => {
     const result = buildContext(
       input({
         tasks: [
           task('task-1', {
-            title: 'Open /Users/Ada/My Documents/secret.txt please',
-            description: 'file:///Users/Ada/private.txt',
+            title: 'Open /Users/Ada/My Documents/private report.txt please',
+            description: 'file:///Users/Ada My Documents/private',
             comments: [
               {
                 id: 'c',
-                text: 'See config/secret.json and https://example.com/a/b',
+                text: 'See C:\\work\\My Documents\\private, then \\\\server\\share\\My Documents\\private, config/secret, and https://example.com/config/secret.',
               },
             ],
           }),
@@ -330,7 +348,13 @@ describe('AI context assembly (F-10)', () => {
     expect(result.tasks[0]?.untrusted.title).toBe('Open [путь скрыт] please');
     expect(result.tasks[0]?.untrusted.description).toBe('[путь скрыт]');
     expect(result.tasks[0]?.untrusted.comments[0]).toBe(
-      'See [путь скрыт] and https://example.com/a/b',
+      'See [путь скрыт], then [путь скрыт], [путь скрыт], and https://example.com/config/secret.',
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /(?:private report|Documents\\private|Documents\/private)/,
+    );
+    expect(JSON.stringify(result)).toContain(
+      'https://example.com/config/secret.',
     );
   });
   it('does not expose extensionless spaced Unix paths in untrusted task fields', () => {
