@@ -1,8 +1,12 @@
 import { copyFileSync } from 'node:fs';
 import type Database from 'better-sqlite3';
 import initialSchema from './migrations/0001_init.sql?raw';
+import attachmentIntegrity from './migrations/0002_attachment_integrity.sql?raw';
 
-const MIGRATIONS = [{ version: 1, sql: initialSchema }] as const;
+const MIGRATIONS = [
+  { version: 1, sql: initialSchema },
+  { version: 2, sql: attachmentIntegrity },
+] as const;
 
 export function migrate(database: Database.Database, path: string): void {
   const current = readUserVersion(database);
