@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Личный планировщик дел для macOS",
-"main": ".vite/build/index.cjs",
+  "main": ".vite/build/index.cjs",
   "scripts": {
     "start": "electron-forge start",
     "typecheck": "tsc --noEmit",
@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "temporal-polyfill": "^1.0.5"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",

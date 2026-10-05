@@ -10,7 +10,7 @@ module.exports = {
       name: 'domain-only-approved-packages',
       severity: 'error',
       from: { path: '^src/domain' },
-      to: { dependencyTypes: ['npm'], pathNot: '^(temporal-polyfill|zod)(/|$)' },
+      to: { dependencyTypes: ['npm'], pathNot: '^(node_modules/)?(temporal-polyfill|zod)(/|$)' },
     },
     {
       name: 'renderer-no-main-or-storage',
