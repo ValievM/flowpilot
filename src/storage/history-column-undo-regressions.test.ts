@@ -63,6 +63,37 @@ function createTask(
 }
 
 describe('column undo regressions', () => {
+  it('distinguishes tombstones after deleting a reused column id', () => {
+    const repository = openRepository();
+    createColumn(repository, 'custom', 0);
+    repository.apply([{ kind: 'column.delete', id: 'custom' }], 1);
+    createColumn(repository, 'custom', 2);
+    repository.apply([{ kind: 'column.delete', id: 'custom' }], 3);
+    const firstDeletion = repository
+      .history(10)
+      .entries.find(({ revision }) => revision === 2);
+    if (!firstDeletion) throw new Error('Expected first deletion history');
+
+    expect(repository.undo(firstDeletion.id)).toMatchObject({
+      ok: false,
+      error: { kind: 'UndoConflict' },
+    });
+    expect(repository.load().revision).toBe(4);
+    expect(repository.load().columns).not.toContainEqual(
+      expect.objectContaining({ id: 'custom' }),
+    );
+    expect(repository.history(10).entries).toHaveLength(4);
+
+    expect(repository.undo()).toMatchObject({
+      ok: true,
+      value: { revision: 5 },
+    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'custom' }),
+    );
+    repository.close();
+  });
+
   it('does not undo an old creation after reusing the same column id', () => {
     const repository = openRepository();
     createColumn(repository, 'custom', 0);

@@ -59,16 +59,7 @@ export function snapshotEntity(
       version: row ? Number(row.version) : null,
     };
   }
-  if (ref.kind === 'column') {
-    const row = database
-      .prepare('SELECT * FROM columns WHERE id = ?')
-      .get(ref.id) as Row | undefined;
-    return {
-      ...ref,
-      state: row ? JSON.stringify(row) : null,
-      version: row ? Number(row.version) : null,
-    };
-  }
+  if (ref.kind === 'column') return snapshotColumn(database, ref);
   const row = database
     .prepare('SELECT * FROM tasks WHERE id = ?')
     .get(ref.id) as Row | undefined;
@@ -89,6 +80,27 @@ export function snapshotEntity(
       attachments: relations[2],
     }),
     version,
+  };
+}
+
+function snapshotColumn(
+  database: Database.Database,
+  ref: EntityRef,
+): EntitySnapshot {
+  const row = database
+    .prepare('SELECT * FROM columns WHERE id = ?')
+    .get(ref.id) as Row | undefined;
+  const generation = row
+    ? Number(row.version)
+    : ((
+        database
+          .prepare('SELECT generation FROM column_generations WHERE id = ?')
+          .get(ref.id) as { generation: number } | undefined
+      )?.generation ?? null);
+  return {
+    ...ref,
+    state: row ? JSON.stringify(row) : null,
+    version: generation,
   };
 }
 
