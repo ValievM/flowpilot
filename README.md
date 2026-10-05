@@ -15,12 +15,13 @@ npm start
 
 ```sh
 npm run check
+npm run test:electron-abi
 npm run e2e
 ```
 
 `npm run check` выполняет typecheck, проверку Prettier, ESLint, Stylelint, dependency-cruiser и Vitest по порядку. `npm run format` форматирует файлы; `npm run format:check` проверяет форматирование без изменений. GitHub Actions запускает обновлённый `check`; Playwright `e2e` остаётся отдельной CI-задачей. `npm run e2e` запускает Electron acceptance-тесты Playwright.
 
-`better-sqlite3` — нативный модуль: Vitest использует ABI Node.js, а Electron — собственный ABI. `npm run test` перед тестами пересобирает модуль для Node.js через `pretest`; Electron Forge пересобирает нативные зависимости для Electron при запуске `npm start`. Запускайте каждую команду штатно через npm и не используйте модуль, собранный для другой среды.
+`better-sqlite3` — нативный модуль: Vitest использует ABI Node.js, а Electron — собственный ABI. `npm run test` пересобирает модуль для Node.js через `pretest`. `npm run test:electron-abi` пересобирает `better-sqlite3` для Electron через `electron-rebuild`, затем запускает Electron в режиме Node.js, чтобы применить схему хранилища и выполнить round-trip задачи без открытия окна. Запускайте каждую команду через npm и не используйте модуль, собранный для другой среды.
 
 Vite внедряет CSP в renderer HTML отдельно для разработки и сборки. В разработке разрешены Vite localhost и WebSocket; `unsafe-inline` для стилей нужен Vite HMR, который внедряет стили в `<style>`. В упакованном приложении localhost, WebSocket и `unsafe-inline` не разрешены.
 

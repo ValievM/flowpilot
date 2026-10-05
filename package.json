@@ -6,7 +6,7 @@
   "main": ".vite/build/index.cjs",
   "scripts": {
     "start": "electron-forge start",
-    "pretest": "npm rebuild better-sqlite3",
+    "test:electron-abi": "electron-rebuild -f -w better-sqlite3 && ELECTRON_RUN_AS_NODE=1 electron scripts/storage-abi-check.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "stylelint": "stylelint \"src/renderer/**/*.css\" --ignore-pattern src/renderer/styles/tokens.css",
