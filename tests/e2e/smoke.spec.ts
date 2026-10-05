@@ -56,10 +56,12 @@ test('has no horizontal overflow at 900 pixels', async () => {
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} Today snapshot at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
       await page.evaluate(() => {
         window.localStorage.clear();
       });
       await page.reload();
+      expect(await page.evaluate(() => window.innerWidth)).toBe(width);
       const themeClicks = theme === 'light' ? 1 : 2;
       for (let click = 0; click < themeClicks; click += 1) {
         await page.getByRole('button', { name: /Тема:/ }).click();

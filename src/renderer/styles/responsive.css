@@ -18,6 +18,17 @@
   }
 }
 
+@media (width <= 900px) {
+  .today-layout,
+  .board-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next-step {
+    position: static;
+  }
+}
+
 @media (width <= 760px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
