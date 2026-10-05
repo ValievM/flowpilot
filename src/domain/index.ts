@@ -3,9 +3,19 @@ import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 
 export type TaskState = 'todo' | 'doing' | 'waiting' | 'done';
 
+declare const workdayCountBrand: unique symbol;
+
+export type WorkdayCount = number & { readonly [workdayCountBrand]: true };
+
 export interface RemainingEstimate {
   unit: 'workdays';
-  value: number;
+  value: WorkdayCount;
+}
+
+export function createRemainingEstimate(value: number): RemainingEstimate | null {
+  if (!Number.isInteger(value) || value < 1) return null;
+
+  return { unit: 'workdays', value: value as WorkdayCount };
 }
 
 export interface Subtask {

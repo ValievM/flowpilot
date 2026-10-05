@@ -2,6 +2,7 @@ import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it } from 'vitest';
 import {
   BUILT_IN_COLUMNS,
+  createRemainingEstimate,
   laterView,
   nowView,
   updateSubtask,
@@ -27,6 +28,15 @@ function task(overrides: Partial<Task> = {}): Task {
     ...overrides,
   };
 }
+
+describe('remaining estimate', () => {
+  it('accepts positive integer workdays only', () => {
+    expect(createRemainingEstimate(1)).toEqual({ unit: 'workdays', value: 1 });
+    expect(createRemainingEstimate(0)).toBeNull();
+    expect(createRemainingEstimate(1.5)).toBeNull();
+  });
+});
+
 
 describe('task views', () => {
   it('shows undated tasks in later, not now', () => {
