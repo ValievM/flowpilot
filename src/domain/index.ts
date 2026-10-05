@@ -14,6 +14,21 @@ export type {
 } from './columns';
 export { createRemainingEstimate } from './estimate';
 export type { RemainingEstimateResult } from './estimate';
+export {
+  availableNow,
+  instancesOn,
+  missed,
+  rescheduleInstance,
+  skipGroups,
+} from './repeats';
+export type {
+  MissedInstance,
+  Outcome,
+  RescheduleOutcome,
+  Series,
+  SeriesInstance,
+  SkipGroup,
+} from './repeat';
 export { rollOver } from './rollover';
 export { updateSubtask } from './subtasks';
 export type { UpdateSubtaskResult } from './subtasks';
