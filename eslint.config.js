@@ -27,16 +27,21 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'max-params': ['error', 4],
+      complexity: ['error', 10],
+      'max-depth': ['error', 3],
+      'max-classes-per-file': ['error', 1],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
     ignores: ['**/*.test.ts', '**/*.test.tsx', 'tests/**', '**/tests/**'],
     rules: {
       'max-lines': [
         'error',
         { max: 300, skipBlankLines: true, skipComments: true },
       ],
-      'max-params': ['error', 4],
-      complexity: ['error', 10],
-      'max-depth': ['error', 3],
-      'max-classes-per-file': ['error', 1],
     },
   },
   {
