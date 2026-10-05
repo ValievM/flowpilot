@@ -4,7 +4,6 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  readdirSync,
   renameSync,
   statSync,
   unlinkSync,
@@ -19,6 +18,7 @@ import {
 } from './attachment-trash';
 import { collectOrphanAttachments } from './attachment-gc';
 import { hashAttachment } from './attachment-hash';
+import { recoverInterruptedAttachmentMoves } from './attachment-recovery';
 
 export const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
 
@@ -147,19 +147,8 @@ export class AttachmentStore {
   restoreFromTrash(attachmentId: string): boolean {
     return restoreFileFromTrash(this.attachmentDir(), attachmentId);
   }
-
   recoverInterruptedRemovals(): void {
-    const trashed = join(this.attachmentDir(), '.trash');
-    if (!existsSync(trashed)) return;
-    const rows = this.database.prepare('SELECT id FROM attachments').all() as {
-      id: string;
-    }[];
-    const trashedIds = new Set(readdirSync(trashed));
-    for (const { id } of rows) {
-      if (!trashedIds.has(id)) continue;
-      if (!this.restoreFromTrash(id))
-        throw new Error(`Unable to recover attachment ${id}`);
-    }
+    recoverInterruptedAttachmentMoves(this.database, this.attachmentDir());
   }
 
   gc(): number {

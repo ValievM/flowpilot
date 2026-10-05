@@ -136,4 +136,26 @@ describe('column undo regressions', () => {
     );
     repository.close();
   });
+  it('reports a conflict when a separately created task references a new column', () => {
+    const repository = openRepository();
+    createColumn(repository, 'custom', 0);
+    const creation = repository.history(10).entries[0];
+    if (!creation) throw new Error('Expected column creation history');
+    createTask(repository, 1, 'custom');
+
+    expect(repository.undo(creation.id)).toMatchObject({
+      ok: false,
+      error: {
+        kind: 'UndoConflict',
+        entities: [{ kind: 'task', id: 'task-1' }],
+      },
+    });
+    const { revision, columns, tasks } = repository.load();
+    expect(revision).toBe(2);
+    expect(columns).toContainEqual(expect.objectContaining({ id: 'custom' }));
+    expect(tasks).toContainEqual(
+      expect.objectContaining({ id: 'task-1', columnId: 'custom' }),
+    );
+    repository.close();
+  });
 });

@@ -81,23 +81,47 @@ function createUndoPlan(
   if (isUndone(database, entry.id))
     return { result: { ok: false, error: { kind: 'AlreadyUndone' } } };
   const records = readEntryEntities(database, entry.id);
-  const conflicts = records.filter(({ ref, after }) => {
+  const conflictingRecords = records.filter(({ ref, after }) => {
     const current = snapshotEntity(database, ref);
     return current.state !== after.state || current.version !== after.version;
   });
-  if (conflicts.length)
+  const conflictingRefs = [
+    ...conflictingRecords.map(({ ref }) => ref),
+    ...referencedTasksForCreatedColumns(database, records),
+  ];
+  if (conflictingRefs.length)
     return {
       result: {
         ok: false,
-        error: {
-          kind: 'UndoConflict',
-          entities: conflicts.map(({ ref }) => ref),
-        },
+        error: { kind: 'UndoConflict', entities: conflictingRefs },
       },
     };
   return {
     plan: { entry, records, attachmentChanges: findAttachmentChanges(records) },
   };
+}
+
+function referencedTasksForCreatedColumns(
+  database: Database.Database,
+  records: readonly UndoRecord[],
+): EntitySnapshot[] {
+  const createdTaskIds = new Set(
+    records
+      .filter(({ ref, before }) => ref.kind === 'task' && before.state === null)
+      .map(({ ref }) => ref.id),
+  );
+  const references: EntitySnapshot[] = [];
+  for (const { ref, before } of records) {
+    if (ref.kind !== 'column' || before.state !== null) continue;
+    const rows = database
+      .prepare('SELECT id FROM tasks WHERE column_id = ?')
+      .all(ref.id) as { id: string }[];
+    for (const { id } of rows) {
+      if (createdTaskIds.has(id)) continue;
+      references.push({ kind: 'task', id, state: null, version: null });
+    }
+  }
+  return references;
 }
 
 function applyUndo(
