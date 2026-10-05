@@ -144,6 +144,32 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('rejects attachment additions through IPC without changing storage', () => {
+    const repository = openRepository();
+    const result = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'attachment.add',
+            taskId: 'task-ipc',
+            attachment: {
+              id: 'attachment-ipc',
+              name: 'notes.txt',
+              mediaType: 'text/plain',
+              sizeBytes: 12,
+            },
+          },
+        ],
+        expectedRevision: 0,
+      },
+      { repository },
+    );
+    expect(result).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(0);
+    expect(repository.load().tasks).toEqual([]);
+    repository.close();
+  });
+
   it('rejects unapproved setting keys through both IPC channels', () => {
     const repository = openRepository();
     expect(
