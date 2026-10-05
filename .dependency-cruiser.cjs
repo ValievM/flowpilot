@@ -63,16 +63,16 @@ module.exports = {
     {
       name: 'domain-is-independent',
       severity: 'error',
-      from: { path: '^src/domain' },
+      from: { path: '^src/domain', pathNot: '\\.test\\.ts$' },
       to: { pathNot: '^src/domain', dependencyTypesNot: ['npm'] },
     },
     {
       name: 'domain-only-approved-packages',
       severity: 'error',
-      from: { path: '^src/domain' },
+      from: { path: '^src/domain', pathNot: '\\.test\\.ts$' },
       to: {
         dependencyTypes: ['npm'],
-        pathNot: '^(temporal-polyfill|zod)(/|$)',
+        pathNot: '^(node_modules/)?(temporal-polyfill|zod)(/|$)',
       },
     },
     {
