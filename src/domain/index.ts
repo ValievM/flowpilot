@@ -20,3 +20,17 @@ export type {
   TaskStatus,
 } from './task';
 export { laterView, nowView, todayView } from './views';
+export {
+  ageOf,
+  availabilityOn,
+  eventsOn,
+  mergeSnapshot,
+  nextEvent,
+  overlappingEvents,
+} from './schedule/fixed-events';
+export type {
+  EventSource,
+  FixedEvent,
+  ScheduleAvailability,
+  ScheduleSnapshot,
+} from './schedule/fixed-events';
