@@ -65,6 +65,62 @@ test('loads an empty profile through the typed preload API', async () => {
   expect(result).toMatchObject({ ok: true, value: { tasks: [], revision: 0 } });
 });
 
+test('rejects renderer attachment additions through the public IPC API', async () => {
+  const result = await page.evaluate(async () => {
+    const created = await window.flowpilot.commands.apply({
+      commands: [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'task-ipc',
+            title: 'Plan',
+            description: '',
+            status: { kind: 'todo' },
+            columnId: 'todo',
+            day: '2026-10-05',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 0,
+          },
+        },
+      ],
+      expectedRevision: 0,
+    });
+    if (!created.ok) return { created, attempt: null, snapshot: null };
+    // The untyped payload simulates a compromised renderer bypassing TypeScript.
+    const attempt = await window.flowpilot.commands.apply({
+      commands: [
+        {
+          kind: 'attachment.add',
+          taskId: 'task-ipc',
+          attachment: {
+            id: 'attachment-ipc',
+            name: 'notes.txt',
+            mediaType: 'text/plain',
+            sizeBytes: 12,
+          },
+        },
+      ],
+      expectedRevision: 1,
+    } as unknown as Parameters<typeof window.flowpilot.commands.apply>[0]);
+    return {
+      created,
+      attempt,
+      snapshot: await window.flowpilot.snapshot.load(),
+    };
+  });
+  expect(result.created).toMatchObject({ ok: true, value: { revision: 1 } });
+  expect(result.attempt).toEqual({ ok: false, error: 'ValidationFailed' });
+  expect(result.snapshot).toMatchObject({
+    ok: true,
+    value: {
+      revision: 1,
+      tasks: [{ id: 'task-ipc', attachments: [] }],
+    },
+  });
+});
+
 test('shows fixture tasks and keyboard accessible navigation', async () => {
   await expect(
     page.getByText('Курсовая: собрать рабочий прототип'),

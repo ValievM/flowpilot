@@ -146,6 +146,24 @@ describe('IPC handlers', () => {
 
   it('rejects attachment additions through IPC without changing storage', () => {
     const repository = openRepository();
+    const task = {
+      id: 'task-ipc',
+      title: 'Plan',
+      description: '',
+      status: { kind: 'todo' as const },
+      columnId: 'todo',
+      day: '2026-10-05',
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      addedOrder: 0,
+    };
+    expect(
+      applyCommands(
+        { commands: [{ kind: 'task.create', task }], expectedRevision: 0 },
+        { repository },
+      ),
+    ).toMatchObject({ ok: true, value: { revision: 1 } });
     const result = applyCommands(
       {
         commands: [
@@ -160,13 +178,15 @@ describe('IPC handlers', () => {
             },
           },
         ],
-        expectedRevision: 0,
+        expectedRevision: 1,
       },
       { repository },
     );
     expect(result).toEqual({ ok: false, error: 'ValidationFailed' });
-    expect(repository.load().revision).toBe(0);
-    expect(repository.load().tasks).toEqual([]);
+    expect(repository.load().revision).toBe(1);
+    expect(repository.load().tasks).toMatchObject([
+      { id: 'task-ipc', attachments: [] },
+    ]);
     repository.close();
   });
 
