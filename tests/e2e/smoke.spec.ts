@@ -1,6 +1,6 @@
-import { _electron as electron, expect, test } from "@playwright/test";
-import type { ElectronApplication, Page } from "@playwright/test";
-import path from "node:path";
+import { _electron as electron, expect, test } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
+import path from 'node:path';
 
 const SNAPSHOT_WINDOW = {
   width: 1280,
@@ -14,7 +14,7 @@ let page: Page;
 test.beforeEach(async () => {
   app = await electron.launch({
     args: [
-      path.resolve(__dirname, "../.."),
+      path.resolve(__dirname, '../..'),
       `--force-device-scale-factor=${String(SNAPSHOT_WINDOW.deviceScaleFactor)}`,
     ],
   });
@@ -26,30 +26,30 @@ test.beforeEach(async () => {
     width: SNAPSHOT_WINDOW.width,
     height: SNAPSHOT_WINDOW.height,
   });
-  await expect(page.getByRole("heading", { name: "FlowPilot" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'FlowPilot' })).toBeVisible();
 });
 
 test.afterEach(async () => {
   if (app) await app.close();
 });
 
-test("opens the app without exposing Node globals", async () => {
+test('opens the app without exposing Node globals', async () => {
   await expect(
-    page.getByText("Ваш день начинается с ясного плана."),
+    page.getByText('Ваш день начинается с ясного плана.'),
   ).toBeVisible();
   expect(
     await page.evaluate(
       () => typeof (window as Window & { require?: unknown }).require,
     ),
-  ).toBe("undefined");
+  ).toBe('undefined');
   expect(
     await page.evaluate(
       () => typeof (window as Window & { process?: unknown }).process,
     ),
-  ).toBe("undefined");
+  ).toBe('undefined');
 });
 
-for (const theme of ["light", "dark"] as const) {
+for (const theme of ['light', 'dark'] as const) {
   test(`matches the ${theme} theme snapshot`, async () => {
     await page.evaluate((selectedTheme) => {
       document.documentElement.dataset.theme = selectedTheme;

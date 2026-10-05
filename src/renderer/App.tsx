@@ -2,7 +2,9 @@ import React from 'react';
 
 export function App(): React.JSX.Element {
   const [theme, setTheme] = React.useState<'light' | 'dark'>(() =>
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light',
   );
 
   React.useEffect(() => {
