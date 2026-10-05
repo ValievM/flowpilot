@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
@@ -187,6 +187,12 @@ describe('IPC handlers', () => {
     expect(repository.load().tasks).toMatchObject([
       { id: 'task-ipc', attachments: [] },
     ]);
+    const sourceDirectory = mkdtempSync(
+      join(tmpdir(), 'flowpilot-ipc-source-'),
+    );
+    directories.push(sourceDirectory);
+    const sourcePath = join(sourceDirectory, 'source.txt');
+    writeFileSync(sourcePath, 'notes');
     expect(
       applyCommands(
         {
@@ -194,7 +200,7 @@ describe('IPC handlers', () => {
             {
               kind: 'attachment.add',
               taskId: 'task-ipc',
-              sourcePath: '/private/source.txt',
+              sourcePath,
             },
           ],
           expectedRevision: 1,
