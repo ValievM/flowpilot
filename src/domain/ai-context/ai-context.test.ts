@@ -263,6 +263,13 @@ describe('AI context assembly (F-10)', () => {
     expect(result.tasks[0]?.untrusted.trust).toBe('untrusted');
     expect(JSON.stringify(result)).not.toMatch(/\/(?:etc|opt|mnt|root)\//);
   });
+  it('redacts extensionless spaced Unix paths without consuming nearby text', () => {
+    expect(
+      sanitizeUntrustedText(
+        'Keep this, hide /Users/Ada/My Documents/private! Then continue.\nNext line stays.',
+      ),
+    ).toBe('Keep this, hide [путь скрыт]! Then continue.\nNext line stays.');
+  });
 
   it('redacts full Windows and UNC paths with spaces without changing URLs', () => {
     expect(
@@ -324,6 +331,30 @@ describe('AI context assembly (F-10)', () => {
     expect(result.tasks[0]?.untrusted.description).toBe('[путь скрыт]');
     expect(result.tasks[0]?.untrusted.comments[0]).toBe(
       'See [путь скрыт] and https://example.com/a/b',
+    );
+  });
+  it('does not expose extensionless spaced Unix paths in untrusted task fields', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('task-1', {
+            title: '/Users/Ada/My Documents/private',
+            description: 'Work at /home/Ada/Project Files/working',
+            comments: [
+              { id: 'c', text: 'Avoid /var/lib/My Data/archive, thanks.' },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe('[путь скрыт]');
+    expect(result.tasks[0]?.untrusted.description).toBe('Work at [путь скрыт]');
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      'Avoid [путь скрыт], thanks.',
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /(?:Users\/Ada|home\/Ada|var\/lib|Documents\/private|Files\/working|Data\/archive)/,
     );
   });
 
