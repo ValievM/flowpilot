@@ -71,6 +71,25 @@ describe('Repository history and undo', () => {
     expect(reopened.history(10).entries).toHaveLength(2);
     reopened.close();
   });
+  it('returns NotFound for an empty undo entry id without undoing latest', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [{ kind: 'task.create', task: task('task-1', 'Write') }],
+      0,
+    );
+    const history = repository.history(10).entries;
+
+    expect(repository.undo('')).toEqual({
+      ok: false,
+      error: { kind: 'NotFound' },
+    });
+    expect(repository.load()).toMatchObject({
+      revision: 1,
+      tasks: [{ id: 'task-1', title: 'Write' }],
+    });
+    expect(repository.history(10).entries).toEqual(history);
+    repository.close();
+  });
   it('records AI-sourced changes and undoes them like user changes', () => {
     const { repository } = openRepository();
     repository.apply(

@@ -4,6 +4,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  readdirSync,
   renameSync,
   statSync,
   unlinkSync,
@@ -145,6 +146,20 @@ export class AttachmentStore {
 
   restoreFromTrash(attachmentId: string): boolean {
     return restoreFileFromTrash(this.attachmentDir(), attachmentId);
+  }
+
+  recoverInterruptedRemovals(): void {
+    const trashed = join(this.attachmentDir(), '.trash');
+    if (!existsSync(trashed)) return;
+    const rows = this.database.prepare('SELECT id FROM attachments').all() as {
+      id: string;
+    }[];
+    const trashedIds = new Set(readdirSync(trashed));
+    for (const { id } of rows) {
+      if (!trashedIds.has(id)) continue;
+      if (!this.restoreFromTrash(id))
+        throw new Error(`Unable to recover attachment ${id}`);
+    }
   }
 
   gc(): number {

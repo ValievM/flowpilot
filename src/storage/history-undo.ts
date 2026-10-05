@@ -156,17 +156,18 @@ function findEntry(
   database: Database.Database,
   entryId?: string,
 ): LogRow | undefined {
-  const row = entryId
-    ? database
-        .prepare(
-          'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log WHERE id = ?',
-        )
-        .get(entryId)
-    : database
-        .prepare(
-          'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT 1',
-        )
-        .get();
+  const row =
+    entryId !== undefined
+      ? database
+          .prepare(
+            'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log WHERE id = ?',
+          )
+          .get(entryId)
+      : database
+          .prepare(
+            'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT 1',
+          )
+          .get();
   return row as LogRow | undefined;
 }
 

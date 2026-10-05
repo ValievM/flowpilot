@@ -47,6 +47,7 @@ export class Repository {
         dirname(path),
         this.clock,
       );
+      this.attachments.recoverInterruptedRemovals();
     } catch (error) {
       this.database.close();
       throw error;
