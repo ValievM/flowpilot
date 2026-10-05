@@ -29,12 +29,28 @@ export interface AttachmentMetadata {
   sizeBytes: number;
 }
 
+export type CategoryColor = 'study' | 'health' | 'personal' | 'none';
+
+export interface TaskType {
+  id: string;
+  name: string;
+  color?: CategoryColor;
+}
+
+export interface Discipline {
+  id: string;
+  name: string;
+  color?: CategoryColor;
+}
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   status: TaskStatus;
   columnId: string;
+  typeId?: string;
+  disciplineId?: string;
   day?: Temporal.PlainDate;
   time?: Temporal.PlainTime;
   deadline?: Temporal.PlainDate;
