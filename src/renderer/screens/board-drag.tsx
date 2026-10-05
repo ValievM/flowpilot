@@ -74,8 +74,15 @@ export function BoardDragContext({
       }}
       sensors={sensors}
       collisionDetection={boardCollisionDetection}
-      onDragStart={() => {
-        keyboardTarget.current = undefined;
+      onDragStart={(event) => {
+        const taskId = readDndId(event.active.id, 'task:');
+        const sourceColumnId = tasks.find(
+          (task) => task.id === taskId,
+        )?.columnId;
+        keyboardTarget.current =
+          event.activatorEvent.type === 'keydown' && sourceColumnId
+            ? `column:${sourceColumnId}`
+            : undefined;
       }}
       onDragEnd={(event) => {
         finishBoardDrag(event, columns, onMove, keyboardTarget.current);
@@ -109,10 +116,12 @@ function announceDragEnd(
   tasks: IpcSnapshot['tasks'],
 ): string {
   const name = taskName(taskId, tasks);
+  const task = tasks.find((item) => item.id === readDndId(taskId, 'task:'));
+  const destinationId = columnId ? readDndId(columnId, 'column:') : undefined;
+  if (destinationId && task?.columnId === destinationId)
+    return `Карточка «${name}» осталась в исходной колонке без изменений.`;
   if (!columnId) return `Карточка «${name}» не перемещена.`;
-  const destination = columns.find(
-    (column) => column.id === readDndId(columnId, 'column:'),
-  );
+  const destination = columns.find((column) => column.id === destinationId);
   const target = destination ? ` в колонку «${destination.name}»` : '';
   return destination?.state === 'waiting'
     ? `Для переноса карточки «${name}»${target} требуется подтверждение причины.`

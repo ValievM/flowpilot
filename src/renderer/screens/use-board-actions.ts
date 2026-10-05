@@ -28,7 +28,7 @@ export type BoardActions = {
     event: React.SyntheticEvent<HTMLFormElement>,
   ) => Promise<void>;
   saveColumn: (event: React.SyntheticEvent<HTMLFormElement>) => Promise<void>;
-  deleteColumn: (columnId?: string) => Promise<void>;
+  deleteColumn: (columnId?: string) => Promise<boolean>;
 };
 
 export function useBoardActions(input: ActionsInput): BoardActions {
@@ -115,21 +115,21 @@ async function saveBoardColumn(
 async function deleteBoardColumn(
   input: ActionsInput,
   columnId = input.deletingId,
-): Promise<void> {
-  if (!input.snapshot || !columnId) return;
+): Promise<boolean> {
+  if (!input.snapshot || !columnId) return false;
   const hasTasks = input.snapshot.tasks.some(
     (task) => task.columnId === columnId,
   );
-  if (hasTasks && !input.deleteTarget) return;
+  if (hasTasks && !input.deleteTarget) return false;
   const command: CommandsApplyRequest['commands'][number] = {
     kind: 'column.delete',
     id: columnId,
     ...(hasTasks ? { targetColumnId: input.deleteTarget } : {}),
   };
-  if (await input.apply([command])) {
-    input.setDeletingId(undefined);
-    input.setDeleteTarget('');
-  }
+  if (!(await input.apply([command]))) return false;
+  input.setDeletingId(undefined);
+  input.setDeleteTarget('');
+  return true;
 }
 
 function stringField(value: FormDataEntryValue | null, fallback = ''): string {

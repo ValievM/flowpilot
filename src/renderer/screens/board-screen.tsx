@@ -112,12 +112,12 @@ function BoardTaskColumns({
       onMove={(id, column) => void actions.move(id, column)}
       onRename={ui.setEditingColumn}
       onDelete={(column, hasTasks) => {
-        if (!hasTasks) {
-          void actions.deleteColumn(column.id);
+        if (hasTasks) {
+          ui.setDeletingId(column.id);
+          ui.setDeleteTarget('');
           return;
         }
-        ui.setDeletingId(column.id);
-        ui.setDeleteTarget('');
+        void deleteEmptyColumn(actions, column.id);
       }}
     />
   );
@@ -157,6 +157,15 @@ function BoardDialogWorkspace({
       }}
     />
   );
+}
+async function deleteEmptyColumn(
+  actions: BoardActions,
+  columnId: string,
+): Promise<void> {
+  if (!(await actions.deleteColumn(columnId))) return;
+  document
+    .querySelector<HTMLElement>('[data-board-dialog-focus-fallback]')
+    ?.focus();
 }
 
 function BoardHeader({
