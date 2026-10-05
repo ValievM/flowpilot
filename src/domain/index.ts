@@ -1,3 +1,10 @@
+export { availableWorkdays, deadlineRisk } from './risk/risk';
+export type {
+  AvailableWorkdaysResult,
+  DeadlineRiskResult,
+  RiskKind,
+  RiskResult,
+} from './risk/risk';
 export { BUILT_IN_COLUMNS, moveTask, removeColumn } from './columns';
 export type {
   MoveTaskResult,
