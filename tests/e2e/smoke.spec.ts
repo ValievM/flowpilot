@@ -2,12 +2,22 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import path from 'node:path';
 
+const SNAPSHOT_WINDOW = { width: 1280, height: 800, deviceScaleFactor: 1 } as const;
+
 let app: ElectronApplication | undefined;
 let page: Page;
 
 test.beforeEach(async () => {
-  app = await electron.launch({ args: [path.resolve(__dirname, '../..')] });
+  app = await electron.launch({
+    args: [path.resolve(__dirname, '../..'), `--force-device-scale-factor=${String(SNAPSHOT_WINDOW.deviceScaleFactor)}`],
+  });
   page = await app.firstWindow();
+  await app.evaluate(
+    ({ BrowserWindow }, { width, height }) => {
+      BrowserWindow.getAllWindows()[0]?.setContentSize(width, height);
+    },
+    SNAPSHOT_WINDOW,
+  );
   await expect(page.getByRole('heading', { name: 'FlowPilot' })).toBeVisible();
 });
 
