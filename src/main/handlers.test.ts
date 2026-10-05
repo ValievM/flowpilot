@@ -387,18 +387,6 @@ describe('IPC handlers', () => {
       {
         operationId: 'startup-scripted',
         context: { tasks: [{ id: 'task-1' }] },
-        referenceIndex: {
-          columns: [
-            { id: 'todo', state: 'todo' },
-            { id: 'waiting', state: 'waiting' },
-          ],
-          taskTypeIds: [],
-          disciplineIds: [],
-          ruleIds: [],
-          taskIds: ['task-1'],
-          subtaskIds: [],
-          commentIds: [],
-        },
         instruction: 'Return the scripted proposal',
         responseSchema: { type: 'object' },
       },

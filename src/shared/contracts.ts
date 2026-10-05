@@ -1,4 +1,3 @@
-import { aiReferenceIndexSchema } from './ai-reference-index';
 import { z } from 'zod';
 import {
   ipcCommandSchema,
@@ -84,7 +83,6 @@ export const aiRequestSchema = z
   .object({
     operationId: z.string().min(1),
     context: z.unknown(),
-    referenceIndex: aiReferenceIndexSchema,
     instruction: z.string().min(1),
     responseSchema: z.record(z.string(), z.unknown()),
   })

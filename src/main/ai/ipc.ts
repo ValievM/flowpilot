@@ -34,11 +34,9 @@ export async function runAiRequest(
     referenceIndex: createAiReferenceIndex({
       columns: snapshot.columns,
       tasks: snapshot.tasks,
-      taskTypes: parsed.data.referenceIndex.taskTypeIds.map((id) => ({ id })),
-      disciplines: parsed.data.referenceIndex.disciplineIds.map((id) => ({
-        id,
-      })),
-      rules: parsed.data.referenceIndex.ruleIds.map((id) => ({ id })),
+      taskTypes: [],
+      disciplines: [],
+      rules: [],
     }),
   });
   if (!result.ok) return { ok: false, error: result.error.kind };

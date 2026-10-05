@@ -40,14 +40,16 @@ leave the provider. The fake provider is selected only in unpackaged
 `FLOWPILOT_TEST=1` builds; manual exchange is the default. No persisted setting
 selects an AI provider.
 
-`ai.run` carries an authoritative `referenceIndex` separately from the limited
-model-visible context. Build the index from the full snapshot with
-`createAiReferenceIndex`; it contains IDs and column states only, is used by
-provider validation, and is never included in the manual prompt. This lets
-validation detect collisions with completed, over-limit, and nested records
-without exposing those records to the model. Move/create validation also
-enforces the #44 column/status semantics. `task.move.status.until` is serialized
-to an ISO date string at the IPC boundary.
+The main process builds a private `referenceIndex` from its repository snapshot,
+separate from the limited model-visible context. It contains task/column IDs
+and states and is never accepted from or included in the renderer/model request.
+This lets validation detect collisions with completed, over-limit, and nested
+records without exposing those records to the model. Move/create validation also
+enforces the #44 column/status semantics. The current repository API does not
+provide authoritative task-type, discipline, or rule catalogs; those references
+are rejected at the IPC provider boundary until such catalogs are available from
+main-process state. `task.move.status.until` is serialized to an ISO date string
+at the IPC boundary.
 
 `FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded proposal in an unpackaged
 test build with `FLOWPILOT_TEST=1`; the startup fake returns it through

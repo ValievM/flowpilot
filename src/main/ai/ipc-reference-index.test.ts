@@ -12,13 +12,82 @@ import { FakeAiProvider } from './fake-ai-provider';
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-06T09:00:00Z') };
 
+const unprovenCatalogCommands: Proposal['commands'] = [
+  {
+    kind: 'task.create',
+    task: {
+      id: 'new-task',
+      title: 'Task with unproven type',
+      columnId: 'todo',
+      typeId: 'forged-type',
+      subtasks: [],
+    },
+  },
+  {
+    kind: 'task.create',
+    task: {
+      id: 'new-task',
+      title: 'Task with unproven discipline',
+      columnId: 'todo',
+      disciplineId: 'forged-discipline',
+      subtasks: [],
+    },
+  },
+  { kind: 'task.classify', taskId: 'task-1', typeId: 'forged-type' },
+  { kind: 'rule.activate', ruleId: 'forged-rule' },
+  {
+    kind: 'rule.import',
+    documentJson: JSON.stringify({
+      schema_version: 'v1',
+      id: 'forged-rule',
+      title: 'Rule',
+      scope: {
+        task_type_ids: ['forged-type'],
+        discipline_ids: ['forged-discipline'],
+      },
+      rules: [
+        {
+          id: 'priority',
+          kind: 'priority',
+          level: 'high',
+          reason: 'Reason',
+        },
+      ],
+    }),
+  },
+];
+
+function seedTask(repository: Repository): number {
+  const snapshot = repository.load();
+  const created = repository.apply(
+    [
+      {
+        kind: 'task.create',
+        task: {
+          id: 'task-1',
+          title: 'Task',
+          status: { kind: 'todo' },
+          columnId: 'todo',
+          subtasks: [],
+          comments: [],
+          attachments: [],
+          addedOrder: 1,
+        },
+      },
+    ],
+    snapshot.revision,
+  );
+  if (!created.ok) throw new Error('Expected the fixture task to be created');
+  return created.value.revision;
+}
+
 afterEach(() => {
   for (const directory of directories.splice(0))
     rmSync(directory, { recursive: true, force: true });
 });
 
 describe('AI IPC reference index', () => {
-  it('replaces renderer task IDs with the full authoritative repository snapshot', async () => {
+  it('builds task references from the full authoritative repository snapshot', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'flowpilot-ai-index-'));
     directories.push(directory);
     const repository = new Repository(join(directory, 'flowpilot.db'), clock);
@@ -71,15 +140,6 @@ describe('AI IPC reference index', () => {
       {
         operationId: 'hidden-index-check',
         context: { tasks: [] },
-        referenceIndex: {
-          columns: [{ id: 'todo', state: 'todo' }],
-          taskTypeIds: [],
-          disciplineIds: [],
-          ruleIds: [],
-          taskIds: [],
-          subtaskIds: [],
-          commentIds: [],
-        },
         instruction: 'Return a proposal',
         responseSchema: { type: 'object' },
       },
@@ -88,6 +148,73 @@ describe('AI IPC reference index', () => {
     );
 
     expect(result).toEqual({ ok: false, error: 'InvalidReply' });
+    repository.close();
+  });
+  it('rejects client-supplied reference indexes at the IPC boundary', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-ai-forged-index-'));
+    directories.push(directory);
+    const repository = new Repository(join(directory, 'flowpilot.db'), clock);
+    const proposal: Proposal = {
+      id: 'forged-index-proposal',
+      baseRevision: 0,
+      ruleVersions: {},
+      commands: [],
+      rationale: 'No commands',
+      unknowns: [],
+      createdAt: '2026-10-06T09:00:00Z',
+    };
+    const result = await runAiRequest(
+      {
+        operationId: 'forged-index-check',
+        context: { tasks: [] },
+        referenceIndex: {
+          columns: [],
+          taskTypeIds: ['forged-type'],
+          disciplineIds: ['forged-discipline'],
+          ruleIds: ['forged-rule'],
+          taskIds: [],
+          subtaskIds: [],
+          commentIds: [],
+        },
+        instruction: 'Return a proposal',
+        responseSchema: { type: 'object' },
+      },
+      new AiRunner(new FakeAiProvider([{ scenario: 'success', proposal }])),
+      repository.load(),
+    );
+    expect(result).toEqual({ ok: false, error: 'ValidationFailed' });
+    repository.close();
+  });
+
+  it('rejects catalog references when no authoritative catalog is available', async () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'flowpilot-ai-missing-catalog-'),
+    );
+    directories.push(directory);
+    const repository = new Repository(join(directory, 'flowpilot.db'), clock);
+    const baseRevision = seedTask(repository);
+    for (const [index, command] of unprovenCatalogCommands.entries()) {
+      const proposal: Proposal = {
+        id: `unproven-catalog-${String(index)}`,
+        baseRevision,
+        ruleVersions: {},
+        commands: [command],
+        rationale: 'Use a catalog reference',
+        unknowns: [],
+        createdAt: '2026-10-06T09:00:00Z',
+      };
+      const result = await runAiRequest(
+        {
+          operationId: `unproven-catalog-${String(index)}`,
+          context: { tasks: [{ id: 'task-1' }] },
+          instruction: 'Return a proposal',
+          responseSchema: { type: 'object' },
+        },
+        new AiRunner(new FakeAiProvider([{ scenario: 'success', proposal }])),
+        repository.load(),
+      );
+      expect(result).toEqual({ ok: false, error: 'InvalidReply' });
+    }
     repository.close();
   });
   it('serializes Temporal task.move waiting dates to the IPC wire format', async () => {
@@ -138,15 +265,6 @@ describe('AI IPC reference index', () => {
       {
         operationId: 'move-wire-check',
         context: { tasks: [{ id: 'task-1' }] },
-        referenceIndex: {
-          columns: [],
-          taskTypeIds: [],
-          disciplineIds: [],
-          ruleIds: [],
-          taskIds: [],
-          subtaskIds: [],
-          commentIds: [],
-        },
         instruction: 'Return a proposal',
         responseSchema: { type: 'object' },
       },
