@@ -16,6 +16,7 @@ test.beforeEach(async () => {
     args: [
       path.resolve(__dirname, '../..'),
       `--force-device-scale-factor=${String(SNAPSHOT_WINDOW.deviceScaleFactor)}`,
+      '--hide-scrollbars',
     ],
   });
   page = await app.firstWindow();
