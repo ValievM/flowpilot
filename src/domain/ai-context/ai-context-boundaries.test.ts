@@ -87,6 +87,83 @@ describe('AI context boundary regressions', () => {
     expect(result.tasks).toHaveLength(100);
     expect(result.tasks.some(({ id }) => id === 'available')).toBe(true);
   });
+  it('does not mark a rolled-over task available before its scheduled start', () => {
+    const scheduledTime = Temporal.PlainTime.from('14:00');
+    const rolledOver = task('rolled-over', {
+      day: today,
+      time: scheduledTime,
+      rolledOverFrom: today.subtract({ days: 1 }),
+    });
+
+    const beforeStart = buildContext(input({ tasks: [rolledOver] }));
+    const atStart = buildContext(
+      input({
+        now: now.add({ hours: 5 }),
+        tasks: [rolledOver],
+      }),
+    );
+    const afterStart = buildContext(
+      input({
+        now: now.add({ hours: 6 }),
+        tasks: [rolledOver],
+      }),
+    );
+
+    expect(beforeStart.tasks[0]?.availability).toBe('today');
+    expect(atStart.tasks[0]?.availability).toBe('rolled-over');
+    expect(afterStart.tasks[0]?.availability).toBe('rolled-over');
+  });
+
+  it('keeps overdue tasks ahead of ordinary low-priority tasks at the cap', () => {
+    const lowPriorityRule = {
+      schema_version: 'v1' as const,
+      id: 'low-priority',
+      title: 'Низкий приоритет',
+      scope: { task_type_ids: ['ordinary'] },
+      rules: [
+        {
+          id: 'low',
+          kind: 'priority' as const,
+          level: 'low' as const,
+          reason: 'Не срочно',
+        },
+      ],
+    };
+    const highPriorityRule = {
+      ...lowPriorityRule,
+      id: 'high-priority',
+      scope: { task_type_ids: ['urgent'] },
+      rules: [
+        {
+          id: 'high',
+          kind: 'priority' as const,
+          level: 'high' as const,
+          reason: 'Срочно',
+        },
+      ],
+    };
+    const lowPriorityTasks = Array.from({ length: 100 }, (_, index) =>
+      task(`low-${String(index).padStart(3, '0')}`, {
+        typeId: 'ordinary',
+      }),
+    );
+    const overdue = task('overdue', {
+      deadline: today.subtract({ days: 1 }),
+    });
+    const highPriority = task('high-priority', { typeId: 'urgent' });
+    const result = buildContext(
+      input({
+        tasks: [...lowPriorityTasks, overdue, highPriority],
+        activeRules: [lowPriorityRule, highPriorityRule],
+      }),
+    );
+
+    expect(result.tasks).toHaveLength(100);
+    expect(result.tasks.some(({ id }) => id === 'overdue')).toBe(true);
+    expect(
+      result.tasks.findIndex(({ id }) => id === 'high-priority'),
+    ).toBeLessThan(result.tasks.findIndex(({ id }) => id === 'overdue'));
+  });
 
   it('ranks effective high priority before truncating tasks', () => {
     const priorityRule = {

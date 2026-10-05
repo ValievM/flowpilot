@@ -18,9 +18,11 @@ export function compareContextTasks(
   return (
     availabilityOrder(left.availability) -
       availabilityOrder(right.availability) ||
+    Number(right.rules.effectivePriority?.level === 'high') -
+      Number(left.rules.effectivePriority?.level === 'high') ||
+    riskOrder(left.deadlineRisk) - riskOrder(right.deadlineRisk) ||
     priorityOrder(left.rules.effectivePriority?.level) -
       priorityOrder(right.rules.effectivePriority?.level) ||
-    riskOrder(left.deadlineRisk) - riskOrder(right.deadlineRisk) ||
     compareDeadline(left.deadline, right.deadline) ||
     left.id.localeCompare(right.id)
   );
@@ -104,15 +106,20 @@ function availability(
   input: ContextInput,
 ): ContextTask['availability'] {
   if (task.status.kind === 'waiting') return 'waiting';
-  if (task.rolledOverFrom) return 'rolled-over';
-  if (task.day && Temporal.PlainDate.compare(task.day, input.today) > 0)
-    return 'future';
-  if (task.day?.equals(input.today)) {
-    return !task.time ||
-      Temporal.PlainTime.compare(task.time, input.now.toPlainTime()) <= 0
-      ? 'available-now'
-      : 'today';
+  if (task.day) {
+    const dayOrder = Temporal.PlainDate.compare(task.day, input.today);
+    if (dayOrder > 0) return 'future';
+    if (dayOrder === 0) {
+      if (
+        task.time &&
+        Temporal.PlainTime.compare(task.time, input.now.toPlainTime()) > 0
+      )
+        return 'today';
+      if (task.rolledOverFrom) return 'rolled-over';
+      return 'available-now';
+    }
   }
+  if (task.rolledOverFrom) return 'rolled-over';
   return 'future';
 }
 
