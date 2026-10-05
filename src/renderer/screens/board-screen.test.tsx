@@ -61,6 +61,7 @@ describe('board task movement', () => {
       );
     });
   });
+
   it('supports keyboard pickup and cancellation with the drag sensor', async () => {
     const value = renderBoard();
     const taskCard = await screen.findByRole('article', {
@@ -75,6 +76,33 @@ describe('board task movement', () => {
       expect(taskCard).not.toHaveAttribute('aria-pressed', 'true');
     });
     expect(value.applyMock).not.toHaveBeenCalled();
+  });
+
+  it('moves a task to the next column with the keyboard drag sensor', async () => {
+    const value = renderBoard();
+    const taskCard = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() => {
+      expect(taskCard).toHaveAttribute('aria-pressed', 'true');
+    });
+    fireEvent.keyDown(taskCard, { key: 'ArrowRight', code: 'ArrowRight' });
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() => {
+      expect(taskCard).not.toHaveAttribute('aria-pressed', 'true');
+      expect(value.applyMock).toHaveBeenCalledWith({
+        commands: [
+          {
+            kind: 'task.move',
+            id: 'task',
+            columnId: 'doing',
+            status: { kind: 'doing' },
+          },
+        ],
+        expectedRevision: 12,
+      });
+    });
   });
 
   it('requires a non-empty reason before moving into waiting', async () => {
