@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { HistoryEntry } from './history-log';
+import type { HistoryEntry } from './types';
 import { Repository } from './repository';
 import { AttachmentStore } from './attachments/attachment-store';
 
@@ -71,6 +71,22 @@ describe('Repository history and undo', () => {
     expect(reopened.history(10).entries).toHaveLength(2);
     reopened.close();
   });
+  it('records AI-sourced changes and undoes them like user changes', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [{ kind: 'task.create', task: task('task-1', 'Before') }],
+      0,
+      { source: 'ai' },
+    );
+    expect(historyEntry(repository).source).toBe('ai');
+    expect(repository.undo()).toMatchObject({ ok: true });
+    expect(repository.load().tasks).toEqual([]);
+    expect(repository.history(10).entries.map(({ source }) => source)).toEqual([
+      'undo',
+      'ai',
+    ]);
+    repository.close();
+  });
 
   it('rejects an earlier edit while a later edit changed that task, then allows it after undoing the later edit', () => {
     const { repository } = openRepository();
@@ -114,7 +130,7 @@ describe('Repository history and undo', () => {
             builtIn: false,
           },
         },
-        { kind: 'setting.set', key: 'theme', value: 'dark' },
+        { kind: 'setting.set', key: 'workdays', value: [1, 2, 3] },
         {
           kind: 'task.create',
           task: { ...task('task-1', 'A'), columnId: 'custom' },

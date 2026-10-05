@@ -1,27 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { EntitySnapshot } from './history-entities';
+import type { HistoryEntry } from './types';
 
 type StoredEntity = EntitySnapshot;
-export type HistoryEntry = {
-  id: string;
-  revision: number;
-  occurredAt: string;
-  source: 'user' | 'ai' | 'undo';
-  batchId: string;
-  undoneEntryId: string | null;
-  entities: readonly {
-    kind: string;
-    id: string;
-    before: unknown;
-    after: unknown;
-    versionAfter: number | null;
-  }[];
-};
 type HistoryWriteOptions = {
   revision: number;
   occurredAt: string;
-  source: 'user' | 'undo';
+  source: 'user' | 'ai' | 'undo';
   undoneEntryId?: string;
 };
 

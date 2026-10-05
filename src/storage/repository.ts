@@ -4,9 +4,9 @@ import {
   AttachmentStore,
   type AttachmentRecord,
 } from './attachments/attachment-store';
-import { commandSchema } from './command-schema';
 import { readHistory } from './history-log';
 import { undoEntry } from './history-undo';
+import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
@@ -79,6 +79,7 @@ export class Repository {
   apply(
     commands: readonly StorageCommand[],
     expectedRevision: number,
+    options: { source?: 'user' | 'ai' } = {},
   ): ApplyResult {
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
@@ -113,6 +114,7 @@ export class Repository {
       now: this.clock.now().toString(),
       attachmentFiles: this.attachments,
       preparedAttachments: prepared,
+      source: options.source ?? 'user',
     });
   }
 

@@ -20,16 +20,26 @@ module.exports = {
       from: { path: '^src/shared' },
       to: {
         pathNot: '^src/shared(/|$)',
-        dependencyTypesNot: ['npm', 'npm-dev'],
+        dependencyTypesNot: ['npm', 'npm-dev', 'type-only'],
       },
     },
     {
-      name: 'shared-only-zod-package',
+      name: 'shared-type-only-approved-sources',
+      severity: 'error',
+      from: { path: '^src/shared' },
+      to: {
+        path: '^src',
+        pathNot: '^src/(shared|domain|storage)(/|$)',
+        dependencyTypes: ['type-only'],
+      },
+    },
+    {
+      name: 'shared-only-approved-packages',
       severity: 'error',
       from: { path: '^src/shared' },
       to: {
         dependencyTypes: ['npm', 'npm-dev'],
-        pathNot: '^node_modules/zod(/|$)',
+        pathNot: '^(node_modules/)?(zod|temporal-polyfill)(/|$)',
       },
     },
     {
@@ -91,6 +101,7 @@ module.exports = {
   options: {
     doNotFollow: { path: 'node_modules' },
     tsConfig: { fileName: 'tsconfig.json' },
+    tsPreCompilationDeps: 'specify',
     enhancedResolveOptions: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     },

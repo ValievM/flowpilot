@@ -1,0 +1,26 @@
+# IPC contract
+
+Renderer access uses only `window.flowpilot`; Node, Electron, filesystem, and
+SQLite are not exposed. The API is defined by `FlowPilotApi` in `contracts.ts`,
+with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
+
+- `snapshot.load()` (`snapshot.load`): empty strict request; returns
+  an `IpcSnapshot`.
+- `commands.apply()` (`commands.apply`): strict
+  `{ commands, expectedRevision }`; returns the updated `IpcSnapshot`.
+- `settings.get()` (`settings.get`): empty strict request; returns settings.
+- `settings.set()` (`settings.set`): strict
+  `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
+- `app.info()` (`app.info`): empty strict request; returns `{ name, version }`.
+
+Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
+`StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
+`InternalError`. Schemas reject unknown fields. Settings writes use the same
+expected-revision transaction as commands. No filesystem paths cross the
+bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
+`IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
+
+Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
+`FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with
+`FLOWPILOT_TEST=1`. Packaged apps always use system time and Electron's
+user-data directory. The injected `Clock` makes tests deterministic.

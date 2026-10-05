@@ -56,6 +56,12 @@ export type {
   ScheduleAvailability,
   ScheduleSnapshot,
 } from './schedule/fixed-events';
+export { parseIcs } from './schedule/ics/parse-ics';
+export type {
+  ParseOptions,
+  ParseProblem,
+  ParseResult,
+} from './schedule/ics/types';
 export { parseRulesJson, validateRulesDocument } from './rules';
 export type {
   PriorityRule,
@@ -66,6 +72,14 @@ export type {
   TimeWindowRule,
   Weekday,
 } from './rules';
+export { canActivate, effectiveRules, lintRules } from './rules-linter';
+export type {
+  EffectiveRulesResult,
+  LintedRule,
+  RuleCatalog,
+  RuleDiagnostic,
+  RuleTaskScope,
+} from './rules-linter';
 export { addType, removeType, renameType } from './task-types';
 export type {
   AddTypeResult,
@@ -85,3 +99,4 @@ export type {
   RenameDisciplineResult,
 } from './disciplines';
 export type { CategoryColor, Discipline, TaskType } from './task';
+export { DEFAULT_REMINDER_SETTINGS, planReminders } from './reminders';

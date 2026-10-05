@@ -22,6 +22,7 @@ type ApplyOptions = {
   now: string;
   attachmentFiles: AttachmentFiles;
   preparedAttachments: ReadonlyMap<number, AttachmentRecord>;
+  source: 'user' | 'ai';
 };
 type CommandCapture = { index: number; options: ApplyOptions };
 type ChangeSet = Map<string, { before: EntitySnapshot; after: EntitySnapshot }>;
@@ -66,7 +67,7 @@ function applyTransaction(
     writeHistory(database, [...changes.values()], {
       revision,
       occurredAt: options.now,
-      source: 'user',
+      source: options.source,
     });
     return revision;
   });

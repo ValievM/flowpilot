@@ -1,5 +1,4 @@
 import type { Temporal } from 'temporal-polyfill';
-import type { HistoryEntry } from './history-log';
 import type {
   Task,
   TaskColumn,
@@ -7,6 +6,21 @@ import type {
   Subtask,
   TaskComment,
 } from '../domain';
+export type HistoryEntry = {
+  id: string;
+  revision: number;
+  occurredAt: string;
+  source: 'user' | 'ai' | 'undo';
+  batchId: string;
+  undoneEntryId: string | null;
+  entities: readonly {
+    kind: string;
+    id: string;
+    before: unknown;
+    after: unknown;
+    versionAfter: number | null;
+  }[];
+};
 
 export interface Clock {
   now(): Temporal.Instant;
