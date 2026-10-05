@@ -69,7 +69,7 @@ function deleteColumn(
     if (!target) throw new Error('target column not found');
     database
       .prepare(
-        `UPDATE tasks SET column_id = ?, status_kind = ?, waiting_reason = CASE WHEN ? = 'waiting' THEN waiting_reason ELSE NULL END,
+        `UPDATE tasks SET column_id = ?, status_kind = ?, waiting_reason = CASE WHEN ? = 'waiting' THEN COALESCE(waiting_reason, 'Перенесено в колонку ожидания') ELSE NULL END,
       waiting_until = CASE WHEN ? = 'waiting' THEN waiting_until ELSE NULL END, version = version + 1 WHERE column_id = ?`,
       )
       .run(targetId, target.state, target.state, target.state, id);

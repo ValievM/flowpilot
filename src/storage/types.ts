@@ -19,26 +19,34 @@ export interface Snapshot {
   readonly revision: number;
 }
 
+type TaskUpdateChanges = Partial<
+  Omit<
+    Pick<
+      Task,
+      | 'title'
+      | 'description'
+      | 'day'
+      | 'time'
+      | 'deadline'
+      | 'estimate'
+      | 'rolledOverFrom'
+      | 'addedOrder'
+      | 'status'
+    >,
+    'description' | 'day' | 'time' | 'deadline' | 'estimate' | 'rolledOverFrom'
+  >
+> & {
+  description?: string | null;
+  day?: Task['day'] | null;
+  time?: Task['time'] | null;
+  deadline?: Task['deadline'] | null;
+  estimate?: Task['estimate'] | null;
+  rolledOverFrom?: Task['rolledOverFrom'] | null;
+};
+
 export type StorageCommand =
   | { kind: 'task.create'; task: Task }
-  | {
-      kind: 'task.update';
-      id: string;
-      changes: Partial<
-        Pick<
-          Task,
-          | 'title'
-          | 'description'
-          | 'day'
-          | 'time'
-          | 'deadline'
-          | 'estimate'
-          | 'rolledOverFrom'
-          | 'addedOrder'
-          | 'status'
-        >
-      >;
-    }
+  | { kind: 'task.update'; id: string; changes: TaskUpdateChanges }
   | { kind: 'task.move'; id: string; columnId: string; status?: TaskStatus }
   | { kind: 'subtask.add'; taskId: string; subtask: Subtask }
   | {

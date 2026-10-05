@@ -22,6 +22,7 @@ const statusSchema = z.discriminatedUnion('kind', [
 ]);
 const dateSchema = dateValueSchema.optional();
 const timeSchema = timeValueSchema.optional();
+const clearableDateSchema = dateValueSchema.nullable().optional();
 const taskSchema = z.object({
   id: z.string().min(1),
   title: z.string().trim().min(1),
@@ -74,12 +75,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
     changes: z
       .object({
         title: z.string().trim().min(1).optional(),
-        description: z.string().optional(),
-        day: dateSchema,
-        time: timeSchema,
-        deadline: dateSchema,
-        estimate: taskSchema.shape.estimate,
-        rolledOverFrom: dateSchema,
+        description: z.string().nullable().optional(),
+        day: clearableDateSchema,
+        time: timeValueSchema.nullable().optional(),
+        deadline: clearableDateSchema,
+        estimate: taskSchema.shape.estimate.nullable(),
+        rolledOverFrom: clearableDateSchema,
         addedOrder: z.number().int().optional(),
         status: statusSchema.optional(),
       })
