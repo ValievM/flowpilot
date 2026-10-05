@@ -25,6 +25,10 @@ main-to-storage commands and are intentionally absent from `ipcCommandSchema`.
 The proposal validator checks snapshot IDs and revision/rule fingerprints before
 returning commands tagged with `source: 'ai'`; it does not call a provider or
 apply writes itself.
+AI `task.update` accepts only user-editable fields. AI `task.create` uses a
+separate strict input shape; conversion derives status from the target column,
+assigns the next add order, and initializes comments and attachments without
+accepting system fields from the proposal.
 
 Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
 `FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with

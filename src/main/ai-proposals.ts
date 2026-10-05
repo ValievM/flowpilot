@@ -11,6 +11,8 @@ import {
   proposalSchema,
   type AiCommand,
   type AiCommandBatch,
+  type AiPlannedCommand,
+  type AiTaskCreation,
   type Proposal,
 } from '../shared/ai-commands';
 
@@ -102,8 +104,14 @@ function commandKind(command: unknown): string {
 
 export function toStorageCommands(
   commands: readonly AiCommand[],
+  snapshot: AiSnapshot,
 ): AiCommandBatch {
-  return { commands, source: 'ai' };
+  const plannedCommands: AiPlannedCommand[] = commands.map((command) =>
+    command.kind === 'task.create'
+      ? { kind: 'task.create', task: buildTask(command.task, snapshot) }
+      : command,
+  );
+  return { commands: plannedCommands, source: 'ai' };
 }
 
 function validateCommand(
@@ -130,7 +138,7 @@ function validateCommandKind(
     case 'task.create':
       return validateCreatedTask(command.task, snapshot);
     case 'task.update':
-      return validateTaskUpdate(command, snapshot);
+      return undefined;
     case 'task.move':
       return validateMove(command, snapshot.columns);
     case 'subtask.add':
@@ -144,17 +152,6 @@ function validateCommandKind(
     case 'rule.activate':
       return validateRuleActivation(command.ruleId, snapshot.rules);
   }
-}
-function validateTaskUpdate(
-  command: Extract<AiCommand, { kind: 'task.update' }>,
-  snapshot: AiSnapshot,
-): string | undefined {
-  if (!command.changes.status) return undefined;
-  const task = snapshot.tasks.find((candidate) => candidate.id === command.id);
-  return task &&
-    matchesColumn(command.changes.status, task.columnId, snapshot.columns)
-    ? undefined
-    : 'status-column-mismatch';
 }
 
 function validateRuleActivation(
@@ -184,13 +181,15 @@ function taskIdFor(command: AiCommand): string | undefined {
 }
 
 function validateCreatedTask(
-  task: Task,
+  task: AiTaskCreation,
   snapshot: AiSnapshot,
 ): string | undefined {
   if (snapshot.tasks.some((existing) => existing.id === task.id))
     return 'task-id-conflict';
-  if (!snapshot.columns.some((column) => column.id === task.columnId))
-    return 'column-not-found';
+  const column = snapshot.columns.find(
+    (candidate) => candidate.id === task.columnId,
+  );
+  if (!column) return 'column-not-found';
   if (
     task.typeId &&
     !snapshot.taskTypes.some((type) => type.id === task.typeId)
@@ -203,9 +202,28 @@ function validateCreatedTask(
     )
   )
     return 'discipline-not-found';
-  return matchesColumn(task.status, task.columnId, snapshot.columns)
-    ? undefined
-    : 'status-column-mismatch';
+  return column.state === 'waiting' ? 'waiting-reason-required' : undefined;
+}
+
+function buildTask(task: AiTaskCreation, snapshot: AiSnapshot): Task {
+  const column = snapshot.columns.find(
+    (candidate) => candidate.id === task.columnId,
+  );
+  if (!column || column.state === 'waiting')
+    throw new Error('Cannot build an AI task without a supported column');
+  const addedOrder =
+    snapshot.tasks.reduce(
+      (highest, existing) => Math.max(highest, existing.addedOrder),
+      -1,
+    ) + 1;
+  const { comment, ...fields } = task;
+  return {
+    ...fields,
+    status: { kind: column.state },
+    comments: comment ? [comment] : [],
+    attachments: [],
+    addedOrder,
+  };
 }
 
 function validateMove(
@@ -222,16 +240,6 @@ function validateMove(
     return 'waiting-reason-required';
   if (status && status.kind !== column.state) return 'status-column-mismatch';
   return undefined;
-}
-
-function matchesColumn(
-  status: { kind: string },
-  columnId: string,
-  columns: readonly TaskColumn[],
-): boolean {
-  return columns.some(
-    (column) => column.id === columnId && column.state === status.kind,
-  );
 }
 
 function validateClassification(

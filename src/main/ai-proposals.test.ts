@@ -149,9 +149,10 @@ describe('AI proposal contract', () => {
     const command = {
       kind: 'task.create',
       task: {
-        ...task,
         id: 'new-task',
         title: 'New',
+        columnId: 'todo',
+        subtasks: [],
         estimate: { unit: 'hours', value: 3 },
       },
     };
@@ -161,7 +162,13 @@ describe('AI proposal contract', () => {
   it('rejects task creation with unknown type ids without dropping remaining commands', () => {
     const command = {
       kind: 'task.create',
-      task: { ...task, id: 'new', title: 'New', typeId: 'missing' },
+      task: {
+        id: 'new',
+        title: 'New',
+        columnId: 'todo',
+        typeId: 'missing',
+        subtasks: [],
+      },
     };
     const result = validateProposal(
       proposal([
@@ -189,7 +196,17 @@ describe('AI proposal contract', () => {
   it('preserves an ambiguous deadline as an unknown instead of inventing a date', () => {
     const result = validateProposal(
       proposal(
-        [{ kind: 'task.create', task: { ...task, id: 'new', title: 'New' } }],
+        [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'new',
+              title: 'New',
+              columnId: 'todo',
+              subtasks: [],
+            },
+          },
+        ],
         { unknowns: ['deadline: Friday is ambiguous'] },
       ),
       snapshot,
@@ -232,7 +249,10 @@ describe('AI proposal contract', () => {
       { kind: 'task.setAiRank', taskId: 'task-1', rank: 1 },
       { kind: 'task.classify', taskId: 'task-1', disciplineId: 'discipline-1' },
     ] as const;
-    expect(toStorageCommands(commands)).toEqual({ commands, source: 'ai' });
+    expect(toStorageCommands(commands, snapshot)).toEqual({
+      commands,
+      source: 'ai',
+    });
   });
 
   it('does not expose internal AI-only commands through renderer IPC', () => {
