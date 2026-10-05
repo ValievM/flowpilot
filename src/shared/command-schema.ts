@@ -99,9 +99,15 @@ export function validateSettingValue(
     context.addIssue({ code: 'custom', message: 'Invalid setting value' });
   }
 }
+const ipcTaskSchema = taskSchema
+  .extend({ attachments: z.array(z.never()) })
+  .strict();
 
 const taskCreateSchema = z
   .object({ kind: z.literal('task.create'), task: taskSchema })
+  .strict();
+const ipcTaskCreateSchema = z
+  .object({ kind: z.literal('task.create'), task: ipcTaskSchema })
   .strict();
 const taskUpdateSchema = z
   .object({
@@ -197,7 +203,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
 ]);
 
 export const ipcCommandSchema = z.discriminatedUnion('kind', [
-  taskCreateSchema,
+  ipcTaskCreateSchema,
   taskUpdateSchema,
   taskMoveSchema,
   subtaskAddSchema,

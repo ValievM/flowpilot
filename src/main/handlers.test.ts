@@ -106,46 +106,41 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('rejects forged attachments without touching storage', () => {
+  it('rejects task creation with renderer-supplied attachments without changing storage', () => {
     const repository = openRepository();
-    const task = {
-      id: 'task-ipc',
-      title: 'Plan',
-      description: '',
-      status: { kind: 'todo' as const },
-      columnId: 'todo',
-      day: '2026-10-05',
-      subtasks: [],
-      comments: [],
-      attachments: [],
-      addedOrder: 0,
-    };
-    applyCommands(
-      { commands: [{ kind: 'task.create', task }], expectedRevision: 0 },
+    const result = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'task-ipc',
+              title: 'Plan',
+              description: '',
+              status: { kind: 'todo' as const },
+              columnId: 'todo',
+              day: '2026-10-05',
+              subtasks: [],
+              comments: [],
+              attachments: [
+                {
+                  id: 'attachment-ipc',
+                  name: 'notes.txt',
+                  mediaType: 'text/plain',
+                  sizeBytes: 12,
+                },
+              ],
+              addedOrder: 0,
+            },
+          },
+        ],
+        expectedRevision: 0,
+      },
       { repository },
     );
-    expect(
-      applyCommands(
-        {
-          commands: [
-            {
-              kind: 'attachment.add',
-              taskId: 'task-ipc',
-              attachment: {
-                id: 'attachment-ipc',
-                name: 'notes.txt',
-                mediaType: 'text/plain',
-                sizeBytes: 12,
-              },
-            },
-          ],
-          expectedRevision: 1,
-        },
-        { repository },
-      ),
-    ).toEqual({ ok: false, error: 'ValidationFailed' });
-    expect(repository.load().revision).toBe(1);
-    expect(repository.load().tasks[0]?.attachments).toEqual([]);
+    expect(result).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(0);
+    expect(repository.load().tasks).toEqual([]);
     repository.close();
   });
 
