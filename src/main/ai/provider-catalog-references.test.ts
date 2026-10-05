@@ -18,6 +18,15 @@ const context = {
   disciplines: [{ id: 'discipline-1' }],
   rules: [{ id: 'rule-1' }],
 };
+const referenceIndex = {
+  columns: [{ id: 'todo', state: 'todo' as const }],
+  taskTypeIds: ['type-1'],
+  disciplineIds: ['discipline-1'],
+  ruleIds: ['rule-1'],
+  taskIds: ['task-1'],
+  subtaskIds: [],
+  commentIds: [],
+};
 const ruleDocument = (typeId: string, disciplineId: string) =>
   JSON.stringify({
     schema_version: 'v1',
@@ -61,7 +70,11 @@ describe('provider catalog references', () => {
       },
     ];
     expect(
-      validateProviderReply({ ...proposal, commands: validCommands }, context),
+      validateProviderReply(
+        { ...proposal, commands: validCommands },
+        context,
+        referenceIndex,
+      ),
     ).toEqual({
       ok: true,
       value: { ...proposal, commands: validCommands },
@@ -96,7 +109,11 @@ describe('provider catalog references', () => {
     ];
     expect(
       invalidCommands.map((command) =>
-        validateProviderReply({ ...proposal, commands: [command] }, context),
+        validateProviderReply(
+          { ...proposal, commands: [command] },
+          context,
+          referenceIndex,
+        ),
       ),
     ).toEqual(
       invalidCommands.map(() => ({

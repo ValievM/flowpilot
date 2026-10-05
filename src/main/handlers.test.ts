@@ -15,6 +15,7 @@ import {
 } from './handlers';
 import { registerIpcHandlers } from './ipc-handlers';
 import type { IpcMainInvokeEvent } from 'electron';
+import type { AiIpcResult } from '../shared/contracts';
 import { ipcChannels } from '../shared/contracts';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
 
@@ -333,12 +334,18 @@ describe('IPC handlers', () => {
         },
         {
           kind: 'task.update',
-          id: 'task-1',
+          id: 'scripted-task',
           changes: {
             day: '2026-10-07',
             time: '14:45',
             deadline: '2026-10-10',
           },
+        },
+        {
+          kind: 'task.move',
+          id: 'scripted-task',
+          columnId: 'waiting',
+          status: { kind: 'waiting', reason: 'Blocked', until: '2026-10-12' },
         },
       ],
       rationale: 'Scripted test reply',
@@ -379,9 +386,18 @@ describe('IPC handlers', () => {
       {} as IpcMainInvokeEvent,
       {
         operationId: 'startup-scripted',
-        context: {
-          tasks: [{ id: 'task-1' }],
-          columns: [{ id: 'todo' }],
+        context: { tasks: [{ id: 'task-1' }] },
+        referenceIndex: {
+          columns: [
+            { id: 'todo', state: 'todo' },
+            { id: 'waiting', state: 'waiting' },
+          ],
+          taskTypeIds: [],
+          disciplineIds: [],
+          ruleIds: [],
+          taskIds: ['task-1'],
+          subtaskIds: [],
+          commentIds: [],
         },
         instruction: 'Return the scripted proposal',
         responseSchema: { type: 'object' },
@@ -407,17 +423,31 @@ describe('IPC handlers', () => {
           },
           {
             kind: 'task.update',
-            id: 'task-1',
+            id: 'scripted-task',
             changes: {
               day: '2026-10-07',
               time: '14:45:00',
               deadline: '2026-10-10',
             },
           },
+          {
+            kind: 'task.move',
+            id: 'scripted-task',
+            columnId: 'waiting',
+            status: { kind: 'waiting', reason: 'Blocked', until: '2026-10-12' },
+          },
         ],
       },
     });
     expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+    // Safe: this is the public result of the registered AI IPC handler.
+    const ipcResult = result as AiIpcResult;
+    if (!ipcResult.ok) throw new Error('Expected a successful AI proposal');
+    const move = ipcResult.value.commands[2];
+    if (move?.kind !== 'task.move' || move.status?.kind !== 'waiting')
+      throw new Error('Expected the waiting task move command');
+    expect(move.status.until).toBe('2026-10-12');
+    expect(move.status.until).not.toBeInstanceOf(Temporal.PlainDate);
     repository.close();
   });
 });

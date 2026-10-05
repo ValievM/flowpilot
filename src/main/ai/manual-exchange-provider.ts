@@ -6,6 +6,7 @@ interface ManualSession {
   readonly prompt: string;
   readonly resolve: (result: ProviderResult<Proposal>) => void;
   readonly context: unknown;
+  readonly referenceIndex: AiRequest['referenceIndex'];
   readonly signal: AbortSignal;
 }
 
@@ -28,6 +29,7 @@ export class ManualExchangeProvider implements AiProvider {
       resolve: (result: ProviderResult<Proposal>) => settle?.(result),
       signal,
       context: request.context,
+      referenceIndex: request.referenceIndex,
     };
     this.sessions.set(request.operationId, session);
     signal.addEventListener(
@@ -49,7 +51,9 @@ export class ManualExchangeProvider implements AiProvider {
     const session = this.sessions.get(operationId);
     if (!session || session.signal.aborted) return false;
     this.sessions.delete(operationId);
-    session.resolve(parseProviderText(text, session.context));
+    session.resolve(
+      parseProviderText(text, session.context, session.referenceIndex),
+    );
     return true;
   }
 }

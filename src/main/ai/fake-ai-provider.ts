@@ -34,7 +34,11 @@ export class FakeAiProvider implements AiProvider {
     }
     if (step.scenario === 'timeout') return waitForAbort(signal);
     await step.wait?.();
-    return validateProviderReply(fakeReply(step), request.context);
+    return validateProviderReply(
+      fakeReply(step),
+      request.context,
+      request.referenceIndex,
+    );
   }
 }
 

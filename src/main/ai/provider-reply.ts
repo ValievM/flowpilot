@@ -1,3 +1,7 @@
+import {
+  aiReferenceIndexSchema,
+  type AiReferenceIndex,
+} from '../../shared/ai-reference-index';
 import { parseRulesJson, validateRulesDocument } from '../../domain';
 import { z } from 'zod';
 import {
@@ -8,23 +12,12 @@ import {
 } from '../../shared/ai-commands';
 import type { ProviderResult } from './ai-provider';
 
-const contextNestedSchema = z.looseObject({ id: z.string().min(1) });
-const contextTaskSchema = z.looseObject({
-  id: z.string().min(1),
-  subtasks: z.array(contextNestedSchema).optional(),
-  comments: z.array(contextNestedSchema).optional(),
-});
-const contextColumnSchema = z.looseObject({ id: z.string().min(1) });
-const contextTypeSchema = z.looseObject({ id: z.string().min(1) });
+const contextTaskSchema = z.looseObject({ id: z.string().min(1) });
 const contextSchema = z.looseObject({
   tasks: z.array(contextTaskSchema),
-  columns: z.array(contextColumnSchema).optional(),
-  taskTypes: z.array(contextTypeSchema).optional(),
-  disciplines: z.array(contextTypeSchema).optional(),
-  rules: z.array(contextTypeSchema).optional(),
 });
 interface ValidationState {
-  readonly columnIds: Set<string>;
+  readonly columnStates: ReadonlyMap<string, string>;
   readonly taskTypeIds: Set<string>;
   readonly disciplineIds: Set<string>;
   readonly ruleIds: Set<string>;
@@ -36,11 +29,17 @@ interface ValidationState {
 export function validateProviderReply(
   value: unknown,
   context: unknown,
+  references: unknown,
 ): ProviderResult<Proposal> {
   const parsed = proposalSchema.safeParse(value);
   const parsedContext = contextSchema.safeParse(context);
-  if (!parsed.success || !parsedContext.success) return invalidReply();
-  const state = createValidationState(parsedContext.data);
+  const parsedReferences = aiReferenceIndexSchema.safeParse(references);
+  if (!parsed.success || !parsedContext.success || !parsedReferences.success)
+    return invalidReply();
+  const state = createValidationState(
+    parsedContext.data,
+    parsedReferences.data,
+  );
   const commands: AiCommand[] = [];
   for (const candidate of parsed.data.commands) {
     const command = aiCommandSchema.safeParse(candidate);
@@ -55,31 +54,30 @@ export function validateProviderReply(
 export function parseProviderText(
   text: string,
   context: unknown,
+  references: unknown,
 ): ProviderResult<Proposal> {
   try {
     const value: unknown = JSON.parse(text);
-    return validateProviderReply(value, context);
+    return validateProviderReply(value, context, references);
   } catch {
     return invalidReply();
   }
 }
 
 function createValidationState(
-  context: z.infer<typeof contextSchema>,
+  _context: z.infer<typeof contextSchema>,
+  references: AiReferenceIndex,
 ): ValidationState {
-  const { tasks } = context;
   return {
-    columnIds: new Set((context.columns ?? []).map(({ id }) => id)),
-    taskTypeIds: new Set((context.taskTypes ?? []).map(({ id }) => id)),
-    disciplineIds: new Set((context.disciplines ?? []).map(({ id }) => id)),
-    ruleIds: new Set((context.rules ?? []).map(({ id }) => id)),
-    taskIds: new Set(tasks.map(({ id }) => id)),
-    subtaskIds: new Set(
-      tasks.flatMap(({ subtasks = [] }) => subtasks.map(({ id }) => id)),
+    columnStates: new Map(
+      references.columns.map(({ id, state }) => [id, state]),
     ),
-    commentIds: new Set(
-      tasks.flatMap(({ comments = [] }) => comments.map(({ id }) => id)),
-    ),
+    taskTypeIds: new Set(references.taskTypeIds),
+    disciplineIds: new Set(references.disciplineIds),
+    ruleIds: new Set(references.ruleIds),
+    taskIds: new Set(references.taskIds),
+    subtaskIds: new Set(references.subtaskIds),
+    commentIds: new Set(references.commentIds),
   };
 }
 
@@ -106,8 +104,9 @@ function hasValidCommandReferences(
   state: ValidationState,
 ): boolean {
   switch (command.kind) {
-    case 'task.move':
-      return state.columnIds.has(command.columnId);
+    case 'task.move': {
+      return hasValidMoveReferences(command, state);
+    }
     case 'task.classify':
       return (
         (!command.typeId || state.taskTypeIds.has(command.typeId)) &&
@@ -120,6 +119,20 @@ function hasValidCommandReferences(
     default:
       return true;
   }
+}
+
+function hasValidMoveReferences(
+  command: Extract<AiCommand, { kind: 'task.move' }>,
+  state: ValidationState,
+): boolean {
+  const columnState = state.columnStates.get(command.columnId);
+  if (!columnState) return false;
+  if (
+    columnState === 'waiting' &&
+    (command.status?.kind !== 'waiting' || !command.status.reason.trim())
+  )
+    return false;
+  return command.status === undefined || command.status.kind === columnState;
 }
 function hasValidRuleReferences(
   documentJson: string,
@@ -135,7 +148,6 @@ function hasValidRuleReferences(
     (scope.discipline_ids ?? []).every((id) => state.disciplineIds.has(id))
   );
 }
-
 function hasValidCreatedTaskReferences(
   task: Extract<AiCommand, { kind: 'task.create' }>['task'],
   state: ValidationState,
@@ -144,7 +156,8 @@ function hasValidCreatedTaskReferences(
     (task.typeId === undefined || state.taskTypeIds.has(task.typeId)) &&
     (task.disciplineId === undefined ||
       state.disciplineIds.has(task.disciplineId)) &&
-    state.columnIds.has(task.columnId)
+    state.columnStates.has(task.columnId) &&
+    state.columnStates.get(task.columnId) !== 'waiting'
   );
 }
 function acceptCreatedTask(

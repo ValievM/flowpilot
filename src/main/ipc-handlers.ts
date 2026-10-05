@@ -44,7 +44,7 @@ export function registerIpcHandlers(
     getAppInfo(request, deps.appInfo),
   );
   ipc.handle(ipcChannels.aiRun, (_event, request: unknown) =>
-    runAiRequest(request, deps.aiRunner),
+    runAiRequest(request, deps.aiRunner, deps.repository.load()),
   );
   ipc.handle(ipcChannels.aiCancel, (_event, request: unknown) =>
     cancelAiRequest(request, deps.aiRunner),

@@ -17,7 +17,16 @@ const proposal: Proposal = {
 };
 const request = {
   operationId: 'operation-1',
-  context: { tasks: [{ id: 'task-1' }], columns: [{ id: 'todo' }] },
+  context: { tasks: [{ id: 'task-1' }] },
+  referenceIndex: {
+    columns: [{ id: 'todo', state: 'todo' as const }],
+    taskTypeIds: [],
+    disciplineIds: [],
+    ruleIds: [],
+    taskIds: ['task-1', 'hidden-task-id'],
+    subtaskIds: [],
+    commentIds: [],
+  },
   instruction: 'Return a proposal',
   responseSchema: { type: 'object' },
 };
@@ -54,6 +63,7 @@ describe('AI provider contract', () => {
     const waiting = provider.ask(request, controller.signal);
     await Promise.resolve();
     const prompt = provider.getPrompt('operation-1');
+    expect(prompt).not.toContain('hidden-task-id');
 
     expect(prompt).toContain(JSON.stringify(request.context, null, 2));
     expect(prompt).toContain(JSON.stringify(request.responseSchema, null, 2));
@@ -181,6 +191,7 @@ describe('AI provider contract', () => {
           ],
         },
         request.context,
+        request.referenceIndex,
       ),
     ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
   });
@@ -201,7 +212,11 @@ describe('AI provider contract', () => {
       { kind: 'task.setAiRank', taskId: 'created-task', rank: 1 },
     ];
     expect(
-      validateProviderReply({ ...proposal, commands }, request.context),
+      validateProviderReply(
+        { ...proposal, commands },
+        request.context,
+        request.referenceIndex,
+      ),
     ).toEqual({ ok: true, value: { ...proposal, commands } });
 
     expect(
@@ -213,6 +228,7 @@ describe('AI provider contract', () => {
           ],
         },
         request.context,
+        request.referenceIndex,
       ),
     ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
     expect(
@@ -225,6 +241,7 @@ describe('AI provider contract', () => {
           ],
         },
         request.context,
+        request.referenceIndex,
       ),
     ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
   });
@@ -233,6 +250,7 @@ describe('AI provider contract', () => {
       validateProviderReply(
         { ...proposal, commands: [{ kind: 'task.delete', taskId: 'task-1' }] },
         request.context,
+        request.referenceIndex,
       ),
     ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
   });

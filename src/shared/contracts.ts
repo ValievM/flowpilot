@@ -1,3 +1,4 @@
+import { aiReferenceIndexSchema } from './ai-reference-index';
 import { z } from 'zod';
 import {
   ipcCommandSchema,
@@ -29,6 +30,16 @@ type SerializedTaskChanges = Omit<
   readonly time?: string | null;
   readonly deadline?: string | null;
 };
+type MoveStatus = NonNullable<
+  Extract<AiCommand, { kind: 'task.move' }>['status']
+>;
+type SerializedMoveStatus =
+  | Exclude<MoveStatus, { kind: 'waiting' }>
+  | { kind: 'waiting'; reason: string; until?: string };
+type SerializedTaskMove = Omit<
+  Extract<AiCommand, { kind: 'task.move' }>,
+  'status'
+> & { readonly status?: SerializedMoveStatus };
 export type AiIpcCommand =
   | { readonly kind: 'task.create'; readonly task: SerializedTaskCreation }
   | {
@@ -36,7 +47,8 @@ export type AiIpcCommand =
       readonly id: string;
       readonly changes: SerializedTaskChanges;
     }
-  | Exclude<AiCommand, { kind: 'task.create' | 'task.update' }>;
+  | SerializedTaskMove
+  | Exclude<AiCommand, { kind: 'task.create' | 'task.update' | 'task.move' }>;
 export type AiIpcProposal = Omit<Proposal, 'commands'> & {
   readonly commands: readonly AiIpcCommand[];
 };
@@ -72,6 +84,7 @@ export const aiRequestSchema = z
   .object({
     operationId: z.string().min(1),
     context: z.unknown(),
+    referenceIndex: aiReferenceIndexSchema,
     instruction: z.string().min(1),
     responseSchema: z.record(z.string(), z.unknown()),
   })

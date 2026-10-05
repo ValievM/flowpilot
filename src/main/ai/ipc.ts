@@ -1,3 +1,6 @@
+import { createAiReferenceIndex } from '../../shared/ai-reference-index';
+import type { Snapshot } from '../../storage';
+import type { TaskStatus } from '../../domain';
 import { Temporal } from 'temporal-polyfill';
 import type {
   AiCommand,
@@ -22,10 +25,22 @@ import type { ManualExchangeProvider } from './manual-exchange-provider';
 export async function runAiRequest(
   input: unknown,
   runner: AiRunner,
+  snapshot: Pick<Snapshot, 'columns' | 'tasks'>,
 ): Promise<AiIpcResult> {
   const parsed = aiRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'ValidationFailed' };
-  const result = await runner.run(parsed.data);
+  const result = await runner.run({
+    ...parsed.data,
+    referenceIndex: createAiReferenceIndex({
+      columns: snapshot.columns,
+      tasks: snapshot.tasks,
+      taskTypes: parsed.data.referenceIndex.taskTypeIds.map((id) => ({ id })),
+      disciplines: parsed.data.referenceIndex.disciplineIds.map((id) => ({
+        id,
+      })),
+      rules: parsed.data.referenceIndex.ruleIds.map((id) => ({ id })),
+    }),
+  });
   if (!result.ok) return { ok: false, error: result.error.kind };
   return { ok: true, value: serializeProposal(result.value) };
 }
@@ -44,7 +59,30 @@ function serializeCommand(command: AiCommand): AiIpcCommand {
   if (command.kind === 'task.update') {
     return { ...command, changes: serializeTaskChanges(command.changes) };
   }
+  if (command.kind === 'task.move') {
+    return command.status
+      ? {
+          kind: 'task.move',
+          id: command.id,
+          columnId: command.columnId,
+          status: serializeMoveStatus(command.status),
+        }
+      : { kind: 'task.move', id: command.id, columnId: command.columnId };
+  }
   return command;
+}
+
+function serializeMoveStatus(
+  status: TaskStatus,
+): NonNullable<Extract<AiIpcCommand, { kind: 'task.move' }>['status']> {
+  if (status.kind !== 'waiting') return status;
+  const { until, ...waitingStatus } = status;
+  return until
+    ? {
+        ...waitingStatus,
+        until: Temporal.PlainDate.from(until).toString(),
+      }
+    : waitingStatus;
 }
 
 function serializeTaskCreation(task: AiTaskCreation) {
