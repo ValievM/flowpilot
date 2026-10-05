@@ -34,9 +34,14 @@ AI calls are explicit through `ai.run()` and `ai.cancel()`. The manual provider
 also exposes `ai.prompt()` and `ai.reply()` for text exchange without clipboard
 or network access. Replies pass strict proposal and command validation before
 they leave the provider. The fake provider is selected only in unpackaged
-`FLOWPILOT_TEST=1` builds; manual exchange is the default.
+`FLOWPILOT_TEST=1` builds; manual exchange is the default. No persisted setting
+selects an AI provider.
 
-Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
-`FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with
-`FLOWPILOT_TEST=1`. Packaged apps always use system time and Electron's
-user-data directory. The injected `Clock` makes tests deterministic.
+`FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded proposal in an unpackaged
+test build with `FLOWPILOT_TEST=1`; the startup fake returns it through
+`ai.run`. Missing or invalid test replies return `ProviderUnavailable`.
+
+Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, `FLOWPILOT_TEST_PROFILE`,
+and `FLOWPILOT_TEST_AI_REPLY` are honored only for unpackaged applications with
+`FLOWPILOT_TEST=1`. Packaged apps always use system time, Electron's user-data
+directory, and manual exchange for AI. The injected `Clock` makes tests deterministic.

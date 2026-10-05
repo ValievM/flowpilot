@@ -14,6 +14,9 @@ import {
   setSetting,
 } from './handlers';
 import { registerIpcHandlers } from './ipc-handlers';
+import type { IpcMainInvokeEvent } from 'electron';
+import { ipcChannels } from '../shared/contracts';
+import { createStartupAiRunner } from './ai/startup-ai-runner';
 
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
@@ -306,6 +309,61 @@ describe('IPC handlers', () => {
       'ai.prompt',
       'ai.reply',
     ]);
+    repository.close();
+  });
+  it('returns a scripted test fake reply through startup and ai.run IPC', async () => {
+    const repository = openRepository();
+    const manualProvider = new ManualExchangeProvider();
+    const proposal = {
+      id: 'scripted-proposal',
+      baseRevision: 1,
+      ruleVersions: {},
+      commands: [{ kind: 'task.setAiRank', taskId: 'task-1', rank: 2 }],
+      rationale: 'Scripted test reply',
+      unknowns: [],
+      createdAt: '2026-10-05T12:00:00Z',
+    };
+    const aiRunner = createStartupAiRunner(
+      false,
+      {
+        FLOWPILOT_TEST: '1',
+        FLOWPILOT_TEST_AI_REPLY: JSON.stringify(proposal),
+      },
+      manualProvider,
+    );
+    const handlers = new Map<
+      string,
+      (event: IpcMainInvokeEvent, request: unknown) => unknown
+    >();
+    registerIpcHandlers(
+      {
+        handle: (channel, handler) => {
+          handlers.set(channel, handler);
+        },
+      },
+      {
+        repository,
+        appInfo: {
+          getName: () => 'FlowPilot',
+          getVersion: () => '0.1.0',
+        },
+        aiRunner,
+        manualProvider,
+      },
+    );
+
+    // The IPC handler ignores Electron's event, so an empty event is safe here.
+    const result = await handlers.get(ipcChannels.aiRun)?.(
+      {} as IpcMainInvokeEvent,
+      {
+        operationId: 'startup-scripted',
+        context: { tasks: [{ id: 'task-1' }] },
+        instruction: 'Return the scripted proposal',
+        responseSchema: { type: 'object' },
+      },
+    );
+
+    expect(result).toEqual({ ok: true, value: proposal });
     repository.close();
   });
 });

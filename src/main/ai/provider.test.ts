@@ -147,11 +147,7 @@ describe('AI provider contract', () => {
   it('only selects fake for explicitly enabled unpackaged test builds', () => {
     const manualProvider = fake('success');
     const fakeProvider = fake('unavailable');
-    const selection = {
-      manualProvider,
-      fakeProvider,
-      choice: 'fake' as const,
-    };
+    const selection = { manualProvider, fakeProvider };
     expect(
       selectAiProvider({
         ...selection,
@@ -182,6 +178,50 @@ describe('AI provider contract', () => {
           ...proposal,
           commands: [
             { kind: 'task.setAiRank', taskId: 'missing-task', rank: 0 },
+          ],
+        },
+        request.context,
+      ),
+    ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
+  });
+  it('accepts references to earlier created tasks and rejects duplicate IDs', () => {
+    const createdTask = {
+      id: 'created-task',
+      title: 'Created task',
+      columnId: 'todo',
+      subtasks: [],
+    };
+    const commands = [
+      { kind: 'task.create', task: createdTask },
+      {
+        kind: 'task.update',
+        id: 'created-task',
+        changes: { title: 'Updated' },
+      },
+      { kind: 'task.setAiRank', taskId: 'created-task', rank: 1 },
+    ];
+    expect(
+      validateProviderReply({ ...proposal, commands }, request.context),
+    ).toEqual({ ok: true, value: { ...proposal, commands } });
+
+    expect(
+      validateProviderReply(
+        {
+          ...proposal,
+          commands: [
+            { kind: 'task.create', task: { ...createdTask, id: 'task-1' } },
+          ],
+        },
+        request.context,
+      ),
+    ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
+    expect(
+      validateProviderReply(
+        {
+          ...proposal,
+          commands: [
+            { kind: 'task.create', task: createdTask },
+            { kind: 'task.create', task: createdTask },
           ],
         },
         request.context,

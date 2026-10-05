@@ -4,10 +4,8 @@ import path from 'node:path';
 import { Repository } from '../storage';
 import { registerIpcHandlers } from './ipc-handlers';
 import { selectRuntimeOptions } from './runtime';
-import { AiRunner } from './ai/ai-runner';
-import { FakeAiProvider } from './ai/fake-ai-provider';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
-import { selectAiProvider } from './ai/provider-selection';
+import { createStartupAiRunner } from './ai/startup-ai-runner';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -39,18 +37,11 @@ if (!app.requestSingleInstanceLock()) {
         path.join(runtime.profilePath, 'flowpilot.db'),
         runtime.clock,
       );
-      const providerChoice =
-        repository.load().settings['ai.provider'] === 'fake'
-          ? 'fake'
-          : 'manual';
-      const provider = selectAiProvider({
-        isPackaged: app.isPackaged,
-        environment: process.env,
+      const aiRunner = createStartupAiRunner(
+        app.isPackaged,
+        process.env,
         manualProvider,
-        fakeProvider: new FakeAiProvider([]),
-        choice: providerChoice,
-      });
-      const aiRunner = new AiRunner(provider);
+      );
       registerIpcHandlers(ipcMain, {
         repository,
         appInfo: {
