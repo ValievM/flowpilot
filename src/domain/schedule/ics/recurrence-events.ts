@@ -3,6 +3,7 @@ import type { FixedEvent } from '../fixed-events';
 import { firstProperty, makeEvent } from './event-properties';
 import {
   endForOccurrence,
+  recurrenceOrdinal,
   startKey,
   startOnDate,
   untilAllows,
@@ -64,9 +65,12 @@ function eventStart(
 function eventForDate(
   plan: RecurrencePlan,
   date: TemporalTypes.PlainDate,
-  index: number,
 ): FixedEvent | undefined {
-  if (plan.count > 0 && index >= plan.count) return undefined;
+  if (
+    plan.count > 0 &&
+    recurrenceOrdinal(plan.start, date, plan.rule) > plan.count
+  )
+    return undefined;
   const start = startOnDate(plan.start, date);
   if (
     !untilAllows(plan.rule.get('UNTIL'), start) ||
@@ -86,8 +90,8 @@ function eventForDate(
 }
 
 export function materializeRecurrence(plan: RecurrencePlan): FixedEvent[] {
-  return plan.dates.flatMap((date, index) => {
-    const event = eventForDate(plan, date, index);
+  return plan.dates.flatMap((date) => {
+    const event = eventForDate(plan, date);
     return event ? [event] : [];
   });
 }

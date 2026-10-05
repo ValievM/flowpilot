@@ -148,6 +148,23 @@ describe('parseIcs', () => {
       result.events.map(({ start }) => start.toPlainDate().toString()),
     ).toEqual(['2026-10-05', '2026-10-12']);
   });
+  it('stops an old weekly series after its COUNT is exhausted', () => {
+    const text = [
+      'BEGIN:VEVENT',
+      'UID:old-counted',
+      'DTSTART;TZID=America/New_York:20000103T100000',
+      'DURATION:PT1H',
+      'RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=2',
+      'END:VEVENT',
+    ].join('\n');
+    const result = parseIcs(text, {
+      ...options,
+      from: Temporal.PlainDate.from('2026-10-05'),
+      to: Temporal.PlainDate.from('2026-10-18'),
+    });
+    expect(result.problems).toEqual([]);
+    expect(result.events).toEqual([]);
+  });
   it('applies weekly COUNT and INTERVAL limits', () => {
     const text = [
       'BEGIN:VEVENT',

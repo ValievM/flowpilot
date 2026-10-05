@@ -58,6 +58,33 @@ function weekdaysOf(
   return days.filter((day): day is number => day !== undefined);
 }
 
+export function recurrenceOrdinal(
+  start: TemporalTypes.ZonedDateTime,
+  date: TemporalTypes.PlainDate,
+  rule: ReadonlyMap<string, string>,
+): number {
+  const interval = intervalOf(rule);
+  const weekdays = weekdaysOf(rule, start);
+  const startDate = start.toPlainDate();
+  const startWeek = startDate.subtract({ days: start.dayOfWeek - 1 });
+  const dateWeek = date.subtract({ days: date.dayOfWeek - 1 });
+  const weekIndex = Math.floor(startWeek.until(dateWeek).days / 7);
+  const fullWeeks = Math.ceil(weekIndex / interval);
+  const priorDates = fullWeeks * weekdays.length;
+  const firstWeekBeforeStart = weekdays.filter(
+    (weekday) => weekday <= start.dayOfWeek,
+  ).length;
+  const currentWeekThroughDate =
+    weekIndex % interval === 0
+      ? weekdays.filter((weekday) => weekday <= date.dayOfWeek).length
+      : 0;
+  const firstWeekAdjustment =
+    weekIndex === 0
+      ? firstWeekBeforeStart
+      : weekdays.filter((weekday) => weekday <= start.dayOfWeek).length;
+  return 1 + priorDates - firstWeekAdjustment + currentWeekThroughDate;
+}
+
 function matchesWeeklyDate(
   date: TemporalTypes.PlainDate,
   startWeek: TemporalTypes.PlainDate,
