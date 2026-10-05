@@ -1,0 +1,12 @@
+package-lock.json
+.vite/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+**/__snapshots__/
+**/*.snap
+docs/
+**/*.md
+src/renderer/styles/tokens.css
