@@ -54,6 +54,9 @@ for (const theme of ['light', 'dark'] as const) {
     await page.evaluate((selectedTheme) => {
       document.documentElement.dataset.theme = selectedTheme;
     }, theme);
-    await expect(page).toHaveScreenshot(`welcome-${theme}.png`);
+    // macOS renderers can disagree on an isolated edge pixel.
+    await expect(page).toHaveScreenshot(`welcome-${theme}.png`, {
+      maxDiffPixelRatio: 0.00001,
+    });
   });
 }
