@@ -24,8 +24,8 @@ AI proposals use a separate strict command contract in `ai-commands.ts`.
 main-to-storage commands and are intentionally absent from `ipcCommandSchema`.
 The proposal validator checks snapshot IDs and revision/rule fingerprints before
 returning commands tagged with `source: 'ai'`; it does not call a provider or
-apply writes itself. The provider boundary also checks task, nested, and column
-IDs against its request context.
+apply writes itself. The provider boundary also checks task, nested, column, and
+task-type IDs against its request context.
 AI `task.update` accepts only user-editable fields. AI `task.create` uses a
 separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without

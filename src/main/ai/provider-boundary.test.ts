@@ -23,6 +23,7 @@ const nestedContext = {
     },
   ],
   columns: [{ id: 'todo' }],
+  taskTypes: [{ id: 'type-1' }],
 };
 
 describe('AI provider boundary', () => {
@@ -192,6 +193,38 @@ describe('AI provider boundary', () => {
       { ok: false, error: { kind: 'InvalidReply' } },
       { ok: false, error: { kind: 'InvalidReply' } },
     ]);
+  });
+  it('validates task type references against the request context', () => {
+    const command = {
+      kind: 'task.create',
+      task: {
+        id: 'typed-task',
+        title: 'Typed task',
+        columnId: 'todo',
+        typeId: 'type-1',
+        subtasks: [],
+      },
+    };
+    expect(
+      validateProviderReply(
+        { ...proposal, commands: [command] },
+        nestedContext,
+      ),
+    ).toEqual({
+      ok: true,
+      value: { ...proposal, commands: [command] },
+    });
+
+    const unknownTypeCommand = {
+      ...command,
+      task: { ...command.task, typeId: 'missing-type' },
+    };
+    expect(
+      validateProviderReply(
+        { ...proposal, commands: [unknownTypeCommand] },
+        nestedContext,
+      ),
+    ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
   });
 
   it('returns parsed Temporal task fields from the runner for IPC serialization', async () => {

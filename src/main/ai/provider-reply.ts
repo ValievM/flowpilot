@@ -14,12 +14,15 @@ const contextTaskSchema = z.looseObject({
   comments: z.array(contextNestedSchema).optional(),
 });
 const contextColumnSchema = z.looseObject({ id: z.string().min(1) });
+const contextTypeSchema = z.looseObject({ id: z.string().min(1) });
 const contextSchema = z.looseObject({
   tasks: z.array(contextTaskSchema),
   columns: z.array(contextColumnSchema).optional(),
+  taskTypes: z.array(contextTypeSchema).optional(),
 });
 interface ValidationState {
   readonly columnIds: Set<string>;
+  readonly taskTypeIds: Set<string>;
   readonly taskIds: Set<string>;
   readonly subtaskIds: Set<string>;
   readonly commentIds: Set<string>;
@@ -35,6 +38,7 @@ export function validateProviderReply(
   const state = createValidationState(
     parsedContext.data.tasks,
     parsedContext.data.columns ?? [],
+    parsedContext.data.taskTypes ?? [],
   );
   const commands: AiCommand[] = [];
   for (const candidate of parsed.data.commands) {
@@ -62,9 +66,11 @@ export function parseProviderText(
 function createValidationState(
   tasks: readonly z.infer<typeof contextTaskSchema>[],
   columns: readonly z.infer<typeof contextColumnSchema>[],
+  taskTypes: readonly z.infer<typeof contextTypeSchema>[],
 ): ValidationState {
   return {
     columnIds: new Set(columns.map(({ id }) => id)),
+    taskTypeIds: new Set(taskTypes.map(({ id }) => id)),
     taskIds: new Set(tasks.map(({ id }) => id)),
     subtaskIds: new Set(
       tasks.flatMap(({ subtasks = [] }) => subtasks.map(({ id }) => id)),
@@ -103,6 +109,7 @@ function acceptCreatedTask(
   const subtaskIds = task.subtasks.map(({ id }) => id);
   const commentId = task.comment?.id;
   if (
+    (task.typeId !== undefined && !state.taskTypeIds.has(task.typeId)) ||
     !state.columnIds.has(task.columnId) ||
     state.taskIds.has(task.id) ||
     !areUniqueIds(subtaskIds, state.subtaskIds) ||
