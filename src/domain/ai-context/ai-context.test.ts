@@ -263,6 +263,31 @@ describe('AI context assembly (F-10)', () => {
     expect(JSON.stringify(result)).not.toMatch(/\/(?:etc|opt|mnt|root)\//);
   });
 
+  it('redacts spaced, file URI, and relative paths in all untrusted text fields', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('task-1', {
+            title: 'Open /Users/Ada/My Documents/secret.txt please',
+            description: 'file:///Users/Ada/private.txt',
+            comments: [
+              {
+                id: 'c',
+                text: 'See config/secret.json and https://example.com/a/b',
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe('Open [путь скрыт] please');
+    expect(result.tasks[0]?.untrusted.description).toBe('[путь скрыт]');
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      'See [путь скрыт] and https://example.com/a/b',
+    );
+  });
+
   it('is stable across calls and input task permutations', () => {
     const tasks = [task('task-2'), task('task-1')];
     expect(buildContext(input({ tasks }))).toEqual(
