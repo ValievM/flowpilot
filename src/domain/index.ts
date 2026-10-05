@@ -56,6 +56,16 @@ export type {
   ScheduleAvailability,
   ScheduleSnapshot,
 } from './schedule/fixed-events';
+export { parseRulesJson, validateRulesDocument } from './rules';
+export type {
+  PriorityRule,
+  RulesDocument,
+  RulesJsonResult,
+  RulesValidationError,
+  RulesValidationResult,
+  TimeWindowRule,
+  Weekday,
+} from './rules';
 export { addType, removeType, renameType } from './task-types';
 export type {
   AddTypeResult,
