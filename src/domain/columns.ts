@@ -84,47 +84,79 @@ export interface RemoveColumnOptions {
   waiting?: WaitingDetails;
 }
 
+type RemovalValidation =
+  | { ok: true; target?: TaskColumn }
+  | {
+      ok: false;
+      error:
+        | 'column-not-found'
+        | 'built-in-column'
+        | 'target-required'
+        | 'invalid-target';
+    };
+
+function validateRemoval(
+  columns: readonly TaskColumn[],
+  tasks: readonly Task[],
+  columnId: string,
+  options: RemoveColumnOptions,
+): RemovalValidation {
+  const column = columns.find(({ id }) => id === columnId);
+  if (!column) return { ok: false, error: 'column-not-found' };
+  if (column.builtIn) return { ok: false, error: 'built-in-column' };
+
+  const hasTasks = tasks.some((task) => task.columnId === columnId);
+  if (hasTasks && !options.targetColumnId) {
+    return { ok: false, error: 'target-required' };
+  }
+  if (!options.targetColumnId) return { ok: true };
+
+  const target = columns.find(({ id }) => id === options.targetColumnId);
+  if (!target || target.id === columnId) {
+    return { ok: false, error: 'invalid-target' };
+  }
+  return { ok: true, target };
+}
+
+type MoveAllResult =
+  { ok: true; tasks: Task[] } | { ok: false; error: 'waiting-reason-required' };
+
+function moveAllTo(
+  tasks: readonly Task[],
+  columnId: string,
+  target: TaskColumn,
+  waiting?: WaitingDetails,
+): MoveAllResult {
+  const updatedTasks: Task[] = [];
+  for (const task of tasks) {
+    if (task.columnId !== columnId) {
+      updatedTasks.push(task);
+      continue;
+    }
+    const moved = moveTask(task, target, waiting);
+    if (!moved.ok) return moved;
+    updatedTasks.push(moved.task);
+  }
+  return { ok: true, tasks: updatedTasks };
+}
+
 export function removeColumn(
   columns: readonly TaskColumn[],
   tasks: readonly Task[],
   columnId: string,
   options: RemoveColumnOptions = {},
 ): RemoveColumnResult {
-  const column = columns.find(({ id }) => id === columnId);
-  if (!column) return { ok: false, error: 'column-not-found' };
-  if (column.builtIn) return { ok: false, error: 'built-in-column' };
+  const validation = validateRemoval(columns, tasks, columnId, options);
+  if (!validation.ok) return validation;
 
-  const movedTasks = tasks.filter(
-    ({ columnId: taskColumnId }) => taskColumnId === columnId,
-  );
-  if (movedTasks.length > 0 && !options.targetColumnId) {
-    return { ok: false, error: 'target-required' };
-  }
-
-  const target = options.targetColumnId
-    ? columns.find(({ id }) => id === options.targetColumnId)
-    : undefined;
-  if (
-    options.targetColumnId &&
-    (!target || options.targetColumnId === columnId)
-  ) {
-    return { ok: false, error: 'invalid-target' };
-  }
-
-  const updatedTasks: Task[] = [];
-  for (const task of tasks) {
-    if (task.columnId !== columnId || !target) {
-      updatedTasks.push(task);
-      continue;
-    }
-    const moved = moveTask(task, target, options.waiting);
-    if (!moved.ok) return moved;
-    updatedTasks.push(moved.task);
-  }
+  const moved = validation.target
+    ? moveAllTo(tasks, columnId, validation.target, options.waiting)
+    : { ok: true as const, tasks: [...tasks] };
+  if (!moved.ok) return moved;
 
   return {
     ok: true,
     columns: columns.filter(({ id }) => id !== columnId),
-    tasks: updatedTasks,
+    tasks: moved.tasks,
   };
 }
