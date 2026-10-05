@@ -8,6 +8,7 @@ import type { View } from '../types';
 interface TodayScreenProps {
   readonly tasks: readonly Task[];
   readonly hasTasks: boolean;
+  readonly hasUndatedTasks: boolean;
   readonly available: readonly Task[];
   readonly workdays: ReadonlySet<number>;
   readonly today: Temporal.PlainDate;
@@ -84,15 +85,19 @@ function TaskRow({
 
 function EmptyDay({
   blocked,
+  hasUndatedTasks,
 }: {
   readonly blocked: boolean;
+  readonly hasUndatedTasks: boolean;
 }): React.JSX.Element {
   return (
     <section className="empty-state" aria-live="polite">
       <h2>{blocked ? 'Нет доступных дел' : 'Сегодня пока пусто'}</h2>
       <p>
         {blocked
-          ? 'Оставшиеся задачи ожидают ответа, уже готовы или назначены на будущее.'
+          ? hasUndatedTasks
+            ? 'Есть задачи без назначенного дня. Назначьте им день, чтобы включить их в план.'
+            : 'Оставшиеся задачи ожидают ответа, уже готовы или назначены на будущее.'
           : 'Добавьте задачу — она сохранится и появится в сегодняшнем списке.'}
       </p>
     </section>
@@ -151,8 +156,10 @@ function TodayHeading({
 export function TodayScreen({
   tasks,
   hasTasks,
+  hasUndatedTasks,
   available,
   workdays,
+
   today,
   todayLabel,
   onViewChange,
@@ -167,7 +174,7 @@ export function TodayScreen({
     return (
       <>
         <TodayHeading todayLabel={todayLabel} onViewChange={onViewChange} />
-        <EmptyDay blocked={hasTasks} />
+        <EmptyDay blocked={hasTasks} hasUndatedTasks={hasUndatedTasks} />
       </>
     );
   return (

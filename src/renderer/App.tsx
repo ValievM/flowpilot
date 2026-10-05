@@ -80,6 +80,7 @@ interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
   readonly hasTasks: boolean;
+  readonly hasUndatedTasks: boolean;
   readonly today: TemporalTypes.PlainDate;
   readonly todayLabel: string;
   readonly available: readonly Task[];
@@ -97,6 +98,7 @@ function ScreenContent(props: ScreenProps): React.JSX.Element {
       <TodayScreen
         tasks={props.tasks}
         hasTasks={props.hasTasks}
+        hasUndatedTasks={props.hasUndatedTasks}
         available={props.available}
         workdays={props.workdays}
         today={props.today}
@@ -105,6 +107,7 @@ function ScreenContent(props: ScreenProps): React.JSX.Element {
         onStart={props.onStart}
       />
     );
+
   if (props.view === 'now')
     return (
       <NowScreen
@@ -220,6 +223,9 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const screenProps: ScreenProps = {
     view,
     hasTasks: views.all.length > 0,
+    hasUndatedTasks: views.all.some(
+      (task) => task.day === undefined && task.status.kind !== 'done',
+    ),
     tasks: views.todayTasks,
     today: views.today,
     todayLabel: localDateLabel(views.today),

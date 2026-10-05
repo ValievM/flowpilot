@@ -124,11 +124,14 @@ function useCommandApply(
           commands,
           expectedRevision: snapshot.revision,
         });
-        const fresh = result.ok
-          ? result.value
-          : result.error === 'StaleRevision'
-            ? await refresh()
-            : undefined;
+        if (!result.ok && result.error !== 'StaleRevision') {
+          controls.setCommandError(
+            'Сохранение не удалось. Данные не изменены; попробуйте снова.',
+          );
+          controls.setSaved(true);
+          return false;
+        }
+        const fresh = result.ok ? result.value : await refresh();
         if (!fresh) {
           controls.setSaved(true);
           return false;

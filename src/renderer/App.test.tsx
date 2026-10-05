@@ -140,6 +140,25 @@ describe('persisted today and now screens', () => {
       screen.queryByRole('button', { name: 'Взять в работу' }),
     ).not.toBeInTheDocument();
   });
+
+  it('explains that an unfinished task without a day is unassigned', async () => {
+    renderApp([{ id: 'undated-task' }]);
+    expect(
+      await screen.findByRole('heading', { name: 'Нет доступных дел' }),
+    ).toBeVisible();
+    expect(screen.getByText(/есть задачи без назначенного дня/i)).toBeVisible();
+    expect(screen.queryByText(/назначены на будущее/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an apply error when starting a task is rejected', async () => {
+    const app = renderApp([{ id: 'rejected-task', day: today() }]);
+    await screen.findByRole('heading', { name: 'rejected-task', level: 3 });
+    app.setAlwaysReject();
+    fireEvent.click(screen.getByRole('button', { name: 'Взять в работу' }));
+    expect(await screen.findByText(/данные не изменены/i)).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Ошибка сохранения');
+  });
+
   it('shows the blocked state when every task is scheduled for the future', async () => {
     const tomorrow = Temporal.Now.plainDateISO().add({ days: 1 }).toString();
     renderApp([{ id: 'future-task', day: tomorrow }]);
