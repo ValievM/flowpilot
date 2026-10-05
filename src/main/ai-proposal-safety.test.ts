@@ -126,6 +126,28 @@ describe('AI task safety contract', () => {
     expect(result.rejectedCommands[0]?.reason).toBe('waiting-reason-required');
   });
 
+  it('assigns unique sequential added orders to tasks created in one proposal', () => {
+    const currentSnapshot = {
+      ...snapshot,
+      tasks: [task, { ...task, id: 'task-2', addedOrder: 8 }],
+    };
+    const inputs = [
+      { id: 'new-1', title: 'First', columnId: 'doing', subtasks: [] },
+      { id: 'new-2', title: 'Second', columnId: 'doing', subtasks: [] },
+    ];
+    const result = validateProposal(
+      proposal(inputs.map((input) => ({ kind: 'task.create', task: input }))),
+      currentSnapshot,
+    );
+    const translated = toStorageCommands(result.validCommands, currentSnapshot);
+    const addedOrders = translated.commands.map((command) =>
+      command.kind === 'task.create' ? command.task.addedOrder : undefined,
+    );
+
+    expect(result.validCommands).toHaveLength(2);
+    expect(addedOrders).toEqual([9, 10]);
+  });
+
   it('derives created task system fields from the snapshot', () => {
     const currentSnapshot = {
       ...snapshot,

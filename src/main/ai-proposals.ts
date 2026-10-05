@@ -106,11 +106,17 @@ export function toStorageCommands(
   commands: readonly AiCommand[],
   snapshot: AiSnapshot,
 ): AiCommandBatch {
-  const plannedCommands: AiPlannedCommand[] = commands.map((command) =>
-    command.kind === 'task.create'
-      ? { kind: 'task.create', task: buildTask(command.task, snapshot) }
-      : command,
-  );
+  let nextAddedOrder =
+    snapshot.tasks.reduce(
+      (highest, existing) => Math.max(highest, existing.addedOrder),
+      -1,
+    ) + 1;
+  const plannedCommands: AiPlannedCommand[] = commands.map((command) => {
+    if (command.kind !== 'task.create') return command;
+    const task = buildTask(command.task, snapshot, nextAddedOrder);
+    nextAddedOrder += 1;
+    return { kind: 'task.create', task };
+  });
   return { commands: plannedCommands, source: 'ai' };
 }
 
@@ -205,17 +211,16 @@ function validateCreatedTask(
   return column.state === 'waiting' ? 'waiting-reason-required' : undefined;
 }
 
-function buildTask(task: AiTaskCreation, snapshot: AiSnapshot): Task {
+function buildTask(
+  task: AiTaskCreation,
+  snapshot: AiSnapshot,
+  addedOrder: number,
+): Task {
   const column = snapshot.columns.find(
     (candidate) => candidate.id === task.columnId,
   );
   if (!column || column.state === 'waiting')
     throw new Error('Cannot build an AI task without a supported column');
-  const addedOrder =
-    snapshot.tasks.reduce(
-      (highest, existing) => Math.max(highest, existing.addedOrder),
-      -1,
-    ) + 1;
   const { comment, ...fields } = task;
   return {
     ...fields,
