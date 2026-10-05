@@ -1,0 +1,116 @@
+@media (width <= 1100px) {
+  .main-content {
+    padding: var(--space-32) var(--space-24);
+  }
+
+  .today-layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr);
+    gap: var(--space-16);
+  }
+
+  .task-row {
+    grid-template-columns: var(--space-24) minmax(0, 1fr);
+  }
+
+  .state-label {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (width <= 900px) {
+  .today-layout,
+  .board-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next-step {
+    position: static;
+  }
+}
+
+@media (width <= 760px) {
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--space-12);
+    padding: var(--space-12);
+    border-right: 0;
+    border-bottom: var(--stroke) solid var(--line);
+  }
+
+  .brand {
+    min-height: var(--size-nav);
+  }
+
+  .primary-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  .sidebar-bottom {
+    display: flex;
+    margin-top: 0;
+  }
+
+  .topbar {
+    padding: var(--space-8) var(--space-12);
+  }
+
+  .saved-status {
+    display: none;
+  }
+
+  .main-content {
+    padding: var(--space-24) var(--space-12);
+  }
+
+  .page-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: var(--space-16);
+  }
+
+  h1 {
+    font-size: var(--hybrid-title-narrow);
+  }
+
+  .today-layout,
+  .board-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next-step {
+    position: static;
+  }
+
+  .task-row {
+    padding: var(--space-16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto;
+    animation-duration: 0s;
+    animation-iteration-count: 1;
+    transition-duration: 0s;
+  }
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  scroll-behavior: auto;
+  animation-duration: 0s;
+  animation-iteration-count: 1;
+  transition-duration: 0s;
+}

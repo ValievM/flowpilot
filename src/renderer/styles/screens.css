@@ -1,0 +1,134 @@
+.simple-screen {
+  display: grid;
+  gap: var(--space-24);
+}
+
+.simple-screen > .eyebrow {
+  margin-bottom: calc(-1 * var(--space-20));
+}
+
+.task-summary {
+  padding: var(--space-16);
+}
+
+.task-summary-meta {
+  color: var(--muted);
+}
+
+.task-summary h2 {
+  font-size: var(--type-task);
+}
+
+.board-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-16);
+}
+
+.board-column {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-16);
+}
+
+.board-column-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+  font-size: var(--type-body);
+}
+
+.board-count {
+  color: var(--muted);
+}
+
+.all-task-list {
+  display: grid;
+  max-width: var(--panel-min);
+  gap: var(--space-12);
+}
+
+.settings-card {
+  display: grid;
+  max-width: var(--inspector-width);
+  gap: var(--space-12);
+  padding: var(--space-24);
+}
+
+.settings-card h2 {
+  margin-bottom: var(--space-8);
+  font-size: var(--type-section);
+}
+
+.settings-card select {
+  width: min(100%, var(--inspector-width));
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: var(--space-8);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--panel);
+}
+
+.motion-setting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+
+.quick-dialog {
+  width: min(var(--quick-width), calc(100vw - var(--dialog-offset)));
+  padding: var(--space-24);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.quick-dialog::backdrop {
+  background: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+.dialog-heading,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.dialog-heading h2 {
+  font-size: var(--type-section);
+}
+
+.icon-button {
+  min-width: var(--control-height);
+  padding: var(--space-4);
+  font-size: var(--type-section);
+}
+
+.quick-dialog form {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.quick-dialog input {
+  min-height: var(--control-height);
+  padding-inline: var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--inset);
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.dialog-actions {
+  justify-content: end;
+  margin-top: var(--space-12);
+}
