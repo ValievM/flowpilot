@@ -83,16 +83,23 @@ describe('board task movement', () => {
     const taskCard = await screen.findByRole('article', {
       name: 'Задача: Написать отчёт',
     });
+    taskCard.focus();
+    expect(document.activeElement).toBe(taskCard);
     fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
     await waitFor(() => {
       expect(taskCard).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('status')).toHaveTextContent('Написать отчёт');
     });
+    expect(screen.getByRole('status')).not.toHaveTextContent('task:task');
     fireEvent.keyDown(taskCard, { key: 'ArrowRight', code: 'ArrowRight' });
     fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
     await waitFor(() => {
       expect(taskCard).not.toHaveAttribute('aria-pressed', 'true');
     });
     await waitFor(() => {
+      expect(
+        document.querySelector('[aria-live="assertive"]'),
+      ).toHaveTextContent('Делаю');
       expect(value.applyMock).toHaveBeenCalledTimes(1);
       expect(value.applyMock).toHaveBeenCalledWith({
         commands: [

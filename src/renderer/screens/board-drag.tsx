@@ -39,6 +39,35 @@ export function BoardDragContext({
   );
   return (
     <DndContext
+      accessibility={{
+        announcements: {
+          onDragStart: ({ active }) =>
+            `Начато перемещение карточки «${taskName(active.id, tasks)}».`,
+          onDragMove: ({ active, over }) =>
+            announceDragOver(
+              active.id,
+              keyboardTarget.current ?? over?.id,
+              columns,
+              tasks,
+            ),
+          onDragOver: ({ active, over }) =>
+            announceDragOver(
+              active.id,
+              keyboardTarget.current ?? over?.id,
+              columns,
+              tasks,
+            ),
+          onDragEnd: ({ active, over }) =>
+            announceDragEnd(
+              active.id,
+              keyboardTarget.current ?? over?.id,
+              columns,
+              tasks,
+            ),
+          onDragCancel: ({ active }) =>
+            `Перемещение карточки «${taskName(active.id, tasks)}» отменено.`,
+        },
+      }}
       sensors={sensors}
       collisionDetection={boardCollisionDetection}
       onDragStart={() => {
@@ -46,12 +75,43 @@ export function BoardDragContext({
       }}
       onDragEnd={(event) => {
         finishBoardDrag(event, columns, onMove, keyboardTarget.current);
-        keyboardTarget.current = undefined;
       }}
     >
       {children}
     </DndContext>
   );
+}
+
+function taskName(id: string | number, tasks: IpcSnapshot['tasks']): string {
+  const taskId = readDndId(id, 'task:');
+  return tasks.find((task) => task.id === taskId)?.title ?? 'задача';
+}
+
+function announceDragOver(
+  taskId: string | number,
+  columnId: string | number | undefined,
+  columns: readonly Column[],
+  tasks: IpcSnapshot['tasks'],
+): string {
+  const name = taskName(taskId, tasks);
+  if (!columnId) return `Перемещается карточка «${name}».`;
+  return `Карточка «${name}» над колонкой «${columnName(columnId, columns)}».`;
+}
+
+function announceDragEnd(
+  taskId: string | number,
+  columnId: string | number | undefined,
+  columns: readonly Column[],
+  tasks: IpcSnapshot['tasks'],
+): string {
+  const name = taskName(taskId, tasks);
+  if (!columnId) return `Карточка «${name}» не перемещена.`;
+  return `Карточка «${name}» перемещена в колонку «${columnName(columnId, columns)}».`;
+}
+
+function columnName(id: string | number, columns: readonly Column[]): string {
+  const columnId = readDndId(id, 'column:');
+  return columns.find((column) => column.id === columnId)?.name ?? 'колонка';
 }
 
 function boardColumnKeyboardCoordinates(

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { IpcSnapshot } from '../../shared/contracts';
+import { BoardModal } from './board-modal';
 
 type Column = IpcSnapshot['columns'][number];
 type DialogProps = {
@@ -65,7 +66,7 @@ function ColumnDialog({
 }): React.JSX.Element | null {
   if (!creating && !editing) return null;
   return (
-    <dialog open className="board-dialog" aria-labelledby="column-heading">
+    <BoardModal labelledBy="column-heading" onCancel={onCancel}>
       <form onSubmit={onSave}>
         <h2 id="column-heading">
           {editing ? 'Изменить колонку' : 'Новая колонка'}
@@ -80,7 +81,7 @@ function ColumnDialog({
           </button>
         </div>
       </form>
-    </dialog>
+    </BoardModal>
   );
 }
 
@@ -145,7 +146,7 @@ function DeleteDialog({
 }): React.JSX.Element | null {
   if (!deletingId) return null;
   return (
-    <dialog open className="board-dialog" aria-labelledby="delete-heading">
+    <BoardModal labelledBy="delete-heading" onCancel={onCancel}>
       <h2 id="delete-heading">Удалить колонку?</h2>
       <p>Карточки будут перемещены в выбранную колонку.</p>
       <label htmlFor="delete-target">Переместить карточки в</label>
@@ -173,7 +174,7 @@ function DeleteDialog({
           Удалить колонку
         </button>
       </div>
-    </dialog>
+    </BoardModal>
   );
 }
 
@@ -196,7 +197,7 @@ function WaitingDialog({
 }): React.JSX.Element | null {
   if (!open) return null;
   return (
-    <dialog open className="board-dialog" aria-labelledby="waiting-heading">
+    <BoardModal labelledBy="waiting-heading" onCancel={onCancel}>
       <form onSubmit={onConfirm}>
         <h2 id="waiting-heading">Почему задача ожидает?</h2>
         <WaitingFields
@@ -214,7 +215,7 @@ function WaitingDialog({
           </button>
         </div>
       </form>
-    </dialog>
+    </BoardModal>
   );
 }
 

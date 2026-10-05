@@ -87,7 +87,12 @@ function BoardWorkspace({
   const snapshot = data.snapshot;
   if (!snapshot) return <BoardLoading />;
   return (
-    <section className="simple-screen board-screen" aria-busy={data.loading}>
+    <section
+      className="simple-screen board-screen"
+      aria-busy={data.loading}
+      tabIndex={-1}
+      data-board-dialog-focus-fallback
+    >
       <BoardHeader ui={ui} notice={data.notice} loading={data.loading} />
       <BoardMessages data={data} />
       <BoardTaskColumns snapshot={snapshot} ui={ui} actions={actions} />

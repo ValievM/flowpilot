@@ -791,6 +791,22 @@ test('loads persisted board columns through the public renderer API', async () =
   }
 });
 
+test('opens the board editor modally and restores focus after Escape', async () => {
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Доска' })
+    .click();
+  const trigger = page.getByRole('button', { name: 'Добавить колонку' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Новая колонка' });
+  const field = dialog.getByLabel('Название');
+  await expect(dialog).toBeVisible();
+  await expect(field).toBeFocused();
+  await field.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+});
+
 test('moves a persisted task from the board UI and reloads the saved state', async () => {
   const created = await page.evaluate(() =>
     window.flowpilot.commands.apply({
