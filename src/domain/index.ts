@@ -56,6 +56,12 @@ export type {
   ScheduleAvailability,
   ScheduleSnapshot,
 } from './schedule/fixed-events';
+export { parseIcs } from './schedule/ics/parse-ics';
+export type {
+  ParseOptions,
+  ParseProblem,
+  ParseResult,
+} from './schedule/ics/types';
 export { parseRulesJson, validateRulesDocument } from './rules';
 export type {
   PriorityRule,
