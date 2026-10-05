@@ -66,6 +66,14 @@ export type {
   TimeWindowRule,
   Weekday,
 } from './rules';
+export { canActivate, effectiveRules, lintRules } from './rules-linter';
+export type {
+  EffectiveRulesResult,
+  LintedRule,
+  RuleCatalog,
+  RuleDiagnostic,
+  RuleTaskScope,
+} from './rules-linter';
 export { addType, removeType, renameType } from './task-types';
 export type {
   AddTypeResult,
