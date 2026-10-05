@@ -132,6 +132,31 @@ describe('Repository attachment history', () => {
     expect(repository.history(10).entries).toHaveLength(2);
     repository.close();
   });
+  it('does not undo attachment addition when its file is missing', () => {
+    const { repository, directory } = openRepository();
+    repository.apply([{ kind: 'task.create', task: basicTask() }], 0);
+    const source = join(directory, 'missing.txt');
+    writeFileSync(source, 'attachment');
+    repository.apply(
+      [{ kind: 'attachment.add', taskId: 'task-1', sourcePath: source }],
+      1,
+    );
+    const attachment = repository.load().tasks[0]?.attachments[0];
+    if (!attachment) throw new Error('Expected attachment');
+    const entry = repository.history(1).entries[0];
+    if (!entry) throw new Error('Expected attachment history entry');
+    const before = repository.load();
+    const historyBefore = repository.history(10);
+    rmSync(join(directory, 'attachments', attachment.id));
+
+    expect(repository.undo(entry.id)).toMatchObject({ ok: false });
+    expect(repository.load()).toEqual(before);
+    expect(repository.history(10)).toEqual(historyBefore);
+    expect(existsSync(join(directory, 'attachments', attachment.id))).toBe(
+      false,
+    );
+    repository.close();
+  });
 
   it('restores attachment file when its removal transaction fails', () => {
     const { repository, directory } = openRepository();
