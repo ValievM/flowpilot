@@ -53,6 +53,14 @@ module.exports = {
       to: { circular: true },
     },
     {
+      name: 'not-to-god-names',
+      severity: 'error',
+      from: {},
+      to: {
+        path: '^src/.*(?:/|^)(utils|helpers|common|manager|misc)(/|\\.|$)',
+      },
+    },
+    {
       name: 'domain-is-independent',
       severity: 'error',
       from: { path: '^src/domain' },
