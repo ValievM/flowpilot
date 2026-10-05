@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { StorageCommand } from './types';
+import { advanceColumnGeneration } from './column-generations';
 
 export function executeColumnCommand(
   database: Database.Database,
@@ -7,27 +8,10 @@ export function executeColumnCommand(
 ): void {
   switch (command.kind) {
     case 'column.create':
-      database
-        .prepare(
-          'INSERT INTO columns(id,name,description,state,built_in,position) VALUES(?,?,?,?,?,COALESCE((SELECT MAX(position)+1 FROM columns),0))',
-        )
-        .run(
-          command.column.id,
-          command.column.name,
-          command.column.description,
-          command.column.state,
-          Number(command.column.builtIn),
-        );
+      createColumn(database, command);
       return;
     case 'column.rename':
-      requireChanged(
-        database
-          .prepare(
-            'UPDATE columns SET name = ?, description = ?, version = version + 1 WHERE id = ? AND built_in = 0',
-          )
-          .run(command.name, command.description, command.id).changes,
-        'column not found or built-in',
-      );
+      renameColumn(database, command);
       return;
     case 'column.delete':
       deleteColumn(database, command.id, command.targetColumnId);
@@ -42,6 +26,45 @@ export function executeColumnCommand(
     default:
       throw new Error('Unsupported column command');
   }
+}
+
+function createColumn(
+  database: Database.Database,
+  command: Extract<StorageCommand, { kind: 'column.create' }>,
+): void {
+  const version = advanceColumnGeneration(database, command.column.id);
+  database
+    .prepare(
+      'INSERT INTO columns(id,name,description,state,built_in,position,version) VALUES(?,?,?,?,?,COALESCE((SELECT MAX(position)+1 FROM columns),0),?)',
+    )
+    .run(
+      command.column.id,
+      command.column.name,
+      command.column.description,
+      command.column.state,
+      Number(command.column.builtIn),
+      version,
+    );
+}
+
+function renameColumn(
+  database: Database.Database,
+  command: Extract<StorageCommand, { kind: 'column.rename' }>,
+): void {
+  const column = database
+    .prepare('SELECT built_in FROM columns WHERE id = ?')
+    .get(command.id) as { built_in: number } | undefined;
+  if (!column || column.built_in === 1)
+    throw new Error('column not found or built-in');
+  const version = advanceColumnGeneration(database, command.id);
+  requireChanged(
+    database
+      .prepare(
+        'UPDATE columns SET name = ?, description = ?, version = ? WHERE id = ?',
+      )
+      .run(command.name, command.description, version, command.id).changes,
+    'column not found or built-in',
+  );
 }
 
 function deleteColumn(
@@ -74,6 +97,7 @@ function deleteColumn(
       )
       .run(targetId, target.state, target.state, target.state, id);
   }
+  advanceColumnGeneration(database, id);
   requireChanged(
     database.prepare('DELETE FROM columns WHERE id = ?').run(id).changes,
     'column not found',

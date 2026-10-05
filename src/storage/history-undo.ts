@@ -113,9 +113,9 @@ function applyUndo(
       )
       .run();
     const revision = readRevision(database);
-    const snapshots = plan.records.map(({ before, ref }) => ({
-      before: snapshotEntity(database, ref),
-      after: before,
+    const snapshots = plan.records.map(({ after, ref }) => ({
+      before: after,
+      after: snapshotEntity(database, ref),
     }));
     writeHistory(database, snapshots, {
       revision,

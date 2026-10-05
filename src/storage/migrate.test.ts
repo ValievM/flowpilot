@@ -5,6 +5,11 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import initialSchema from './migrations/0001_init.sql?raw';
 import { migrate } from './migrate';
+import { Temporal } from 'temporal-polyfill';
+import attachmentIntegrity from './migrations/0002_attachment_integrity.sql?raw';
+import historySchema from './migrations/0003_change_log.sql?raw';
+import entityVersions from './migrations/0004_entity_versions.sql?raw';
+import { Repository } from './repository';
 
 const directories: string[] = [];
 
@@ -40,7 +45,12 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 4 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 5 }]);
+    expect(
+      database
+        .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
+        .get(),
+    ).toEqual({ generation: 1 });
     expect(
       database
         .prepare(
@@ -49,5 +59,80 @@ describe('database migrations', () => {
         .get(),
     ).toEqual({ name: 'change_log' });
     database.close();
+  });
+  it('preserves generations for deleted columns when upgrading version four', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v4-'));
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const database = new Database(path);
+    database.exec(initialSchema);
+    database.exec(attachmentIntegrity);
+    database.exec(historySchema);
+    database.exec(entityVersions);
+    database.pragma('user_version = 4');
+    database
+      .prepare(
+        'INSERT INTO columns(id,name,description,state,built_in,position,version) VALUES(?,?,?,?,?,?,?)',
+      )
+      .run('custom', 'Custom', '', 'todo', 0, 4, 1);
+    database
+      .prepare(
+        'INSERT INTO change_log(id,revision,occurred_at,source,batch_id) VALUES(?,?,?,?,?)',
+      )
+      .run('old-create', 1, '2026-10-05T12:00:00Z', 'user', 'batch-1');
+    database
+      .prepare(
+        'INSERT INTO change_log_entities(entry_id,entity_kind,entity_id,state_before_json,state_after_json,version_after) VALUES(?,?,?,?,?,?)',
+      )
+      .run(
+        'old-create',
+        'column',
+        'custom',
+        null,
+        JSON.stringify({
+          id: 'custom',
+          name: 'Custom',
+          description: '',
+          state: 'todo',
+          built_in: 0,
+          position: 4,
+          version: 1,
+        }),
+        1,
+      );
+    database.prepare('DELETE FROM columns WHERE id = ?').run('custom');
+    database
+      .prepare('UPDATE metadata SET revision = 1 WHERE singleton = 1')
+      .run();
+    migrate(database, path);
+    database.close();
+
+    const repository = new Repository(path, {
+      now: () => Temporal.Instant.from('2026-10-05T12:00:00Z'),
+    });
+    repository.apply(
+      [
+        {
+          kind: 'column.create',
+          column: {
+            id: 'custom',
+            name: 'Custom',
+            description: '',
+            state: 'todo',
+            builtIn: false,
+          },
+        },
+      ],
+      1,
+    );
+
+    expect(repository.undo('old-create')).toMatchObject({
+      ok: false,
+      error: { kind: 'UndoConflict' },
+    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'Custom' }),
+    );
+    repository.close();
   });
 });

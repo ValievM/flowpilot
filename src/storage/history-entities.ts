@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { StorageCommand } from './types';
+import { advanceColumnGeneration } from './column-generations';
 type EntityRef = { kind: 'task' | 'column' | 'setting'; id: string };
 type Row = Record<string, string | number | null>;
 export type EntitySnapshot = EntityRef & {
@@ -106,12 +107,60 @@ export function restoreEntity(
     return;
   }
   if (snapshot.kind === 'column') {
-    database.prepare('DELETE FROM columns WHERE id = ?').run(snapshot.id);
-    if (snapshot.state)
-      insertRow(database, 'columns', JSON.parse(snapshot.state) as Row);
+    restoreColumn(database, snapshot);
     return;
   }
   restoreTask(database, snapshot);
+}
+
+function restoreColumn(
+  database: Database.Database,
+  snapshot: EntitySnapshot,
+): void {
+  const current = database
+    .prepare('SELECT id FROM columns WHERE id = ?')
+    .get(snapshot.id);
+  if (!snapshot.state) {
+    if (current) {
+      advanceColumnGeneration(database, snapshot.id);
+      database.prepare('DELETE FROM columns WHERE id = ?').run(snapshot.id);
+    }
+    return;
+  }
+  const row = JSON.parse(snapshot.state) as Row;
+  const version = advanceColumnGeneration(database, snapshot.id);
+  if (current) {
+    database
+      .prepare(
+        'UPDATE columns SET name = ?,description = ?,state = ?,built_in = ?,position = ?,version = ? WHERE id = ?',
+      )
+      .run(
+        row.name,
+        row.description,
+        row.state,
+        row.built_in,
+        row.position,
+        version,
+        snapshot.id,
+      );
+    return;
+  }
+  const savedPosition = row.position;
+  if (typeof savedPosition !== 'number')
+    throw new Error('Invalid column position');
+  const occupied = database
+    .prepare('SELECT id FROM columns WHERE position = ?')
+    .get(savedPosition);
+  const position = occupied
+    ? (
+        database
+          .prepare(
+            'SELECT COALESCE(MAX(position) + 1, 0) AS position FROM columns',
+          )
+          .get() as { position: number }
+      ).position
+    : savedPosition;
+  insertRow(database, 'columns', { ...row, position, version });
 }
 
 function restoreTask(

@@ -1,0 +1,139 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Temporal } from 'temporal-polyfill';
+import { afterEach, describe, expect, it } from 'vitest';
+import { Repository } from './repository';
+
+const directories: string[] = [];
+const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
+
+afterEach(() => {
+  for (const directory of directories.splice(0))
+    rmSync(directory, { recursive: true, force: true });
+});
+
+function openRepository(): Repository {
+  const directory = mkdtempSync(join(tmpdir(), 'flowpilot-column-undo-'));
+  directories.push(directory);
+  return new Repository(join(directory, 'tasks.sqlite'), clock);
+}
+
+function createColumn(repository: Repository, id: string, revision: number) {
+  return repository.apply(
+    [
+      {
+        kind: 'column.create',
+        column: {
+          id,
+          name: id,
+          description: '',
+          state: 'todo',
+          builtIn: false,
+        },
+      },
+    ],
+    revision,
+  );
+}
+
+function createTask(
+  repository: Repository,
+  revision: number,
+  columnId: string,
+) {
+  return repository.apply(
+    [
+      {
+        kind: 'task.create',
+        task: {
+          id: 'task-1',
+          title: 'Keep this task',
+          status: { kind: 'todo' },
+          columnId,
+          subtasks: [],
+          comments: [],
+          attachments: [],
+          addedOrder: 1,
+        },
+      },
+    ],
+    revision,
+  );
+}
+
+describe('column undo regressions', () => {
+  it('does not undo an old creation after reusing the same column id', () => {
+    const repository = openRepository();
+    createColumn(repository, 'custom', 0);
+    const creation = repository.history(10).entries[0];
+    if (!creation) throw new Error('Expected column creation history');
+    repository.apply([{ kind: 'column.delete', id: 'custom' }], 1);
+    createColumn(repository, 'custom', 2);
+
+    expect(repository.undo(creation.id)).toMatchObject({
+      ok: false,
+      error: { kind: 'UndoConflict' },
+    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'custom' }),
+    );
+    repository.close();
+  });
+
+  it('undoes a column rename in place while a task references it', () => {
+    const repository = openRepository();
+    createColumn(repository, 'custom', 0);
+    createTask(repository, 1, 'custom');
+    repository.apply(
+      [
+        {
+          kind: 'column.rename',
+          id: 'custom',
+          name: 'Renamed',
+          description: '',
+        },
+      ],
+      2,
+    );
+    const rename = repository
+      .history(10)
+      .entries.find(({ revision }) => revision === 3);
+    if (!rename) throw new Error('Expected column rename history');
+
+    expect(repository.undo(rename.id)).toMatchObject({ ok: true });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'custom' }),
+    );
+    expect(repository.load().tasks).toContainEqual(
+      expect.objectContaining({ id: 'task-1', columnId: 'custom' }),
+    );
+    repository.close();
+  });
+
+  it('restores a deleted column when its position has been reused', () => {
+    const repository = openRepository();
+    createColumn(repository, 'deleted', 0);
+    createTask(repository, 1, 'deleted');
+    repository.apply(
+      [{ kind: 'column.delete', id: 'deleted', targetColumnId: 'todo' }],
+      2,
+    );
+    createColumn(repository, 'replacement', 3);
+    const deletion = repository
+      .history(10)
+      .entries.find(({ revision }) => revision === 3);
+    if (!deletion) throw new Error('Expected column deletion history');
+
+    expect(repository.undo(deletion.id)).toMatchObject({ ok: true });
+    const { columns, tasks } = repository.load();
+    const restored = columns.find(({ id }) => id === 'deleted');
+    expect(restored).toEqual(
+      expect.objectContaining({ id: 'deleted', name: 'deleted' }),
+    );
+    expect(tasks).toContainEqual(
+      expect.objectContaining({ id: 'task-1', columnId: 'deleted' }),
+    );
+    repository.close();
+  });
+});
