@@ -1,6 +1,11 @@
 import React from 'react';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardRiskMark } from './board-risk-mark';
+import {
+  BoardDraggableTask,
+  BoardDragContext,
+  BoardDroppableColumn,
+} from './board-drag';
 
 type Column = IpcSnapshot['columns'][number];
 type Task = IpcSnapshot['tasks'][number];
@@ -13,8 +18,6 @@ type BoardColumnProps = {
   onMove: (taskId: string, column: Column) => void;
   onRename: (column: Column) => void;
   onDelete: () => void;
-  onDragMove: (taskId: string) => void;
-  onDrop: () => void;
 };
 
 export function BoardColumns({
@@ -22,45 +25,42 @@ export function BoardColumns({
   onMove,
   onRename,
   onDelete,
-  onDragMove,
-  onDrop,
 }: {
   snapshot: IpcSnapshot;
   onMove: (taskId: string, column: Column) => void;
   onRename: (column: Column) => void;
   onDelete: (column: Column, hasTasks: boolean) => void;
-  onDragMove: (taskId: string) => void;
-  onDrop: (column: Column) => void;
 }): React.JSX.Element {
   return (
-    <div className="board-columns">
-      {snapshot.columns.map((column) => {
-        const tasks = snapshot.tasks.filter(
-          (task) => task.columnId === column.id,
-        );
-        return (
-          <BoardColumn
-            key={column.id}
-            column={column}
-            tasks={tasks}
-            columns={snapshot.columns}
-            snapshot={snapshot}
-            onMove={onMove}
-            onRename={onRename}
-            onDelete={() => {
-              onDelete(column, tasks.length > 0);
-            }}
-            onDragMove={onDragMove}
-            onDrop={() => {
-              onDrop(column);
-            }}
-          />
-        );
-      })}
-    </div>
+    <BoardDragContext
+      columns={snapshot.columns}
+      tasks={snapshot.tasks}
+      onMove={onMove}
+    >
+      <div className="board-columns">
+        {snapshot.columns.map((column) => {
+          const tasks = snapshot.tasks.filter(
+            (task) => task.columnId === column.id,
+          );
+          return (
+            <BoardColumn
+              key={column.id}
+              column={column}
+              tasks={tasks}
+              columns={snapshot.columns}
+              snapshot={snapshot}
+              onMove={onMove}
+              onRename={onRename}
+              onDelete={() => {
+                onDelete(column, tasks.length > 0);
+              }}
+            />
+          );
+        })}
+      </div>
+    </BoardDragContext>
   );
 }
-
 function BoardColumn({
   column,
   tasks,
@@ -69,20 +69,12 @@ function BoardColumn({
   onMove,
   onRename,
   onDelete,
-  onDragMove,
-  onDrop,
 }: BoardColumnProps): React.JSX.Element {
   return (
-    <section
+    <BoardDroppableColumn
+      id={column.id}
+      label={column.name}
       className="board-column"
-      aria-label={column.name}
-      onDragOver={(event) => {
-        event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        onDrop();
-      }}
     >
       <div className="board-column-heading">
         <h2>{column.name}</h2>
@@ -95,9 +87,8 @@ function BoardColumn({
         columns={columns}
         snapshot={snapshot}
         onMove={onMove}
-        onDragMove={onDragMove}
       />
-    </section>
+    </BoardDroppableColumn>
   );
 }
 
@@ -134,14 +125,12 @@ function BoardTaskList({
   columns,
   snapshot,
   onMove,
-  onDragMove,
 }: {
   column: Column;
   tasks: readonly Task[];
   columns: readonly Column[];
   snapshot: IpcSnapshot;
   onMove: (taskId: string, column: Column) => void;
-  onDragMove: (taskId: string) => void;
 }): React.JSX.Element {
   if (!tasks.length) {
     return <p className="board-column-empty">В этой колонке пока нет задач.</p>;
@@ -156,37 +145,29 @@ function BoardTaskList({
           columns={columns}
           snapshot={snapshot}
           onMove={onMove}
-          onDragMove={onDragMove}
         />
       ))}
     </>
   );
 }
-
 function BoardTaskCard({
   task,
   column,
   columns,
   snapshot,
   onMove,
-  onDragMove,
 }: {
   task: Task;
   column: Column;
   columns: readonly Column[];
   snapshot: IpcSnapshot;
   onMove: (taskId: string, column: Column) => void;
-  onDragMove: (taskId: string) => void;
 }): React.JSX.Element {
   return (
-    <article
+    <BoardDraggableTask
+      id={task.id}
       className="task-summary board-task"
-      draggable
-      aria-label={`Задача: ${task.title}`}
-      onDragStart={(event) => {
-        event.dataTransfer.setData('text/plain', task.id);
-        onDragMove(task.id);
-      }}
+      label={`Задача: ${task.title}`}
     >
       <BoardRiskMark task={task} snapshot={snapshot} />
       <h3>{task.title}</h3>
@@ -204,7 +185,7 @@ function BoardTaskCard({
         columns={columns}
         onMove={onMove}
       />
-    </article>
+    </BoardDraggableTask>
   );
 }
 

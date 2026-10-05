@@ -198,8 +198,12 @@
   scroll-margin-inline: var(--space-16);
 }
 
-.board-task[draggable='true'] {
+.board-task[aria-roledescription='перетаскиваемая карточка'] {
   cursor: grab;
+}
+
+.board-task[aria-roledescription='перетаскиваемая карточка']:active {
+  cursor: grabbing;
 }
 
 .all-task-list {

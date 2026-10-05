@@ -24,8 +24,6 @@ type BoardUiState = {
   setDeletingId: (value: string | undefined) => void;
   deleteTarget: string;
   setDeleteTarget: (value: string) => void;
-  draggedTask: string | undefined;
-  setDraggedTask: (value: string | undefined) => void;
 };
 
 type BoardWorkspaceProps = {
@@ -63,7 +61,6 @@ function useBoardUiState(): BoardUiState {
   const [creatingColumn, setCreatingColumn] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string>();
   const [deleteTarget, setDeleteTarget] = React.useState('');
-  const [draggedTask, setDraggedTask] = React.useState<string>();
   return {
     waitingMove,
     setWaitingMove,
@@ -79,8 +76,6 @@ function useBoardUiState(): BoardUiState {
     setDeletingId,
     deleteTarget,
     setDeleteTarget,
-    draggedTask,
-    setDraggedTask,
   };
 }
 
@@ -115,11 +110,6 @@ function BoardTaskColumns({
         ui.setDeletingId(column.id);
         ui.setDeleteTarget('');
         if (!hasTasks) void actions.deleteColumn(column.id);
-      }}
-      onDragMove={ui.setDraggedTask}
-      onDrop={(column) => {
-        if (ui.draggedTask) void actions.move(ui.draggedTask, column);
-        ui.setDraggedTask(undefined);
       }}
     />
   );

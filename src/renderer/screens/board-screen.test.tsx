@@ -62,6 +62,21 @@ describe('board task movement', () => {
       );
     });
   });
+  it('supports keyboard pickup and cancellation with the drag sensor', async () => {
+    const value = renderBoard();
+    const taskCard = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() => {
+      expect(taskCard).toHaveAttribute('aria-pressed', 'true');
+    });
+    fireEvent.keyDown(taskCard, { key: 'Escape', code: 'Escape' });
+    await waitFor(() => {
+      expect(taskCard).not.toHaveAttribute('aria-pressed', 'true');
+    });
+    expect(value.applyMock).not.toHaveBeenCalled();
+  });
 
   it('requires a non-empty reason before moving into waiting', async () => {
     const value = renderBoard();

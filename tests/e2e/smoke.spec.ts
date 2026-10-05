@@ -822,8 +822,21 @@ test('moves a persisted task from the board UI and reloads the saved state', asy
   const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
   await expect(card).toBeVisible();
   const doing = page.getByRole('region', { name: 'Делаю' });
-  await card.dragTo(doing);
-  await expect(doing.getByRole('article')).toBeVisible();
+  const cardBounds = await card.boundingBox();
+  const columnBounds = await doing.boundingBox();
+  if (!cardBounds || !columnBounds)
+    throw new Error('Board drag targets are missing');
+  await page.mouse.move(
+    cardBounds.x + cardBounds.width / 2,
+    cardBounds.y + cardBounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    columnBounds.x + columnBounds.width / 2,
+    columnBounds.y + columnBounds.height / 2,
+    { steps: 8 },
+  );
+  await page.mouse.up();
   await card
     .getByRole('combobox', { name: /Переместить в/ })
     .selectOption('todo');

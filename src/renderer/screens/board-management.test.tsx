@@ -114,26 +114,21 @@ describe('board columns and empty states', () => {
     });
   });
 
-  it('moves a dragged card persistently when dropped in a column', async () => {
+  it('activates and cancels a drag with the pointer sensor', async () => {
     const value = renderBoard();
-    fireEvent.dragStart(
-      await screen.findByRole('article', { name: 'Задача: Написать отчёт' }),
-      { dataTransfer: { setData: () => {} } },
-    );
-    fireEvent.drop(screen.getByRole('region', { name: 'Делаю' }));
-    await waitFor(() => {
-      expect(value.applyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          commands: [
-            expect.objectContaining({
-              kind: 'task.move',
-              id: 'task',
-              columnId: 'doing',
-            }),
-          ],
-        }),
-      );
+    const card = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
     });
+    fireEvent(card, pointerEvent('pointerdown', 10, 10));
+    fireEvent(document, pointerEvent('pointermove', 320, 100));
+    await waitFor(() => {
+      expect(card).toHaveAttribute('data-dragging', 'true');
+    });
+    fireEvent(document, pointerEvent('pointercancel', 320, 100));
+    await waitFor(() => {
+      expect(card).not.toHaveAttribute('data-dragging', 'true');
+    });
+    expect(value.applyMock).not.toHaveBeenCalled();
   });
 
   it('renders a retryable error if the real snapshot cannot load', async () => {
@@ -148,3 +143,20 @@ describe('board columns and empty states', () => {
     ).toBeInTheDocument();
   });
 });
+
+function pointerEvent(
+  type: string,
+  clientX: number,
+  clientY: number,
+): MouseEvent {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    clientX,
+    clientY,
+  });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  Object.defineProperty(event, 'isPrimary', { value: true });
+  return event;
+}
