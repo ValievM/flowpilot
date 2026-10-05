@@ -19,6 +19,7 @@
     "make": "electron-forge make --arch=arm64 --platform=darwin"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "temporal-polyfill": "^1.0.5"

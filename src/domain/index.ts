@@ -42,6 +42,16 @@ export type {
   TaskStatus,
 } from './task';
 export { laterView, nowView, todayView } from './views';
+export { parseRulesJson, validateRulesDocument } from './rules';
+export type {
+  PriorityRule,
+  RulesDocument,
+  RulesJsonResult,
+  RulesValidationError,
+  RulesValidationResult,
+  TimeWindowRule,
+  Weekday,
+} from './rules';
 export { addType, removeType, renameType } from './task-types';
 export type {
   AddTypeResult,

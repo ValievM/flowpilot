@@ -72,7 +72,7 @@ module.exports = {
       from: { path: '^src/domain', pathNot: '\\.test\\.ts$' },
       to: {
         dependencyTypes: ['npm'],
-        pathNot: '^(node_modules/)?(temporal-polyfill|zod)(/|$)',
+        pathNot: '^(node_modules/)?(ajv|temporal-polyfill|zod)(/|$)',
       },
     },
     {
