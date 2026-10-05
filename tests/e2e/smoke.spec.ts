@@ -2,12 +2,30 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import path from 'node:path';
 
+const SNAPSHOT_WINDOW = {
+  width: 1280,
+  height: 800,
+  deviceScaleFactor: 1,
+} as const;
+
 let app: ElectronApplication | undefined;
 let page: Page;
 
 test.beforeEach(async () => {
-  app = await electron.launch({ args: [path.resolve(__dirname, '../..')] });
+  app = await electron.launch({
+    args: [
+      path.resolve(__dirname, '../..'),
+      `--force-device-scale-factor=${String(SNAPSHOT_WINDOW.deviceScaleFactor)}`,
+    ],
+  });
   page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }, { width, height }) => {
+    BrowserWindow.getAllWindows()[0]?.setContentSize(width, height);
+  }, SNAPSHOT_WINDOW);
+  await page.setViewportSize({
+    width: SNAPSHOT_WINDOW.width,
+    height: SNAPSHOT_WINDOW.height,
+  });
   await expect(
     page.getByRole('heading', { name: 'Сегодня, 5 октября', exact: true }),
   ).toBeVisible();
@@ -66,9 +84,10 @@ for (const width of [900, 1280]) {
       for (let click = 0; click < themeClicks; click += 1) {
         await page.getByRole('button', { name: /Тема:/ }).click();
       }
+      // macOS renderers can disagree on an isolated edge pixel.
       await expect(page).toHaveScreenshot(
         `today-${theme}-${width.toString()}.png`,
-        { fullPage: true },
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
       );
     });
   }
