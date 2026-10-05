@@ -34,6 +34,8 @@ export interface EffectivePriority {
 
 export interface ContextTask {
   readonly id: string;
+  readonly typeId?: string;
+  readonly disciplineId?: string;
   readonly state: Task['status']['kind'];
   readonly day?: string;
   readonly time?: string;
@@ -53,6 +55,11 @@ export interface ContextTask {
     readonly description?: string;
     readonly waitingReason?: string;
     readonly comments: readonly string[];
+    readonly subtasks: readonly {
+      readonly id: string;
+      readonly title: string;
+      readonly completed: boolean;
+    }[];
     readonly attachments: readonly {
       readonly name: string;
       readonly status: 'не прочитано';
@@ -63,6 +70,7 @@ export interface ContextTask {
 export interface ContextRepeatGroup {
   readonly trust: 'untrusted';
   readonly seriesId: string;
+  readonly title: string;
   readonly count: number;
   readonly dates: readonly string[];
   readonly first: string;

@@ -94,6 +94,7 @@ describe('AI context assembly (F-10)', () => {
       {
         trust: 'untrusted',
         seriesId: 'study',
+        title: 'Учиться',
         count: 1,
         dates: ['2026-09-28'],
         first: '2026-09-28',
@@ -382,6 +383,126 @@ describe('AI context assembly (F-10)', () => {
     );
   });
 
+  it('redacts extensionless spaced basenames and local file URI paths', () => {
+    const examples: ReadonlyArray<readonly [string, string]> = [
+      ['/Users/Ada/My Documents/private report', '[путь скрыт]'],
+      ['C:\\work\\My Documents\\private report', '[путь скрыт]'],
+      ['file:///Users/Ada/My Documents/private report', '[путь скрыт]'],
+      ['file://localhost/Users/Ada/private', '[путь скрыт]'],
+      [
+        'file:///Users/Ada/My Documents/private report then continue.',
+        '[путь скрыт] then continue.',
+      ],
+    ];
+
+    for (const [text, expected] of examples) {
+      expect(sanitizeUntrustedText(text)).toBe(expected);
+    }
+  });
+
+  it('redacts Unicode relative paths but preserves prose and URL queries', () => {
+    expect(sanitizeUntrustedText('Документы/секрет')).toBe('[путь скрыт]');
+    expect(sanitizeUntrustedText('and/or')).toBe('and/or');
+    expect(
+      sanitizeUntrustedText('https://example.com/?next=config/secret'),
+    ).toBe('https://example.com/?next=config/secret');
+    expect(sanitizeUntrustedText('config/secret')).toBe('[путь скрыт]');
+  });
+
+  it('redacts reviewer path cases through buildContext fields', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('task-1', {
+            title: 'Open /Users/Ada/My Documents/private report; and/or stays',
+            description:
+              'file://localhost/Users/Ada/private report then continue.',
+            comments: [
+              {
+                id: 'comment-1',
+                text: 'C:\\work\\My Documents\\private report, Документы/секрет; https://example.com/?next=config/secret',
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe(
+      'Open [путь скрыт]; and/or stays',
+    );
+    expect(result.tasks[0]?.untrusted.description).toBe(
+      '[путь скрыт] then continue.',
+    );
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      '[путь скрыт], [путь скрыт]; https://example.com/?next=config/secret',
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /(?:private report|private|Документы\/секрет)/,
+    );
+  });
+
+  it('keeps task category references and sanitized subtask progress in context', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('task-1', {
+            typeId: 'type-study',
+            disciplineId: 'discipline-math',
+            subtasks: [
+              {
+                id: 'sub-1',
+                title: 'Read /Users/Ada/private report',
+                completed: true,
+              },
+              { id: 'sub-2', title: 'Solve exercises', completed: false },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]).toMatchObject({
+      typeId: 'type-study',
+      disciplineId: 'discipline-math',
+      untrusted: {
+        subtasks: [
+          { id: 'sub-1', title: 'Read [путь скрыт]', completed: true },
+          { id: 'sub-2', title: 'Solve exercises', completed: false },
+        ],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('private report');
+  });
+
+  it('includes sanitized series titles in missed-repeat groups', () => {
+    const result = buildContext(
+      input({
+        series: [
+          {
+            id: 'study',
+            title: 'Review /Users/Ada/private report',
+            weekdays: [1],
+            startsOn: today.subtract({ days: 7 }),
+          },
+        ],
+        outcomes: [],
+      }),
+    );
+
+    expect(result.missedRepeats).toEqual([
+      {
+        trust: 'untrusted',
+        seriesId: 'study',
+        title: 'Review [путь скрыт]',
+        count: 1,
+        dates: ['2026-09-28'],
+        first: '2026-09-28',
+        last: '2026-09-28',
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('private report');
+  });
   it('is stable across calls and input task permutations', () => {
     const tasks = [task('task-2'), task('task-1')];
     expect(buildContext(input({ tasks }))).toEqual(

@@ -62,6 +62,10 @@ function missedGroups(input: ContextInput): ContextRepeatGroup[] {
   return skipGroups(input.series, input.outcomes, input.today)
     .map((group) => ({
       trust: 'untrusted' as const,
+      title: sanitizeUntrustedText(
+        input.series.find((series) => series.id === group.seriesId)?.title ??
+          group.seriesId,
+      ),
       seriesId: group.seriesId,
       count: group.count,
       dates: group.dates.map((date) => date.toString()),

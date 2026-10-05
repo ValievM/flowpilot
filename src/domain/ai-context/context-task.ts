@@ -33,6 +33,8 @@ export function mapContextTask(task: Task, input: ContextInput): ContextTask {
   const priority = rules.conflict ? null : selectedPriority(priorityRules);
   return {
     id: task.id,
+    ...(task.typeId ? { typeId: task.typeId } : {}),
+    ...(task.disciplineId ? { disciplineId: task.disciplineId } : {}),
     state: task.status.kind,
     ...(task.day ? { day: task.day.toString() } : {}),
     ...(task.time ? { time: task.time.toString() } : {}),
@@ -55,6 +57,11 @@ export function mapContextTask(task: Task, input: ContextInput): ContextTask {
         ? { waitingReason: sanitizeUntrustedText(task.status.reason) }
         : {}),
       comments: task.comments.map(({ text }) => sanitizeUntrustedText(text)),
+      subtasks: task.subtasks.map(({ id, title, completed }) => ({
+        id,
+        title: sanitizeUntrustedText(title),
+        completed,
+      })),
       attachments: task.attachments.map(({ name }) => ({
         name: fileName(name),
         status: 'не прочитано',
