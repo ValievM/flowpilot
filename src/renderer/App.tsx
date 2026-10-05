@@ -113,6 +113,8 @@ function ScreenContent(props: ScreenProps): React.JSX.Element {
       <NowScreen
         task={props.available[0]}
         today={props.today}
+        hasTasks={props.hasTasks}
+        hasUndatedTasks={props.hasUndatedTasks}
         workdays={props.workdays}
         isLoading={props.loading}
         onStart={props.onStart}

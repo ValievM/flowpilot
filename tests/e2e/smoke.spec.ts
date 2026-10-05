@@ -71,9 +71,21 @@ test('opens the app without exposing Node globals', async () => {
   ).toBe('undefined');
 });
 
-test('loads an empty profile through the typed preload API', async () => {
+test('loads an empty profile and shows the empty state in Сейчас', async () => {
   const result = await page.evaluate(() => window.flowpilot.snapshot.load());
   expect(result).toMatchObject({ ok: true, value: { tasks: [], revision: 0 } });
+  await page.getByRole('button', { name: 'Сейчас' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Сегодня пока пусто' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'Добавьте задачу — она сохранится и появится в сегодняшнем списке.',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/ожидают ответа, завершены или назначены на будущее/i),
+  ).toHaveCount(0);
 });
 
 test('rejects renderer attachment additions through the public IPC API', async () => {

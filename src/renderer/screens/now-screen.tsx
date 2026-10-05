@@ -10,25 +10,40 @@ interface NowScreenProps {
   readonly today: Temporal.PlainDate;
   readonly workdays: ReadonlySet<number>;
   readonly isLoading: boolean;
+  readonly hasTasks: boolean;
+  readonly hasUndatedTasks: boolean;
   readonly onStart: (task: Task) => void;
 }
 
 function NoAvailableTask({
   isLoading,
+  hasTasks,
+  hasUndatedTasks,
 }: {
   readonly isLoading: boolean;
+  readonly hasTasks: boolean;
+  readonly hasUndatedTasks: boolean;
 }): React.JSX.Element {
+  const isBlocked = hasTasks && !isLoading;
   return (
     <section className="simple-screen" aria-live="polite">
       <p className="eyebrow">СЛЕДУЮЩЕЕ ДЕЙСТВИЕ</p>
       <h1>Сейчас</h1>
       <h2>
-        {isLoading ? 'Обновляем сохранённые задачи…' : 'Нет доступных дел'}
+        {isLoading
+          ? 'Обновляем сохранённые задачи…'
+          : isBlocked
+            ? 'Нет доступных дел'
+            : 'Сегодня пока пусто'}
       </h2>
       <p>
         {isLoading
           ? 'Сохранённые задачи останутся на экране после обновления.'
-          : 'Все задачи ожидают ответа, завершены или назначены на будущее.'}
+          : isBlocked
+            ? hasUndatedTasks
+              ? 'Есть задачи без назначенного дня. Назначьте им день, чтобы включить их в план.'
+              : 'Оставшиеся задачи ожидают ответа, уже готовы или назначены на будущее.'
+            : 'Добавьте задачу — она сохранится и появится в сегодняшнем списке.'}
       </p>
     </section>
   );
@@ -57,8 +72,17 @@ export function NowScreen({
   workdays,
   isLoading,
   onStart,
+  hasTasks,
+  hasUndatedTasks,
 }: NowScreenProps): React.JSX.Element {
-  if (!task) return <NoAvailableTask isLoading={isLoading} />;
+  if (!task)
+    return (
+      <NoAvailableTask
+        isLoading={isLoading}
+        hasTasks={hasTasks}
+        hasUndatedTasks={hasUndatedTasks}
+      />
+    );
   const risk = deadlineRisk(task, today, workdays);
   return (
     <section className="simple-screen now-screen">

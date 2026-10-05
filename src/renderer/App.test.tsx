@@ -100,6 +100,22 @@ describe('persisted today and now screens', () => {
       screen.queryByText('Курсовая: собрать рабочий прототип'),
     ).not.toBeInTheDocument();
   });
+  it('shows the matching empty state in Сейчас when the saved snapshot is empty', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.getByRole('heading', { name: 'Сегодня пока пусто' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        'Добавьте задачу — она сохранится и появится в сегодняшнем списке.',
+      ),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(/ожидают ответа, завершены или назначены на будущее/i),
+    ).not.toBeInTheDocument();
+  });
 
   it('shows a saved today task in Сегодня and Сейчас', async () => {
     renderApp([{ id: 'today-task', title: 'Текущая задача', day: today() }]);
@@ -141,10 +157,12 @@ describe('persisted today and now screens', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('explains that an unfinished task without a day is unassigned', async () => {
+  it('explains an unassigned unfinished task in Сейчас', async () => {
     renderApp([{ id: 'undated-task' }]);
+    await screen.findByRole('heading', { name: 'Нет доступных дел' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
     expect(
-      await screen.findByRole('heading', { name: 'Нет доступных дел' }),
+      screen.getByRole('heading', { name: 'Нет доступных дел' }),
     ).toBeVisible();
     expect(screen.getByText(/есть задачи без назначенного дня/i)).toBeVisible();
     expect(screen.queryByText(/назначены на будущее/i)).not.toBeInTheDocument();
@@ -159,11 +177,13 @@ describe('persisted today and now screens', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Ошибка сохранения');
   });
 
-  it('shows the blocked state when every task is scheduled for the future', async () => {
+  it('shows the scheduled-for-future reason in Сейчас', async () => {
     const tomorrow = Temporal.Now.plainDateISO().add({ days: 1 }).toString();
     renderApp([{ id: 'future-task', day: tomorrow }]);
+    await screen.findByRole('heading', { name: 'Нет доступных дел' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
     expect(
-      await screen.findByRole('heading', { name: 'Нет доступных дел' }),
+      screen.getByRole('heading', { name: 'Нет доступных дел' }),
     ).toBeVisible();
     expect(screen.getByText(/назначены на будущее/i)).toBeVisible();
   });
