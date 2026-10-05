@@ -45,7 +45,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 5 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 6 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")

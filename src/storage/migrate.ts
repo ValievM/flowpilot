@@ -5,6 +5,7 @@ import attachmentIntegrity from './migrations/0002_attachment_integrity.sql?raw'
 import historySchema from './migrations/0003_change_log.sql?raw';
 import entityVersions from './migrations/0004_entity_versions.sql?raw';
 import columnGenerations from './migrations/0005_column_generations.sql?raw';
+import legacyTombstoneGenerations from './migrations/0006_legacy_tombstone_generations.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -12,6 +13,7 @@ const MIGRATIONS = [
   { version: 3, sql: historySchema },
   { version: 4, sql: entityVersions },
   { version: 5, sql: columnGenerations },
+  { version: 6, sql: legacyTombstoneGenerations },
 ] as const;
 
 export function migrate(database: Database.Database, path: string): void {
