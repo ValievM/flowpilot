@@ -20,16 +20,16 @@ module.exports = {
       from: { path: '^src/shared' },
       to: {
         pathNot: '^src/shared(/|$)',
-        dependencyTypesNot: ['npm', 'npm-dev'],
+        dependencyTypesNot: ['npm', 'npm-dev', 'type-only'],
       },
     },
     {
-      name: 'shared-only-zod-package',
+      name: 'shared-only-approved-packages',
       severity: 'error',
       from: { path: '^src/shared' },
       to: {
         dependencyTypes: ['npm', 'npm-dev'],
-        pathNot: '^node_modules/zod(/|$)',
+        pathNot: '^(node_modules/)?(zod|temporal-polyfill)(/|$)',
       },
     },
     {

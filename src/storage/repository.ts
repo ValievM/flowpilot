@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { commandSchema } from './command-schema';
+import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';

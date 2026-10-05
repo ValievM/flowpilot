@@ -1,7 +1,8 @@
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-
 const SNAPSHOT_WINDOW = {
   width: 1280,
   height: 800,
@@ -9,14 +10,22 @@ const SNAPSHOT_WINDOW = {
 } as const;
 
 let app: ElectronApplication | undefined;
-let page: Page;
-
+// Playwright initializes the renderer page in beforeEach before each test body.
+let page!: Page;
+let profilePath: string;
 test.beforeEach(async () => {
+  profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
   app = await electron.launch({
     args: [
       path.resolve(__dirname, '../..'),
       `--force-device-scale-factor=${String(SNAPSHOT_WINDOW.deviceScaleFactor)}`,
     ],
+    env: {
+      ...process.env,
+      FLOWPILOT_TEST: '1',
+      FLOWPILOT_TEST_NOW: '2026-10-05T12:00:00Z',
+      FLOWPILOT_TEST_PROFILE: profilePath,
+    },
   });
   page = await app.firstWindow();
   await app.evaluate(({ BrowserWindow }, { width, height }) => {
@@ -33,6 +42,7 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   if (app) await app.close();
+  rmSync(profilePath, { recursive: true, force: true });
 });
 
 test('opens the app without exposing Node globals', async () => {
@@ -47,6 +57,11 @@ test('opens the app without exposing Node globals', async () => {
       () => typeof (window as Window & { process?: unknown }).process,
     ),
   ).toBe('undefined');
+});
+
+test('loads an empty profile through the typed preload API', async () => {
+  const result = await page.evaluate(() => window.flowpilot.snapshot.load());
+  expect(result).toMatchObject({ ok: true, value: { tasks: [], revision: 0 } });
 });
 
 test('shows fixture tasks and keyboard accessible navigation', async () => {
