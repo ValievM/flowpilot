@@ -45,21 +45,24 @@ export function undoEntry(
 ): UndoResult {
   const attempt = createUndoPlan(database, entryId);
   if ('result' in attempt) return attempt.result;
-  if (!restoreFiles(attachmentFiles, attempt.plan.attachmentChanges.restore))
-    return {
-      ok: false,
-      error: { kind: 'NotUndoable', reason: 'файл вложения удалён' },
-    };
+  const restored: string[] = [];
+  const trashed: string[] = [];
   try {
+    for (const id of attempt.plan.attachmentChanges.restore) {
+      if (!attachmentFiles.restoreFromTrash(id))
+        throw new Error('файл вложения удалён');
+      restored.push(id);
+    }
+    for (const id of attempt.plan.attachmentChanges.trash) {
+      if (!attachmentFiles.moveToTrash(id))
+        throw new Error('Не удалось переместить вложение в корзину');
+      trashed.push(id);
+    }
     const revision = applyUndo(database, attempt.plan, now);
-    attempt.plan.attachmentChanges.trash.forEach((id) =>
-      attachmentFiles.moveToTrash(id),
-    );
     return { ok: true, value: { revision } };
   } catch (error) {
-    attempt.plan.attachmentChanges.restore.forEach((id) =>
-      attachmentFiles.moveToTrash(id),
-    );
+    trashed.forEach((id) => attachmentFiles.restoreFromTrash(id));
+    restored.forEach((id) => attachmentFiles.moveToTrash(id));
     return {
       ok: false,
       error: { kind: 'NotUndoable', reason: errorMessage(error) },
@@ -94,19 +97,6 @@ function createUndoPlan(
   return {
     plan: { entry, records, attachmentChanges: findAttachmentChanges(records) },
   };
-}
-
-function restoreFiles(files: AttachmentFiles, ids: readonly string[]): boolean {
-  const restored: string[] = [];
-  for (const id of ids) {
-    if (files.restoreFromTrash(id)) {
-      restored.push(id);
-      continue;
-    }
-    restored.forEach((restoredId) => files.moveToTrash(restoredId));
-    return false;
-  }
-  return true;
 }
 
 function applyUndo(

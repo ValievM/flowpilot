@@ -14,6 +14,7 @@ type AttachmentFiles = {
   insert(record: AttachmentRecord): void;
   discard(id: string): void;
   moveToTrash(id: string): boolean;
+  restoreFromTrash(id: string): boolean;
 };
 type ApplyOptions = {
   commands: readonly StorageCommand[];
@@ -29,17 +30,21 @@ export function applyCommands(
   database: Database.Database,
   options: ApplyOptions,
 ): ApplyResult {
-  let revision: number;
+  const trashed: string[] = [];
   try {
-    revision = applyTransaction(database, options);
+    for (const command of options.commands) {
+      if (command.kind !== 'attachment.remove') continue;
+      if (!options.attachmentFiles.moveToTrash(command.attachmentId))
+        throw new Error('Unable to move attachment to trash');
+      trashed.push(command.attachmentId);
+    }
+    const revision = applyTransaction(database, options);
+    return { ok: true, value: { revision } };
   } catch (error) {
+    trashed.forEach((id) => options.attachmentFiles.restoreFromTrash(id));
     discardPrepared(options);
     return classifyApplyError(error, options.expectedRevision);
   }
-  for (const command of options.commands)
-    if (command.kind === 'attachment.remove')
-      options.attachmentFiles.moveToTrash(command.attachmentId);
-  return { ok: true, value: { revision } };
 }
 
 function applyTransaction(
