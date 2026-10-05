@@ -779,3 +779,94 @@ for (const screen of ['today', 'now'] as const) {
     }
   }
 }
+
+test('loads persisted board columns through the public renderer API', async () => {
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Доска' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Доска' })).toBeVisible();
+  for (const name of ['Сделать', 'Делаю', 'Ожидание', 'Готово']) {
+    await expect(page.getByRole('region', { name })).toBeVisible();
+  }
+});
+
+test('moves a persisted task from the board UI and reloads the saved state', async () => {
+  const created = await page.evaluate(() =>
+    window.flowpilot.commands.apply({
+      commands: [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'board-smoke-task',
+            title: 'Проверить перенос',
+            description: '',
+            status: { kind: 'todo' },
+            columnId: 'todo',
+            day: '2026-10-05',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 0,
+          },
+        },
+      ],
+      expectedRevision: 0,
+    }),
+  );
+  expect(created).toMatchObject({ ok: true, value: { revision: 1 } });
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Доска' })
+    .click();
+  const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
+  await expect(card).toBeVisible();
+  const doing = page.getByRole('region', { name: 'Делаю' });
+  await card.dragTo(doing);
+  await expect(doing.getByRole('article')).toBeVisible();
+  await card
+    .getByRole('combobox', { name: /Переместить в/ })
+    .selectOption('todo');
+  await expect(
+    page.getByRole('region', { name: 'Сделать' }).getByRole('article'),
+  ).toBeVisible();
+  const saved = await page.evaluate(() => window.flowpilot.snapshot.load());
+  expect(saved).toMatchObject({
+    ok: true,
+    value: {
+      tasks: [
+        {
+          id: 'board-smoke-task',
+          columnId: 'todo',
+          status: { kind: 'todo' },
+        },
+      ],
+      revision: 3,
+    },
+  });
+});
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} Board snapshot at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.evaluate(() => {
+        window.localStorage.clear();
+      });
+      await page.reload();
+      const themeClicks = theme === 'light' ? 1 : 2;
+      for (let click = 0; click < themeClicks; click += 1) {
+        await page.getByRole('button', { name: /Тема:/ }).click();
+      }
+      await page
+        .getByRole('navigation', { name: 'Представления' })
+        .getByRole('button', { name: 'Доска' })
+        .click();
+      await expect(page.getByRole('heading', { name: 'Доска' })).toBeVisible();
+      await expect(page).toHaveScreenshot(
+        `board-${theme}-${width.toString()}px.png`,
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
+      );
+    });
+  }
+}
