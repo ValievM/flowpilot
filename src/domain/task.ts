@@ -59,6 +59,7 @@ export interface Task {
   comments: readonly TaskComment[];
   attachments: readonly AttachmentMetadata[];
   rolledOverFrom?: Temporal.PlainDate;
+  aiRank?: number;
   addedOrder: number;
 }
 

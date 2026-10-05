@@ -32,6 +32,8 @@ const taskSchema = z
     description: z.string().optional(),
     status: statusSchema,
     columnId: z.string().min(1),
+    typeId: z.string().min(1).optional(),
+    disciplineId: z.string().min(1).optional(),
     day: dateSchema,
     time: timeSchema,
     deadline: dateSchema,

@@ -19,6 +19,12 @@ Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
 expected-revision transaction as commands. No filesystem paths cross the
 bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
 `IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
+AI proposals use a separate strict command contract in `ai-commands.ts`.
+`task.classify`, `rule.import`, `rule.activate`, and `task.setAiRank` are internal
+main-to-storage commands and are intentionally absent from `ipcCommandSchema`.
+The proposal validator checks snapshot IDs and revision/rule fingerprints before
+returning commands tagged with `source: 'ai'`; it does not call a provider or
+apply writes itself.
 
 Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
 `FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with

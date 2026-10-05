@@ -77,6 +77,45 @@ describe('task views', () => {
       'later',
     ]);
   });
+  it('uses AI rank before deadline and added order when present', () => {
+    const ranked = task({
+      id: 'ranked',
+      day: today.add({ days: 1 }),
+      deadline: today.add({ days: 8 }),
+      aiRank: 0,
+      addedOrder: 9,
+    });
+    const urgent = task({
+      id: 'urgent',
+      day: today.add({ days: 1 }),
+      deadline: today.add({ days: 1 }),
+      aiRank: 1,
+      addedOrder: 0,
+    });
+    expect(laterView([urgent, ranked], today).map(({ id }) => id)).toEqual([
+      'ranked',
+      'urgent',
+    ]);
+  });
+
+  it('keeps deadline then added order when AI rank is absent', () => {
+    const later = task({
+      id: 'later',
+      day: today.add({ days: 1 }),
+      deadline: today.add({ days: 2 }),
+      addedOrder: 0,
+    });
+    const earlier = task({
+      id: 'earlier',
+      day: today.add({ days: 1 }),
+      deadline: today.add({ days: 1 }),
+      addedOrder: 9,
+    });
+    expect(laterView([later, earlier], today).map(({ id }) => id)).toEqual([
+      'earlier',
+      'later',
+    ]);
+  });
   it('shows undated tasks in later but not in now', () => {
     const undated = task();
     expect(laterView([undated], today)).toEqual([undated]);
