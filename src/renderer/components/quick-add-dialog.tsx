@@ -40,7 +40,7 @@ export function QuickAddDialog({
       );
       return;
     }
-    setTitle('');
+    setTitle((current) => (current === trimmedTitle ? '' : current));
     onClose();
     addButtonRef.current?.focus();
   };

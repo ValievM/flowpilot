@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import {
   cleanup,
   fireEvent,
@@ -9,6 +10,7 @@ import {
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import { QuickAddDialog } from './components/quick-add-dialog';
 import {
   fakeApi,
   mockSystemTheme,
@@ -200,7 +202,8 @@ describe('persisted today and now screens', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Сохранено');
     expect(screen.queryByText('Ошибка сохранения')).not.toBeInTheDocument();
   });
-  it('shows loading then an honest source error with retry action', async () => {
+  it('shows loading then recovers after retrying a source error', async () => {
+    mockSystemTheme(false);
     const fake = fakeApi();
     fake.setLoadFailure();
     Object.defineProperty(window, 'flowpilot', {
@@ -212,7 +215,50 @@ describe('persisted today and now screens', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /не удалось загрузить сохранённые задачи/i,
     );
+    fake.setLoadFailure(false);
     fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Сегодня пока пусто' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('retains text typed during an asynchronous save', async () => {
+    let resolveSave!: (saved: boolean) => void;
+    const close = vi.fn();
+    const addButtonRef = createRef<HTMLButtonElement>();
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const app = render(
+      <QuickAddDialog
+        open
+        onClose={close}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    const field = screen.getByLabelText('Что нужно сделать?');
+    fireEvent.change(field, { target: { value: 'Отправленная задача' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    fireEvent.change(field, { target: { value: 'Следующая задача' } });
+    resolveSave(true);
+    await waitFor(() => {
+      expect(close).toHaveBeenCalledOnce();
+    });
+    app.rerender(
+      <QuickAddDialog
+        open
+        onClose={close}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    expect(screen.getByLabelText('Что нужно сделать?')).toHaveValue(
+      'Следующая задача',
+    );
   });
   it('shows a stale-retry load error without reporting a save failure', async () => {
     const fake = renderApp();

@@ -193,7 +193,7 @@ export interface FakeFlowPilot {
   setStaleOnce(): void;
   setAlwaysReject(): void;
   setRejectRetry(): void;
-  setLoadFailure(): void;
+  setLoadFailure(failed?: boolean): void;
   snapshot(): IpcSnapshot;
 }
 
@@ -250,8 +250,8 @@ export function fakeApi(
     setRejectRetry: () => {
       state.rejectRetry = true;
     },
-    setLoadFailure: () => {
-      state.loadFailure = true;
+    setLoadFailure: (failed = true) => {
+      state.loadFailure = failed;
     },
     snapshot: () => state.current,
   };

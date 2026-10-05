@@ -1,9 +1,15 @@
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { Temporal } from 'temporal-polyfill';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 const TEST_NOW = '2026-10-05T12:00:00Z';
+const TODAY_DATE = Temporal.Instant.from(TEST_NOW)
+  .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+  .toPlainDate();
+const TODAY = TODAY_DATE.toString();
+const DEADLINE = TODAY_DATE.add({ days: 4 }).toString();
 const TODAY_LABEL = `Сегодня, ${new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
   month: 'long',
@@ -71,7 +77,7 @@ test('loads an empty profile through the typed preload API', async () => {
 });
 
 test('rejects renderer attachment additions through the public IPC API', async () => {
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (today) => {
     const created = await window.flowpilot.commands.apply({
       commands: [
         {
@@ -82,7 +88,7 @@ test('rejects renderer attachment additions through the public IPC API', async (
             description: '',
             status: { kind: 'todo' },
             columnId: 'todo',
-            day: '2026-10-05',
+            day: today,
             subtasks: [],
             comments: [],
             attachments: [],
@@ -114,7 +120,7 @@ test('rejects renderer attachment additions through the public IPC API', async (
       attempt,
       snapshot: await window.flowpilot.snapshot.load(),
     };
-  });
+  }, TODAY);
   expect(result.created).toMatchObject({ ok: true, value: { revision: 1 } });
   expect(result.attempt).toEqual({ ok: false, error: 'ValidationFailed' });
   expect(result.snapshot).toMatchObject({
@@ -191,7 +197,7 @@ test('creates and starts a task through persisted Today and Now flows', async ()
         {
           title: 'Проверить быстрый ввод',
           status: { kind: 'todo' },
-          day: '2026-10-05',
+          day: TODAY,
         },
       ],
     },
@@ -212,29 +218,31 @@ for (const screen of ['today', 'now'] as const) {
     for (const theme of ['light', 'dark'] as const) {
       test(`matches ${theme} ${screen} snapshot at ${width.toString()}px`, async () => {
         await page.setViewportSize({ width, height: 800 });
-        const seeded = await page.evaluate(() =>
-          window.flowpilot.commands.apply({
-            commands: [
-              {
-                kind: 'task.create',
-                task: {
-                  id: 'snapshot-risk',
-                  title: 'Задача с риском срока',
-                  description: '',
-                  status: { kind: 'todo' },
-                  columnId: 'todo',
-                  day: '2026-10-05',
-                  deadline: '2026-10-09',
-                  estimate: { unit: 'workdays', value: 5 },
-                  subtasks: [],
-                  comments: [],
-                  attachments: [],
-                  addedOrder: 0,
+        const seeded = await page.evaluate(
+          ({ today, deadline }) =>
+            window.flowpilot.commands.apply({
+              commands: [
+                {
+                  kind: 'task.create',
+                  task: {
+                    id: 'snapshot-risk',
+                    title: 'Задача с риском срока',
+                    description: '',
+                    status: { kind: 'todo' },
+                    columnId: 'todo',
+                    day: today,
+                    deadline,
+                    estimate: { unit: 'workdays', value: 5 },
+                    subtasks: [],
+                    comments: [],
+                    attachments: [],
+                    addedOrder: 0,
+                  },
                 },
-              },
-            ],
-            expectedRevision: 0,
-          }),
+              ],
+              expectedRevision: 0,
+            }),
+          { today: TODAY, deadline: DEADLINE },
         );
         expect(seeded).toMatchObject({ ok: true, value: { revision: 1 } });
         await page.evaluate(() => {
