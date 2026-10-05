@@ -106,6 +106,8 @@ export interface AiContext {
   }[];
   readonly workdays: readonly number[];
   readonly schedule?: {
+    readonly status: ScheduleSnapshot['status'];
+    readonly fetchedAt: string;
     readonly nearestFixedEvents: readonly ContextEvent[];
   };
 }

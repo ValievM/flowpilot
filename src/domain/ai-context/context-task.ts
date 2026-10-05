@@ -16,9 +16,11 @@ export function compareContextTasks(
   right: ContextTask,
 ): number {
   return (
-    riskOrder(left.deadlineRisk) - riskOrder(right.deadlineRisk) ||
     availabilityOrder(left.availability) -
       availabilityOrder(right.availability) ||
+    priorityOrder(left.rules.effectivePriority?.level) -
+      priorityOrder(right.rules.effectivePriority?.level) ||
+    riskOrder(left.deadlineRisk) - riskOrder(right.deadlineRisk) ||
     compareDeadline(left.deadline, right.deadline) ||
     left.id.localeCompare(right.id)
   );
@@ -136,6 +138,15 @@ function availabilityOrder(value: ContextTask['availability']): number {
     future: 4,
   };
   return order[value];
+}
+
+function priorityOrder(
+  priority: EffectivePriority['level'] | undefined,
+): number {
+  if (priority === 'high') return 0;
+  if (priority === 'normal') return 1;
+  if (priority === 'low') return 2;
+  return 3;
 }
 
 function compareDeadline(

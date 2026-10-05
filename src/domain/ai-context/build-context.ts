@@ -1,3 +1,4 @@
+import { Temporal } from 'temporal-polyfill';
 import { skipGroups } from '../repeats';
 import { nextEvent } from '../schedule/fixed-events';
 import type {
@@ -48,7 +49,13 @@ export function buildContext(input: ContextInput): AiContext {
       .sort((left, right) => left.id.localeCompare(right.id)),
     workdays: [...input.workdays].sort((left, right) => left - right),
     ...(input.schedule
-      ? { schedule: { nearestFixedEvents: nearestEvents(input) } }
+      ? {
+          schedule: {
+            status: input.schedule.status,
+            fetchedAt: input.schedule.fetchedAt.toString(),
+            nearestFixedEvents: nearestEvents(input),
+          },
+        }
       : {}),
   };
   return context;
@@ -77,7 +84,17 @@ function missedGroups(input: ContextInput): ContextRepeatGroup[] {
 
 function nearestEvents(input: ContextInput): ContextEvent[] {
   if (!input.schedule) return [];
-  const event = nextEvent(input.schedule, input.now);
+  const active = input.schedule.events
+    .filter(
+      (candidate) =>
+        !candidate.cancelled &&
+        Temporal.ZonedDateTime.compare(candidate.start, input.now) <= 0 &&
+        Temporal.ZonedDateTime.compare(candidate.end, input.now) > 0,
+    )
+    .sort((left, right) =>
+      Temporal.ZonedDateTime.compare(left.start, right.start),
+    )[0];
+  const event = active ?? nextEvent(input.schedule, input.now);
   return event
     ? [
         {
