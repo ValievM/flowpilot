@@ -104,7 +104,10 @@ const ipcTaskSchema = taskSchema
   .strict();
 
 const taskCreateSchema = z
-  .object({ kind: z.literal('task.create'), task: taskSchema })
+  .object({
+    kind: z.literal('task.create'),
+    task: taskSchema.extend({ attachments: z.array(z.never()) }),
+  })
   .strict();
 const ipcTaskCreateSchema = z
   .object({ kind: z.literal('task.create'), task: ipcTaskSchema })

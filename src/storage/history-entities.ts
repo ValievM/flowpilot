@@ -50,15 +50,23 @@ export function snapshotEntity(
 ): EntitySnapshot {
   if (ref.kind === 'setting') {
     const row = database
-      .prepare('SELECT key,value_json FROM settings WHERE key = ?')
+      .prepare('SELECT key,value_json,version FROM settings WHERE key = ?')
       .get(ref.id) as Row | undefined;
-    return { ...ref, state: row ? JSON.stringify(row) : null, version: null };
+    return {
+      ...ref,
+      state: row ? JSON.stringify(row) : null,
+      version: row ? Number(row.version) : null,
+    };
   }
   if (ref.kind === 'column') {
     const row = database
       .prepare('SELECT * FROM columns WHERE id = ?')
       .get(ref.id) as Row | undefined;
-    return { ...ref, state: row ? JSON.stringify(row) : null, version: null };
+    return {
+      ...ref,
+      state: row ? JSON.stringify(row) : null,
+      version: row ? Number(row.version) : null,
+    };
   }
   const row = database
     .prepare('SELECT * FROM tasks WHERE id = ?')
@@ -92,8 +100,8 @@ export function restoreEntity(
     if (snapshot.state) {
       const row = JSON.parse(snapshot.state) as Row;
       database
-        .prepare('INSERT INTO settings(key,value_json) VALUES(?,?)')
-        .run(row.key, row.value_json);
+        .prepare('INSERT INTO settings(key,value_json,version) VALUES(?,?,?)')
+        .run(row.key, row.value_json, row.version);
     }
     return;
   }

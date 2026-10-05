@@ -3,11 +3,13 @@ import type Database from 'better-sqlite3';
 import initialSchema from './migrations/0001_init.sql?raw';
 import attachmentIntegrity from './migrations/0002_attachment_integrity.sql?raw';
 import historySchema from './migrations/0003_change_log.sql?raw';
+import entityVersions from './migrations/0004_entity_versions.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
   { version: 2, sql: attachmentIntegrity },
   { version: 3, sql: historySchema },
+  { version: 4, sql: entityVersions },
 ] as const;
 
 export function migrate(database: Database.Database, path: string): void {

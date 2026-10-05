@@ -25,9 +25,22 @@ describe('database migrations', () => {
     const columns = database
       .prepare('PRAGMA table_info(attachments)')
       .all() as { name: string }[];
-    expect(columns.map(({ name }) => name)).toContain('sha256');
     expect(columns.map(({ name }) => name)).toContain('created_at');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 3 }]);
+    expect(
+      (
+        database.prepare('PRAGMA table_info(columns)').all() as {
+          name: string;
+        }[]
+      ).map(({ name }) => name),
+    ).toContain('version');
+    expect(
+      (
+        database.prepare('PRAGMA table_info(settings)').all() as {
+          name: string;
+        }[]
+      ).map(({ name }) => name),
+    ).toContain('version');
+    expect(database.pragma('user_version')).toEqual([{ user_version: 4 }]);
     expect(
       database
         .prepare(

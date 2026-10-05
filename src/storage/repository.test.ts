@@ -27,7 +27,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 3 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 4 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);
@@ -54,14 +54,7 @@ describe('Repository', () => {
       estimate: { unit: 'workdays' as const, value: 3 },
       subtasks: [{ id: 'sub-1', title: 'Outline', completed: true }],
       comments: [{ id: 'comment-1', text: 'Initial note' }],
-      attachments: [
-        {
-          id: 'file-1',
-          name: 'notes.txt',
-          mediaType: 'text/plain',
-          sizeBytes: 24,
-        },
-      ],
+      attachments: [],
       rolledOverFrom: Temporal.PlainDate.from('2026-10-04'),
       addedOrder: 42,
     };

@@ -81,9 +81,10 @@ function createUndoPlan(
   if (isUndone(database, entry.id))
     return { result: { ok: false, error: { kind: 'AlreadyUndone' } } };
   const records = readEntryEntities(database, entry.id);
-  const conflicts = records.filter(
-    ({ ref, after }) => snapshotEntity(database, ref).state !== after.state,
-  );
+  const conflicts = records.filter(({ ref, after }) => {
+    const current = snapshotEntity(database, ref);
+    return current.state !== after.state || current.version !== after.version;
+  });
   if (conflicts.length)
     return {
       result: {
@@ -232,9 +233,10 @@ function entityKind(kind: string): EntitySnapshot['kind'] {
 }
 
 function versionFromState(kind: string, state: string | null): number | null {
-  if (kind !== 'task' || !state) return null;
-  const parsed = JSON.parse(state) as { task: { version: number } };
-  return parsed.task.version;
+  if (!state) return null;
+  const parsed = JSON.parse(state) as
+    { task: { version: number } } | { version: number };
+  return 'task' in parsed ? parsed.task.version : parsed.version;
 }
 
 function readRevision(database: Database.Database): number {

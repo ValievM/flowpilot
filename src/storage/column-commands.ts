@@ -23,7 +23,7 @@ export function executeColumnCommand(
       requireChanged(
         database
           .prepare(
-            'UPDATE columns SET name = ?, description = ? WHERE id = ? AND built_in = 0',
+            'UPDATE columns SET name = ?, description = ?, version = version + 1 WHERE id = ? AND built_in = 0',
           )
           .run(command.name, command.description, command.id).changes,
         'column not found or built-in',
@@ -35,7 +35,7 @@ export function executeColumnCommand(
     case 'setting.set':
       database
         .prepare(
-          'INSERT INTO settings(key,value_json) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json',
+          'INSERT INTO settings(key,value_json) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, version = settings.version + 1',
         )
         .run(command.key, JSON.stringify(command.value));
       return;
