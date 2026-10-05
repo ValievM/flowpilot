@@ -30,10 +30,12 @@ separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without
 accepting system fields from the proposal.
 
-AI calls are explicit through `ai.run()` and `ai.cancel()`. The manual provider
-also exposes `ai.prompt()` and `ai.reply()` for text exchange without clipboard
-or network access. Replies pass strict proposal and command validation before
-they leave the provider. The fake provider is selected only in unpackaged
+AI calls are explicit through `ai.run()` and `ai.cancel()`. The main-process
+`ai.run()` boundary serializes Temporal date and time values to canonical ISO
+strings before returning a proposal to the renderer. The manual provider also
+exposes `ai.prompt()` and `ai.reply()` for text exchange without clipboard or
+network access. Replies pass strict proposal and command validation before they
+leave the provider. The fake provider is selected only in unpackaged
 `FLOWPILOT_TEST=1` builds; manual exchange is the default. No persisted setting
 selects an AI provider.
 

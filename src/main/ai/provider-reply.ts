@@ -7,8 +7,18 @@ import {
 } from '../../shared/ai-commands';
 import type { ProviderResult } from './ai-provider';
 
-const contextTaskSchema = z.looseObject({ id: z.string().min(1) });
+const contextNestedSchema = z.looseObject({ id: z.string().min(1) });
+const contextTaskSchema = z.looseObject({
+  id: z.string().min(1),
+  subtasks: z.array(contextNestedSchema).optional(),
+  comments: z.array(contextNestedSchema).optional(),
+});
 const contextSchema = z.looseObject({ tasks: z.array(contextTaskSchema) });
+interface ValidationState {
+  readonly taskIds: Set<string>;
+  readonly subtaskIds: Set<string>;
+  readonly commentIds: Set<string>;
+}
 
 export function validateProviderReply(
   value: unknown,
@@ -17,11 +27,11 @@ export function validateProviderReply(
   const parsed = proposalSchema.safeParse(value);
   const parsedContext = contextSchema.safeParse(context);
   if (!parsed.success || !parsedContext.success) return invalidReply();
-  const taskIds = new Set(parsedContext.data.tasks.map(({ id }) => id));
+  const state = createValidationState(parsedContext.data.tasks);
   const commands: AiCommand[] = [];
   for (const candidate of parsed.data.commands) {
     const command = aiCommandSchema.safeParse(candidate);
-    if (!command.success || !isTaskReferenceValid(command.data, taskIds)) {
+    if (!command.success || !isCommandValid(command.data, state)) {
       return invalidReply();
     }
     commands.push(command.data);
@@ -41,17 +51,67 @@ export function parseProviderText(
   }
 }
 
-function isTaskReferenceValid(
-  command: AiCommand,
-  taskIds: Set<string>,
-): boolean {
-  if (command.kind === 'task.create') {
-    if (taskIds.has(command.task.id)) return false;
-    taskIds.add(command.task.id);
+function createValidationState(
+  tasks: readonly z.infer<typeof contextTaskSchema>[],
+): ValidationState {
+  return {
+    taskIds: new Set(tasks.map(({ id }) => id)),
+    subtaskIds: new Set(
+      tasks.flatMap(({ subtasks = [] }) => subtasks.map(({ id }) => id)),
+    ),
+    commentIds: new Set(
+      tasks.flatMap(({ comments = [] }) => comments.map(({ id }) => id)),
+    ),
+  };
+}
+
+function isCommandValid(command: AiCommand, state: ValidationState): boolean {
+  if (command.kind === 'task.create') return acceptCreatedTask(command, state);
+  const taskId = taskIdFor(command);
+  if (taskId !== undefined && !state.taskIds.has(taskId)) return false;
+  if (command.kind === 'subtask.add') {
+    if (state.subtaskIds.has(command.subtask.id)) return false;
+    state.subtaskIds.add(command.subtask.id);
     return true;
   }
-  const taskId = taskIdFor(command);
-  return taskId === undefined || taskIds.has(taskId);
+  if (command.kind === 'comment.add') {
+    if (state.commentIds.has(command.comment.id)) return false;
+    state.commentIds.add(command.comment.id);
+    return true;
+  }
+  return true;
+}
+
+function acceptCreatedTask(
+  command: Extract<AiCommand, { kind: 'task.create' }>,
+  state: ValidationState,
+): boolean {
+  const { task } = command;
+  const subtaskIds = task.subtasks.map(({ id }) => id);
+  const commentId = task.comment?.id;
+  if (
+    state.taskIds.has(task.id) ||
+    !areUniqueIds(subtaskIds, state.subtaskIds) ||
+    (commentId !== undefined && state.commentIds.has(commentId))
+  ) {
+    return false;
+  }
+  state.taskIds.add(task.id);
+  subtaskIds.forEach((id) => state.subtaskIds.add(id));
+  if (commentId !== undefined) state.commentIds.add(commentId);
+  return true;
+}
+
+function areUniqueIds(
+  ids: readonly string[],
+  existing: ReadonlySet<string>,
+): boolean {
+  const candidateIds = new Set<string>();
+  for (const id of ids) {
+    if (existing.has(id) || candidateIds.has(id)) return false;
+    candidateIds.add(id);
+  }
+  return true;
 }
 
 function taskIdFor(command: AiCommand): string | undefined {
@@ -67,9 +127,10 @@ function taskIdFor(command: AiCommand): string | undefined {
     case 'rule.import':
     case 'rule.activate':
       return undefined;
+    case 'task.create':
+      return command.task.id;
   }
 }
-
 function invalidReply(): ProviderResult<Proposal> {
   return { ok: false, error: { kind: 'InvalidReply' } };
 }

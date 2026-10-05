@@ -1,9 +1,18 @@
+import { Temporal } from 'temporal-polyfill';
+import type {
+  AiCommand,
+  AiTaskChanges,
+  AiTaskCreation,
+  Proposal,
+} from '../../shared/ai-commands';
 import {
   aiCancelRequestSchema,
   aiReplyRequestSchema,
   aiRequestSchema,
   type AiCancelResult,
   type AiIpcResult,
+  type AiIpcCommand,
+  type AiIpcProposal,
   type AiManualReplyResult,
 } from '../../shared/contracts';
 import type { Result } from '../../shared/ipc-result';
@@ -17,7 +26,60 @@ export async function runAiRequest(
   const parsed = aiRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'ValidationFailed' };
   const result = await runner.run(parsed.data);
-  return result.ok ? result : { ok: false, error: result.error.kind };
+  if (!result.ok) return { ok: false, error: result.error.kind };
+  return { ok: true, value: serializeProposal(result.value) };
+}
+
+function serializeProposal(proposal: Proposal): AiIpcProposal {
+  return {
+    ...proposal,
+    commands: proposal.commands.map(serializeCommand),
+  };
+}
+
+function serializeCommand(command: AiCommand): AiIpcCommand {
+  if (command.kind === 'task.create') {
+    return { ...command, task: serializeTaskCreation(command.task) };
+  }
+  if (command.kind === 'task.update') {
+    return { ...command, changes: serializeTaskChanges(command.changes) };
+  }
+  return command;
+}
+
+function serializeTaskCreation(task: AiTaskCreation) {
+  const { day, time, deadline, ...remaining } = task;
+  return {
+    ...remaining,
+    ...(day ? { day: Temporal.PlainDate.from(day).toString() } : {}),
+    ...(time ? { time: Temporal.PlainTime.from(time).toString() } : {}),
+    ...(deadline
+      ? { deadline: Temporal.PlainDate.from(deadline).toString() }
+      : {}),
+  };
+}
+
+function serializeTaskChanges(changes: AiTaskChanges) {
+  const { day, time, deadline, ...remaining } = changes;
+  return {
+    ...remaining,
+    ...(day !== undefined
+      ? { day: day === null ? null : Temporal.PlainDate.from(day).toString() }
+      : {}),
+    ...(time !== undefined
+      ? {
+          time: time === null ? null : Temporal.PlainTime.from(time).toString(),
+        }
+      : {}),
+    ...(deadline !== undefined
+      ? {
+          deadline:
+            deadline === null
+              ? null
+              : Temporal.PlainDate.from(deadline).toString(),
+        }
+      : {}),
+  };
 }
 
 export function cancelAiRequest(

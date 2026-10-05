@@ -7,7 +7,39 @@ import {
 import type { Task, TaskStatus } from '../domain';
 import type { Snapshot } from '../storage';
 import type { Result } from './ipc-result';
-import type { Proposal } from './ai-commands';
+import type {
+  AiCommand,
+  AiTaskChanges,
+  AiTaskCreation,
+  Proposal,
+} from './ai-commands';
+type SerializedTaskCreation = Omit<
+  AiTaskCreation,
+  'day' | 'time' | 'deadline'
+> & {
+  readonly day?: string;
+  readonly time?: string;
+  readonly deadline?: string;
+};
+type SerializedTaskChanges = Omit<
+  AiTaskChanges,
+  'day' | 'time' | 'deadline'
+> & {
+  readonly day?: string | null;
+  readonly time?: string | null;
+  readonly deadline?: string | null;
+};
+export type AiIpcCommand =
+  | { readonly kind: 'task.create'; readonly task: SerializedTaskCreation }
+  | {
+      readonly kind: 'task.update';
+      readonly id: string;
+      readonly changes: SerializedTaskChanges;
+    }
+  | Exclude<AiCommand, { kind: 'task.create' | 'task.update' }>;
+export type AiIpcProposal = Omit<Proposal, 'commands'> & {
+  readonly commands: readonly AiIpcCommand[];
+};
 type IpcTaskStatus =
   | Exclude<TaskStatus, { kind: 'waiting' }>
   | { kind: 'waiting'; reason: string; until?: string };
@@ -52,7 +84,7 @@ export const aiReplyRequestSchema = z
   .strict();
 export type AiIpcRequest = z.infer<typeof aiRequestSchema>;
 export type AiIpcResult =
-  | { readonly ok: true; readonly value: Proposal }
+  | { readonly ok: true; readonly value: AiIpcProposal }
   | {
       readonly ok: false;
       readonly error:

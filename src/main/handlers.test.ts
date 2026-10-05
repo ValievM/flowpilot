@@ -318,7 +318,29 @@ describe('IPC handlers', () => {
       id: 'scripted-proposal',
       baseRevision: 1,
       ruleVersions: {},
-      commands: [{ kind: 'task.setAiRank', taskId: 'task-1', rank: 2 }],
+      commands: [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'scripted-task',
+            title: 'Scripted task',
+            columnId: 'todo',
+            subtasks: [],
+            day: '2026-10-06',
+            time: '09:30',
+            deadline: '2026-10-09',
+          },
+        },
+        {
+          kind: 'task.update',
+          id: 'task-1',
+          changes: {
+            day: '2026-10-07',
+            time: '14:45',
+            deadline: '2026-10-10',
+          },
+        },
+      ],
       rationale: 'Scripted test reply',
       unknowns: [],
       createdAt: '2026-10-05T12:00:00Z',
@@ -363,7 +385,36 @@ describe('IPC handlers', () => {
       },
     );
 
-    expect(result).toEqual({ ok: true, value: proposal });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ...proposal,
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'scripted-task',
+              title: 'Scripted task',
+              columnId: 'todo',
+              subtasks: [],
+              day: '2026-10-06',
+              time: '09:30:00',
+              deadline: '2026-10-09',
+            },
+          },
+          {
+            kind: 'task.update',
+            id: 'task-1',
+            changes: {
+              day: '2026-10-07',
+              time: '14:45:00',
+              deadline: '2026-10-10',
+            },
+          },
+        ],
+      },
+    });
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result);
     repository.close();
   });
 });
