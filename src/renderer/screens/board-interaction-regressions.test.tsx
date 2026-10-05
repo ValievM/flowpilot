@@ -130,6 +130,29 @@ describe('board interaction regressions', () => {
     });
     expect(screen.getByRole('status')).not.toHaveTextContent('сохранения');
   });
+  it.each([
+    ['the gap between columns', 199],
+    ['outside every column', 400],
+  ])('does not move a task when pointer release is %s', async (_place, x) => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        const label = this.getAttribute('aria-label');
+        if (label === 'Сделать') return new DOMRect(0, 0, 160, 180);
+        if (label === 'Делаю') return new DOMRect(200, 0, 160, 180);
+        return new DOMRect(0, 0, 0, 0);
+      },
+    );
+    const value = renderBoard();
+    const card = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    fireEvent(card, pointerEvent('pointerdown', 10, 10));
+    fireEvent(card, pointerEvent('pointermove', x, 40));
+    fireEvent(card, pointerEvent('pointermove', x, 40));
+    fireEvent(card, pointerEvent('pointerup', x, 40));
+
+    expect(value.applyMock).not.toHaveBeenCalled();
+  });
 });
 
 function pointerEvent(

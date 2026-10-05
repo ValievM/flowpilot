@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   columns,
@@ -7,6 +14,10 @@ import {
   snapshot,
   task,
 } from './board-test-data';
+import type { IpcSnapshot } from '../../shared/contracts';
+import type { Result } from '../../shared/ipc-result';
+
+type ApplyResponse = Result<IpcSnapshot>;
 
 afterEach(cleanup);
 
@@ -75,6 +86,63 @@ describe('apply feedback in board dialogs', () => {
       name: 'Изменить колонку',
     });
     expect(within(editDialog).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('ignores a late stale delete result after another dialog opens', async () => {
+    const custom = {
+      id: 'custom',
+      name: 'Своя',
+      description: '',
+      state: 'todo' as const,
+      builtIn: false,
+    };
+    const api = createBoardApi({
+      ...snapshot([task('other', 'custom')]),
+      columns: [...columns, custom],
+    });
+    const pending: Array<(result: ApplyResponse) => void> = [];
+    api.applyMock.mockImplementation(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    renderBoard(api);
+    const boardColumn = await screen.findByRole('region', { name: 'Своя' });
+    fireEvent.click(
+      within(boardColumn).getByRole('button', { name: 'Удалить колонку' }),
+    );
+    const deleteDialog = screen.getByRole('dialog', {
+      name: 'Удалить колонку?',
+    });
+    fireEvent.change(screen.getByLabelText('Переместить карточки в'), {
+      target: { value: 'todo' },
+    });
+    const deleteButton = within(deleteDialog).getByRole('button', {
+      name: 'Удалить колонку',
+    });
+    fireEvent.click(deleteButton);
+    fireEvent.click(deleteButton);
+    expect(api.applyMock).toHaveBeenCalledTimes(2);
+
+    const resolveFirst = pending.shift();
+    if (!resolveFirst) throw new Error('Expected first deferred apply');
+    await act(async () => {
+      resolveFirst({ ok: true, value: snapshot([task('other', 'todo')]) });
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить колонку' }));
+    const addDialog = screen.getByRole('dialog', { name: 'Новая колонка' });
+    const resolveSecond = pending.shift();
+    if (!resolveSecond) throw new Error('Expected second deferred apply');
+    await act(async () => {
+      resolveSecond({ ok: false, error: 'StaleRevision' });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(api.loadMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(within(addDialog).queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

@@ -1,4 +1,4 @@
-import type React from 'react';
+import { useRef, type SyntheticEvent } from 'react';
 import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
 import type { ApplyResult } from './use-board-snapshot';
 
@@ -28,19 +28,21 @@ type ActionsInput = {
 
 export type BoardActions = {
   move: (taskId: string, column: Column) => Promise<void>;
-  confirmWaiting: (
-    event: React.SyntheticEvent<HTMLFormElement>,
-  ) => Promise<void>;
-  saveColumn: (event: React.SyntheticEvent<HTMLFormElement>) => Promise<void>;
+  confirmWaiting: (event: SyntheticEvent<HTMLFormElement>) => Promise<void>;
+  saveColumn: (event: SyntheticEvent<HTMLFormElement>) => Promise<void>;
   deleteColumn: (columnId?: string) => Promise<boolean>;
 };
 
 export function useBoardActions(input: ActionsInput): BoardActions {
+  const completedDialogs = useRef(new WeakSet<HTMLDialogElement>());
   return {
     move: (taskId, column) => moveTask(input, taskId, column),
-    confirmWaiting: (event) => confirmWaitingMove(input, event),
-    saveColumn: (event) => saveBoardColumn(input, event),
-    deleteColumn: (id) => deleteBoardColumn(input, id),
+    confirmWaiting: (event) =>
+      confirmWaitingMove(input, event, completedDialogs.current),
+    saveColumn: (event) =>
+      saveBoardColumn(input, event, completedDialogs.current),
+    deleteColumn: (id) =>
+      deleteBoardColumn(input, completedDialogs.current, id),
   };
 }
 
@@ -70,11 +72,13 @@ async function moveTask(
 
 async function confirmWaitingMove(
   input: ActionsInput,
-  event: React.SyntheticEvent<HTMLFormElement>,
+  event: SyntheticEvent<HTMLFormElement>,
+  completedDialogs: WeakSet<HTMLDialogElement>,
 ): Promise<void> {
   event.preventDefault();
   const reason = input.waitingReason.trim();
   if (!input.waitingMove || !reason) return;
+  const dialog = event.currentTarget.closest('dialog');
   input.setDialogError('');
   const status = input.waitingUntil
     ? { kind: 'waiting' as const, reason, until: input.waitingUntil }
@@ -87,19 +91,25 @@ async function confirmWaitingMove(
       status,
     },
   ]);
-  if (result.ok) input.setWaitingMove(undefined);
-  else input.setDialogError(result.message);
+  if (result.ok) {
+    completeDialog(dialog, completedDialogs);
+    input.setWaitingMove(undefined);
+  } else if (canReportDialogError(dialog, completedDialogs)) {
+    input.setDialogError(result.message);
+  }
 }
 
 async function saveBoardColumn(
   input: ActionsInput,
-  event: React.SyntheticEvent<HTMLFormElement>,
+  event: SyntheticEvent<HTMLFormElement>,
+  completedDialogs: WeakSet<HTMLDialogElement>,
 ): Promise<void> {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const name = stringField(form.get('name')).trim();
   const description = stringField(form.get('description'));
   if (!name) return;
+  const dialog = event.currentTarget.closest('dialog');
   input.setDialogError('');
   const state = stringField(form.get('state'), 'todo') as Column['state'];
   const command: CommandsApplyRequest['commands'][number] = input.editingColumn
@@ -116,13 +126,17 @@ async function saveBoardColumn(
       };
   const result = await input.apply([command]);
   if (result.ok) {
+    completeDialog(dialog, completedDialogs);
     input.setEditingColumn(undefined);
     input.setCreatingColumn(false);
-  } else input.setDialogError(result.message);
+  } else if (canReportDialogError(dialog, completedDialogs)) {
+    input.setDialogError(result.message);
+  }
 }
 
 async function deleteBoardColumn(
   input: ActionsInput,
+  completedDialogs: WeakSet<HTMLDialogElement>,
   columnId = input.deletingId,
 ): Promise<boolean> {
   if (!input.snapshot || !columnId) return false;
@@ -130,6 +144,7 @@ async function deleteBoardColumn(
     (task) => task.columnId === columnId,
   );
   if (hasTasks && !input.deleteTarget) return false;
+  const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
   input.setDialogError('');
   const command: CommandsApplyRequest['commands'][number] = {
     kind: 'column.delete',
@@ -138,12 +153,29 @@ async function deleteBoardColumn(
   };
   const result = await input.apply([command]);
   if (!result.ok) {
-    input.setDialogError(result.message);
+    if (canReportDialogError(dialog, completedDialogs)) {
+      input.setDialogError(result.message);
+    }
     return false;
   }
+  completeDialog(dialog, completedDialogs);
   input.setDeletingId(undefined);
   input.setDeleteTarget('');
   return true;
+}
+function canReportDialogError(
+  dialog: HTMLDialogElement | null,
+  completedDialogs: WeakSet<HTMLDialogElement>,
+): boolean {
+  return dialog
+    ? dialog.isConnected && dialog.open && !completedDialogs.has(dialog)
+    : true;
+}
+function completeDialog(
+  dialog: HTMLDialogElement | null,
+  completedDialogs: WeakSet<HTMLDialogElement>,
+): void {
+  if (dialog) completedDialogs.add(dialog);
 }
 
 function stringField(value: FormDataEntryValue | null, fallback = ''): string {

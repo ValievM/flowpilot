@@ -9,6 +9,7 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type Collision,
   type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core';
@@ -73,7 +74,9 @@ export function BoardDragContext({
         },
       }}
       sensors={sensors}
-      collisionDetection={boardCollisionDetection}
+      collisionDetection={(args) =>
+        boardCollisionDetection(args, keyboardTarget.current)
+      }
       onDragStart={(event) => {
         const taskId = readDndId(event.active.id, 'task:');
         const sourceColumnId = tasks.find(
@@ -169,10 +172,15 @@ function keyboardColumnOffset(
   return key === nextKey ? 1 : key === previousKey ? -1 : undefined;
 }
 
-const boardCollisionDetection: CollisionDetection = (args) => {
+function boardCollisionDetection(
+  args: Parameters<CollisionDetection>[0],
+  keyboardTargetId: string | undefined,
+): Collision[] {
   const pointerCollisions = pointerWithin(args);
-  return pointerCollisions.length ? pointerCollisions : closestCenter(args);
-};
+  return keyboardTargetId && !pointerCollisions.length
+    ? closestCenter(args)
+    : pointerCollisions;
+}
 function finishBoardDrag(
   event: DragEndEvent,
   columns: readonly Column[],
