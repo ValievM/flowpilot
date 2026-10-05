@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe('database migrations', () => {
-  it('adds attachment integrity metadata when upgrading a version-one database', () => {
+  it('adds attachment integrity and change history when upgrading a version-one database', () => {
     const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v1-'));
     directories.push(directory);
     const path = join(directory, 'tasks.sqlite');
@@ -27,7 +27,14 @@ describe('database migrations', () => {
       .all() as { name: string }[];
     expect(columns.map(({ name }) => name)).toContain('sha256');
     expect(columns.map(({ name }) => name)).toContain('created_at');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 2 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 3 }]);
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='change_log'",
+        )
+        .get(),
+    ).toEqual({ name: 'change_log' });
     database.close();
   });
 });

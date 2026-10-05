@@ -111,7 +111,11 @@ export const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('attachment.add'),
     taskId: z.string().min(1),
-    attachment: taskSchema.shape.attachments.element,
+    sourcePath: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('attachment.remove'),
+    attachmentId: z.string().min(1),
   }),
   z.object({ kind: z.literal('column.create'), column: columnSchema }),
   z.object({
