@@ -6,6 +6,7 @@
   "main": ".vite/build/index.cjs",
   "scripts": {
     "start": "electron-forge start",
+    "test:electron-abi": "electron-rebuild -f -w better-sqlite3 && ELECTRON_RUN_AS_NODE=1 electron scripts/storage-abi-check.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "stylelint": "stylelint \"src/renderer/**/*.css\" --ignore-pattern src/renderer/styles/tokens.css",
@@ -19,10 +20,12 @@
     "make": "electron-forge make --arch=arm64 --platform=darwin"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "ajv": "^8.20.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "temporal-polyfill": "^1.0.5"
+    "temporal-polyfill": "^1.0.5",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@electron-forge/cli": "^8.0.1",
