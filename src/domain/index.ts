@@ -20,3 +20,22 @@ export type {
   TaskStatus,
 } from './task';
 export { laterView, nowView, todayView } from './views';
+export { addType, removeType, renameType } from './task-types';
+export type {
+  AddTypeResult,
+  RemoveTypeOptions,
+  RemoveTypeResult,
+  RenameTypeResult,
+} from './task-types';
+export {
+  addDiscipline,
+  removeDiscipline,
+  renameDiscipline,
+} from './disciplines';
+export type {
+  AddDisciplineResult,
+  RemoveDisciplineOptions,
+  RemoveDisciplineResult,
+  RenameDisciplineResult,
+} from './disciplines';
+export type { CategoryColor, Discipline, TaskType } from './task';
