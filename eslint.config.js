@@ -12,8 +12,15 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
-      globals: { console: 'readonly', process: 'readonly', __dirname: 'readonly' },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+      },
     },
     plugins: { 'react-hooks': reactHooks },
     rules: { ...reactHooks.configs.recommended.rules },

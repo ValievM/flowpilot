@@ -1,16 +1,29 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import { App } from './App';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { isThemeChoice } from './theme/use-theme';
 
 function mockSystemTheme(matches: boolean): void {
-  vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
-    matches,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  }));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
 }
 
-if (Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal') === undefined) {
+if (
+  Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal') ===
+  undefined
+) {
   Object.defineProperties(HTMLDialogElement.prototype, {
     showModal: {
       value(this: HTMLDialogElement): void {
@@ -36,23 +49,36 @@ describe('app shell', () => {
     vi.restoreAllMocks();
   });
 
-  it('follows the system theme by default and persists a manual choice', () => {
+  it('follows system theme and persists a manual choice under the correct key', () => {
     mockSystemTheme(true);
     render(<App />);
     expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
     expect(document.documentElement.dataset.theme).toBe('dark');
-    const themeChoice = screen.getByRole('combobox', { name: 'Тема верхней панели' });
-    fireEvent.change(themeChoice, { target: { value: 'light' } });
+    fireEvent.click(screen.getByRole('button', { name: /Тема:/ }));
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(window.localStorage.getItem('flowpilot-theme')).toBe('light');
+    expect(Object.keys(window.localStorage)).toEqual(['flowpilot-theme']);
+  });
+
+  it('rejects unknown theme values', () => {
+    expect(isThemeChoice('ultraviolet')).toBe(false);
+    expect(isThemeChoice('dark')).toBe(true);
   });
 
   it('provides keyboard-focusable navigation and accessible icon buttons', () => {
     mockSystemTheme(false);
     render(<App />);
-    const navigation = screen.getByRole('navigation', { name: 'Представления' });
-    expect(within(navigation).getAllByRole('button').every((button) => button.tabIndex === 0)).toBe(true);
-    expect(within(navigation).getByRole('button', { name: 'Сегодня' })).toHaveAttribute('aria-current', 'page');
+    const navigation = screen.getByRole('navigation', {
+      name: 'Представления',
+    });
+    expect(
+      within(navigation)
+        .getAllByRole('button')
+        .every((button) => button.tabIndex === 0),
+    ).toBe(true);
+    expect(
+      within(navigation).getByRole('button', { name: 'Сегодня' }),
+    ).toHaveAttribute('aria-current', 'page');
     fireEvent.keyDown(document, { key: 'k', metaKey: true });
     expect(screen.getByRole('dialog', { name: 'Новая задача' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeInTheDocument();
@@ -62,11 +88,19 @@ describe('app shell', () => {
   it('shows fixture tasks, an explanatory risk, and the next-step panel', () => {
     mockSystemTheme(false);
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'Очередь на сегодня' })).toBeVisible();
-    expect(screen.getByText('Курсовая: собрать рабочий прототип')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Очередь на сегодня' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Курсовая: собрать рабочий прототип'),
+    ).toBeVisible();
     expect(screen.getByText(/следующий шаг/i)).toBeVisible();
-    expect(screen.getAllByText(/до срока 5 рабочих дней, оценка остатка — 5/i)).toHaveLength(2);
-    expect(screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' })).toBeVisible();
+    expect(
+      screen.getAllByText(/до срока 5 рабочих дней, оценка остатка — 5/i),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' }),
+    ).toBeVisible();
   });
 
   it('changes view with the keyboard-focusable navigation', () => {
@@ -74,14 +108,18 @@ describe('app shell', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
     expect(screen.getByRole('heading', { name: 'Все задачи' })).toBeVisible();
-    expect(screen.getByRole('navigation', { name: 'Представления' })).toContainElement(screen.getByRole('button', { name: 'Все задачи' }));
+    expect(
+      screen.getByRole('navigation', { name: 'Представления' }),
+    ).toContainElement(screen.getByRole('button', { name: 'Все задачи' }));
   });
 
   it('adds a task from the quick-add dialog', () => {
     mockSystemTheme(false);
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
-    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), { target: { value: 'Подготовить заметки' } });
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Подготовить заметки' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
     expect(screen.getByText('Подготовить заметки')).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -91,10 +129,14 @@ describe('app shell', () => {
     mockSystemTheme(false);
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Начать задачу' }));
-    const coursework = screen.getByRole('heading', { name: 'Курсовая: собрать рабочий прототип' }).closest('li');
-    if (!coursework) throw new Error('Coursework task is missing from the queue');
+    const coursework = screen
+      .getByRole('heading', { name: 'Курсовая: собрать рабочий прототип' })
+      .closest('li');
+    if (!coursework)
+      throw new Error('Coursework task is missing from the queue');
     expect(within(coursework).getByText('В работе')).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' }),
+    ).toBeVisible();
   });
-
 });

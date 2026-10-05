@@ -16,6 +16,8 @@
 | Дизайн-система | [design/c-system/](design/c-system/) (токены, компоненты, движение, доступность, клавиши, macOS) |
 | Экраны | [design/d-screens/index.html](design/d-screens/index.html), передача [design/e-handoff.md](design/e-handoff.md) |
 | Процесс и метки | [process/pipeline.md](process/pipeline.md) |
+| Стиль кода | [process/code-style.md](process/code-style.md) |
+| Ревью и уровни замечаний | [process/review.md](process/review.md) |
 | Разведка старого проекта (история) | [spec/00-recon.md](spec/00-recon.md) |
 
 Источник: пакет `TZ_AI_Planner_next/design/FlowPilot-final` от 04.10.2026 (спека, дизайн). Старый проект `TZ_AI_Planner` не переносится.
