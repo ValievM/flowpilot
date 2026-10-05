@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Task } from '../task';
 import { buildContext, contextFingerprint } from './build-context';
 import type { ContextInput } from './context-types';
+import { sanitizeUntrustedText } from './untrusted-text';
 
 const today = Temporal.PlainDate.from('2026-10-05');
 const now = Temporal.ZonedDateTime.from(
@@ -263,6 +264,44 @@ describe('AI context assembly (F-10)', () => {
     expect(JSON.stringify(result)).not.toMatch(/\/(?:etc|opt|mnt|root)\//);
   });
 
+  it('redacts full Windows and UNC paths with spaces without changing URLs', () => {
+    expect(
+      sanitizeUntrustedText(
+        'Open C:\\work\\My Documents\\secret.txt, then \\\\server\\share\\My Documents\\secret.txt!',
+      ),
+    ).toBe('Open [путь скрыт], then [путь скрыт]!');
+    expect(
+      sanitizeUntrustedText('https://example.com/config/secret.json'),
+    ).toBe('https://example.com/config/secret.json');
+    expect(
+      sanitizeUntrustedText('file:///Users/Ada/My%20Documents/secret.txt'),
+    ).toBe('[путь скрыт]');
+  });
+
+  it('redacts Windows and UNC paths in context while preserving complete web URLs', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('task-1', {
+            title: 'Open C:\\work\\My Documents\\secret.txt, please',
+            description: 'Review \\\\server\\share\\My Documents\\secret.txt.',
+            comments: [
+              {
+                id: 'c',
+                text: 'Use https://example.com/config/secret.json, not a local path.',
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe('Open [путь скрыт], please');
+    expect(result.tasks[0]?.untrusted.description).toBe('Review [путь скрыт].');
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      'Use https://example.com/config/secret.json, not a local path.',
+    );
+  });
   it('redacts spaced, file URI, and relative paths in all untrusted text fields', () => {
     const result = buildContext(
       input({
