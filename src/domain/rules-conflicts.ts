@@ -12,6 +12,10 @@ export function findRuleConflicts(
   documents: readonly RulesDocument[],
 ): ConflictDiagnostic[] {
   const result: ConflictDiagnostic[] = [];
+  for (const document of documents) {
+    comparePriority(document, document, result);
+    compareWindows(document, document, result);
+  }
   for (let leftIndex = 0; leftIndex < documents.length; leftIndex += 1) {
     for (
       let rightIndex = leftIndex + 1;

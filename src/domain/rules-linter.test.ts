@@ -107,6 +107,36 @@ describe('rules linter', () => {
       ).map((item) => item.code),
     ).toContain('duplicate-document-id');
   });
+  it('detects conflicting rules within the same document', () => {
+    const document: RulesDocument = {
+      ...priorityDocument('internal', 'high'),
+      rules: [
+        { id: 'first', kind: 'priority', level: 'high', reason: 'Важное' },
+        { id: 'second', kind: 'priority', level: 'low', reason: 'Менее важно' },
+        {
+          id: 'morning',
+          kind: 'time_window',
+          mode: 'allowed',
+          days: ['monday'],
+          start: '09:00',
+          end: '12:00',
+          time_zone: 'Europe/Moscow',
+        },
+        {
+          id: 'afternoon',
+          kind: 'time_window',
+          mode: 'allowed',
+          days: ['monday'],
+          start: '13:00',
+          end: '15:00',
+          time_zone: 'Europe/Moscow',
+        },
+      ],
+    };
+    const codes = lintRules([document], catalog).map((item) => item.code);
+    expect(codes).toContain('priority-conflict');
+    expect(codes).toContain('time-window-conflict');
+  });
 
   it('lets discipline-specific priority refine the type-wide priority', () => {
     const general = priorityDocument('general', 'high');
