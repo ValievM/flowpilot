@@ -1,0 +1,290 @@
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs';
+import type Database from 'better-sqlite3';
+import { basename, extname, join } from 'node:path';
+import type { Clock } from '../types';
+import { cleanAttachmentName, mediaTypeFor } from './attachment-metadata';
+
+export const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
+
+type AddError =
+  | { kind: 'FileNotFound' }
+  | { kind: 'NotAFile' }
+  | { kind: 'TooLarge'; limitBytes: number }
+  | { kind: 'NotReadable' }
+  | { kind: 'CopyFailed' };
+
+type AttachmentRecord = {
+  id: string;
+  taskId: string;
+  name: string;
+  mediaType: string;
+  sizeBytes: number;
+  sha256: string;
+  createdAt: string;
+};
+
+type AttachmentStoreOptions = {
+  maxSizeBytes?: number;
+  makeId?: () => string;
+};
+
+export class AttachmentStore {
+  private readonly limit: number;
+  private readonly makeId: () => string;
+
+  constructor(
+    private readonly database: Database.Database,
+    private readonly dataDir: string,
+    private readonly clock: Clock,
+    options: AttachmentStoreOptions = {},
+  ) {
+    this.limit = options.maxSizeBytes ?? MAX_ATTACHMENT_SIZE_BYTES;
+    this.makeId = options.makeId ?? randomUUID;
+  }
+
+  add(
+    taskId: string,
+    sourcePath: string,
+  ): { ok: true; value: AttachmentRecord } | { ok: false; error: AddError } {
+    const source = inspectSource(sourcePath);
+    if (!source.ok) return source;
+    if (source.value.size > this.limit)
+      return { ok: false, error: { kind: 'TooLarge', limitBytes: this.limit } };
+    return this.copyAndRecord(taskId, sourcePath, source.value.size);
+  }
+
+  getPath(attachmentId: string): string | undefined {
+    const row = this.database
+      .prepare('SELECT id FROM attachments WHERE id = ?')
+      .get(attachmentId) as { id: string } | undefined;
+    return row &&
+      safeAttachmentId(row.id) &&
+      isAttachmentDirectory(this.attachmentDir())
+      ? join(this.attachmentDir(), row.id)
+      : undefined;
+  }
+
+  verify(
+    attachmentId: string,
+  ): { kind: 'Valid' } | { kind: 'Missing' } | { kind: 'ChecksumMismatch' } {
+    const row = this.record(attachmentId);
+    if (
+      !row ||
+      !safeAttachmentId(row.id) ||
+      !isAttachmentDirectory(this.attachmentDir())
+    )
+      return { kind: 'Missing' };
+    try {
+      const path = join(this.attachmentDir(), row.id);
+      if (!lstatSync(path).isFile()) return { kind: 'Missing' };
+      return hashFile(path) === row.sha256
+        ? { kind: 'Valid' }
+        : { kind: 'ChecksumMismatch' };
+    } catch {
+      return { kind: 'Missing' };
+    }
+  }
+
+  remove(attachmentId: string): boolean {
+    if (!safeAttachmentId(attachmentId)) return false;
+    const path = join(this.attachmentDir(), attachmentId);
+    const transaction = this.database.transaction(() =>
+      this.database
+        .prepare('DELETE FROM attachments WHERE id = ?')
+        .run(attachmentId),
+    );
+    const deleted = transaction().changes > 0;
+    if (deleted) removeFile(path);
+    return deleted;
+  }
+
+  gc(): number {
+    const directory = this.attachmentDir();
+    if (!isAttachmentDirectory(directory)) return 0;
+    const rows = this.database.prepare('SELECT id FROM attachments').all() as {
+      id: string;
+    }[];
+    const recorded = new Set(rows.map(({ id }) => id));
+    let removed = 0;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isFile() && !recorded.has(entry.name)) {
+        unlinkSync(join(directory, entry.name));
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  private copyAndRecord(
+    taskId: string,
+    sourcePath: string,
+    sourceSize: number,
+  ): { ok: true; value: AttachmentRecord } | { ok: false; error: AddError } {
+    const id = this.makeId();
+    if (!safeAttachmentId(id))
+      return { ok: false, error: { kind: 'CopyFailed' } };
+    const directory = this.attachmentDir();
+    const temporaryPath = join(directory, `.${id}.tmp`);
+    const finalPath = join(directory, id);
+    try {
+      mkdirSync(directory, { recursive: true });
+      if (!isAttachmentDirectory(directory))
+        throw new Error('Attachment directory must be a real directory');
+      copyFileSync(sourcePath, temporaryPath);
+      const sizeBytes = statSync(temporaryPath).size;
+      if (sizeBytes > this.limit) {
+        removeFile(temporaryPath);
+        return {
+          ok: false,
+          error: { kind: 'TooLarge', limitBytes: this.limit },
+        };
+      }
+      if (sizeBytes !== sourceSize)
+        throw new Error('Source changed during copy');
+      const sha256 = hashFile(temporaryPath);
+      renameSync(temporaryPath, finalPath);
+      const record = makeRecord(
+        id,
+        taskId,
+        { sourcePath, sizeBytes, sha256 },
+        this.clock,
+      );
+      this.insertRecord(record);
+      return { ok: true, value: record };
+    } catch (error) {
+      removeFile(temporaryPath);
+      removeFile(finalPath);
+      return { ok: false, error: classifyCopyError(error) };
+    }
+  }
+
+  private insertRecord(record: AttachmentRecord): void {
+    this.database.transaction(() => {
+      this.database
+        .prepare(
+          'INSERT INTO attachments(id, task_id, name, media_type, size_bytes, position, sha256, created_at) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(position) + 1 FROM attachments WHERE task_id = ?), 0), ?, ?)',
+        )
+        .run(
+          record.id,
+          record.taskId,
+          record.name,
+          record.mediaType,
+          record.sizeBytes,
+          record.taskId,
+          record.sha256,
+          record.createdAt,
+        );
+    })();
+  }
+
+  private record(id: string): AttachmentRecord | undefined {
+    return this.database
+      .prepare(
+        'SELECT id, task_id AS taskId, name, media_type AS mediaType, size_bytes AS sizeBytes, sha256, created_at AS createdAt FROM attachments WHERE id = ?',
+      )
+      .get(id) as AttachmentRecord | undefined;
+  }
+
+  private attachmentDir(): string {
+    return join(this.dataDir, 'attachments');
+  }
+}
+
+function inspectSource(
+  sourcePath: string,
+): { ok: true; value: { size: number } } | { ok: false; error: AddError } {
+  try {
+    const info = lstatSync(sourcePath);
+    if (info.isSymbolicLink() && statSync(sourcePath).isDirectory())
+      return { ok: false, error: { kind: 'NotAFile' } };
+    const target = statSync(sourcePath);
+    if (!target.isFile()) return { ok: false, error: { kind: 'NotAFile' } };
+    return { ok: true, value: { size: target.size } };
+  } catch (error) {
+    return { ok: false, error: classifySourceError(error) };
+  }
+}
+
+function makeRecord(
+  id: string,
+  taskId: string,
+  details: { sourcePath: string; sizeBytes: number; sha256: string },
+  clock: Clock,
+): AttachmentRecord {
+  const name = cleanAttachmentName(basename(details.sourcePath));
+  return {
+    id,
+    taskId,
+    name,
+    mediaType: mediaTypeFor(extname(name)),
+    sizeBytes: details.sizeBytes,
+    sha256: details.sha256,
+    createdAt: clock.now().toString(),
+  };
+}
+
+function hashFile(path: string): string {
+  const descriptor = openSync(path, 'r');
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = readSync(descriptor, buffer, 0, buffer.length, null);
+      if (bytesRead > 0) hash.update(buffer.subarray(0, bytesRead));
+    } while (bytesRead > 0);
+    return hash.digest('hex');
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+function classifySourceError(error: unknown): AddError {
+  if (errorCode(error) === 'ENOENT') return { kind: 'FileNotFound' };
+  if (errorCode(error) === 'EACCES' || errorCode(error) === 'EPERM')
+    return { kind: 'NotReadable' };
+  return { kind: 'CopyFailed' };
+}
+
+function classifyCopyError(error: unknown): AddError {
+  if (errorCode(error) === 'EACCES' || errorCode(error) === 'EPERM')
+    return { kind: 'NotReadable' };
+  return { kind: 'CopyFailed' };
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error))
+    return undefined;
+  return typeof error.code === 'string' ? error.code : undefined;
+}
+function safeAttachmentId(value: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+function isAttachmentDirectory(path: string): boolean {
+  if (!existsSync(path)) return false;
+  const info = lstatSync(path);
+  return info.isDirectory() && !info.isSymbolicLink();
+}
+
+function removeFile(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch (error) {
+    if (errorCode(error) !== 'ENOENT' && errorCode(error) !== 'ENOTDIR')
+      throw error;
+  }
+}
