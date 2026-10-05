@@ -91,6 +91,9 @@ describe('board task movement', () => {
     fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
     await waitFor(() => {
       expect(taskCard).not.toHaveAttribute('aria-pressed', 'true');
+    });
+    await waitFor(() => {
+      expect(value.applyMock).toHaveBeenCalledTimes(1);
       expect(value.applyMock).toHaveBeenCalledWith({
         commands: [
           {
