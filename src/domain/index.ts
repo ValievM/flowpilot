@@ -93,3 +93,4 @@ export type {
   RenameDisciplineResult,
 } from './disciplines';
 export type { CategoryColor, Discipline, TaskType } from './task';
+export { DEFAULT_REMINDER_SETTINGS, planReminders } from './reminders';
