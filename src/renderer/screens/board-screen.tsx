@@ -24,6 +24,8 @@ type BoardUiState = {
   setDeletingId: (value: string | undefined) => void;
   deleteTarget: string;
   setDeleteTarget: (value: string) => void;
+  dialogError: string;
+  setDialogError: (message: string) => void;
 };
 
 type BoardWorkspaceProps = {
@@ -61,6 +63,7 @@ function useBoardUiState(): BoardUiState {
   const [creatingColumn, setCreatingColumn] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string>();
   const [deleteTarget, setDeleteTarget] = React.useState('');
+  const [dialogError, setDialogError] = React.useState('');
   return {
     waitingMove,
     setWaitingMove,
@@ -76,6 +79,8 @@ function useBoardUiState(): BoardUiState {
     setDeletingId,
     deleteTarget,
     setDeleteTarget,
+    dialogError,
+    setDialogError,
   };
 }
 
@@ -112,6 +117,7 @@ function BoardTaskColumns({
       onMove={(id, column) => void actions.move(id, column)}
       onRename={ui.setEditingColumn}
       onDelete={(column, hasTasks) => {
+        ui.setDialogError('');
         if (hasTasks) {
           ui.setDeletingId(column.id);
           ui.setDeleteTarget('');
@@ -136,24 +142,28 @@ function BoardDialogWorkspace({
       deletingId={ui.deletingId}
       deleteTarget={ui.deleteTarget}
       waiting={Boolean(ui.waitingMove)}
+      error={ui.dialogError}
       waitingReason={ui.waitingReason}
       waitingUntil={ui.waitingUntil}
       onSaveColumn={(event) => void actions.saveColumn(event)}
       onCancelColumn={() => {
         ui.setEditingColumn(undefined);
         ui.setCreatingColumn(false);
+        ui.setDialogError('');
       }}
       onDeleteTarget={ui.setDeleteTarget}
       onDelete={() => void actions.deleteColumn()}
       onCancelDelete={() => {
         ui.setDeletingId(undefined);
         ui.setDeleteTarget('');
+        ui.setDialogError('');
       }}
       onWaitingReason={ui.setWaitingReason}
       onWaitingUntil={ui.setWaitingUntil}
       onConfirmWaiting={(event) => void actions.confirmWaiting(event)}
       onCancelWaiting={() => {
         ui.setWaitingMove(undefined);
+        ui.setDialogError('');
       }}
     />
   );

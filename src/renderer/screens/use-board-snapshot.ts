@@ -8,6 +8,8 @@ type SnapshotSetters = {
   setNotice: React.Dispatch<React.SetStateAction<string>>;
 };
 
+export type ApplyResult = { ok: true } | { ok: false; message: string };
+
 type ApplyInput = SnapshotSetters & {
   snapshot: IpcSnapshot | undefined;
   commands: CommandsApplyRequest['commands'];
@@ -21,7 +23,7 @@ export type BoardSnapshotState = {
   notice: string;
   load: () => Promise<boolean>;
   retry: () => void;
-  apply: (commands: CommandsApplyRequest['commands']) => Promise<boolean>;
+  apply: (commands: CommandsApplyRequest['commands']) => Promise<ApplyResult>;
 };
 
 export function useBoardSnapshot(): BoardSnapshotState {
@@ -50,7 +52,7 @@ export function useBoardSnapshot(): BoardSnapshotState {
 
   const apply = (
     commands: CommandsApplyRequest['commands'],
-  ): Promise<boolean> =>
+  ): Promise<ApplyResult> =>
     applyBoardCommands({ ...setters, snapshot, commands, load });
 
   return { snapshot, loading, error, notice, load, retry, apply };
@@ -79,8 +81,10 @@ async function loadBoardSnapshot(setters: SnapshotSetters): Promise<boolean> {
   }
 }
 
-async function applyBoardCommands(input: ApplyInput): Promise<boolean> {
-  if (!input.snapshot) return false;
+async function applyBoardCommands(input: ApplyInput): Promise<ApplyResult> {
+  if (!input.snapshot) {
+    return { ok: false, message: 'Доска ещё не загружена.' };
+  }
   input.setError('');
   try {
     const result = await window.flowpilot.commands.apply({
@@ -90,27 +94,27 @@ async function applyBoardCommands(input: ApplyInput): Promise<boolean> {
     if (result.ok) {
       input.setSnapshot(result.value);
       input.setNotice('Изменения сохранены.');
-      return true;
+      return { ok: true };
     }
     if (result.error === 'StaleRevision') {
       input.setNotice(
         'Доска изменилась в другом месте. Актуальные данные загружаются; это изменение не применено.',
       );
       const refreshed = await input.load();
-      input.setNotice(
-        refreshed
-          ? 'Доска изменилась в другом месте. Показаны актуальные данные; это изменение не применено.'
-          : 'Доска изменилась в другом месте. Актуальные данные загрузить не удалось; это изменение не применено.',
-      );
-      return false;
+      const message = refreshed
+        ? 'Доска изменилась в другом месте. Показаны актуальные данные; это изменение не применено.'
+        : 'Доска изменилась в другом месте. Актуальные данные загрузить не удалось; это изменение не применено.';
+      input.setNotice(message);
+      return { ok: false, message };
     }
-    input.setError(
-      'Не удалось сохранить изменения. Проверьте данные и повторите попытку.',
-    );
+    const message =
+      'Не удалось сохранить изменения. Проверьте данные и повторите попытку.';
+    input.setError(message);
+    return { ok: false, message };
   } catch {
-    input.setError(
-      'Не удалось сохранить изменения. Проверьте соединение и повторите попытку.',
-    );
+    const message =
+      'Не удалось сохранить изменения. Проверьте соединение и повторите попытку.';
+    input.setError(message);
+    return { ok: false, message };
   }
-  return false;
 }

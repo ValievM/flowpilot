@@ -1,8 +1,11 @@
 import type React from 'react';
 import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
+import type { ApplyResult } from './use-board-snapshot';
 
 type Column = IpcSnapshot['columns'][number];
-type Apply = (commands: CommandsApplyRequest['commands']) => Promise<boolean>;
+type Apply = (
+  commands: CommandsApplyRequest['commands'],
+) => Promise<ApplyResult>;
 type Move = { taskId: string; columnId: string };
 type ActionsInput = {
   snapshot: IpcSnapshot | undefined;
@@ -20,6 +23,7 @@ type ActionsInput = {
   setDeletingId: (value: string | undefined) => void;
   deleteTarget: string;
   setDeleteTarget: (value: string) => void;
+  setDialogError: (message: string) => void;
 };
 
 export type BoardActions = {
@@ -48,6 +52,7 @@ async function moveTask(
   const task = input.snapshot?.tasks.find((item) => item.id === taskId);
   if (!task || task.columnId === column.id) return;
   if (column.state === 'waiting') {
+    input.setDialogError('');
     input.setWaitingMove({ taskId, columnId: column.id });
     input.setWaitingReason('');
     input.setWaitingUntil('');
@@ -70,10 +75,11 @@ async function confirmWaitingMove(
   event.preventDefault();
   const reason = input.waitingReason.trim();
   if (!input.waitingMove || !reason) return;
+  input.setDialogError('');
   const status = input.waitingUntil
     ? { kind: 'waiting' as const, reason, until: input.waitingUntil }
     : { kind: 'waiting' as const, reason };
-  const saved = await input.apply([
+  const result = await input.apply([
     {
       kind: 'task.move',
       id: input.waitingMove.taskId,
@@ -81,7 +87,8 @@ async function confirmWaitingMove(
       status,
     },
   ]);
-  if (saved) input.setWaitingMove(undefined);
+  if (result.ok) input.setWaitingMove(undefined);
+  else input.setDialogError(result.message);
 }
 
 async function saveBoardColumn(
@@ -93,6 +100,7 @@ async function saveBoardColumn(
   const name = stringField(form.get('name')).trim();
   const description = stringField(form.get('description'));
   if (!name) return;
+  input.setDialogError('');
   const state = stringField(form.get('state'), 'todo') as Column['state'];
   const command: CommandsApplyRequest['commands'][number] = input.editingColumn
     ? { kind: 'column.rename', id: input.editingColumn.id, name, description }
@@ -106,10 +114,11 @@ async function saveBoardColumn(
           builtIn: false,
         },
       };
-  if (await input.apply([command])) {
+  const result = await input.apply([command]);
+  if (result.ok) {
     input.setEditingColumn(undefined);
     input.setCreatingColumn(false);
-  }
+  } else input.setDialogError(result.message);
 }
 
 async function deleteBoardColumn(
@@ -121,12 +130,17 @@ async function deleteBoardColumn(
     (task) => task.columnId === columnId,
   );
   if (hasTasks && !input.deleteTarget) return false;
+  input.setDialogError('');
   const command: CommandsApplyRequest['commands'][number] = {
     kind: 'column.delete',
     id: columnId,
     ...(hasTasks ? { targetColumnId: input.deleteTarget } : {}),
   };
-  if (!(await input.apply([command]))) return false;
+  const result = await input.apply([command]);
+  if (!result.ok) {
+    input.setDialogError(result.message);
+    return false;
+  }
   input.setDeletingId(undefined);
   input.setDeleteTarget('');
   return true;

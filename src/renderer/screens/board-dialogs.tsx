@@ -12,6 +12,7 @@ type DialogProps = {
   waiting: boolean;
   waitingReason: string;
   waitingUntil: string;
+  error: string;
   onSaveColumn: (event: React.SyntheticEvent<HTMLFormElement>) => void;
   onCancelColumn: () => void;
   onDeleteTarget: (value: string) => void;
@@ -29,6 +30,7 @@ export function BoardDialogs(props: DialogProps): React.JSX.Element {
       <ColumnDialog
         editing={props.editing}
         creating={props.creating}
+        error={props.error}
         onSave={props.onSaveColumn}
         onCancel={props.onCancelColumn}
       />
@@ -36,6 +38,7 @@ export function BoardDialogs(props: DialogProps): React.JSX.Element {
         columns={props.columns}
         deletingId={props.deletingId}
         target={props.deleteTarget}
+        error={props.error}
         onTarget={props.onDeleteTarget}
         onDelete={props.onDelete}
         onCancel={props.onCancelDelete}
@@ -44,6 +47,7 @@ export function BoardDialogs(props: DialogProps): React.JSX.Element {
         open={props.waiting}
         reason={props.waitingReason}
         until={props.waitingUntil}
+        error={props.error}
         onReason={props.onWaitingReason}
         onUntil={props.onWaitingUntil}
         onConfirm={props.onConfirmWaiting}
@@ -56,11 +60,13 @@ export function BoardDialogs(props: DialogProps): React.JSX.Element {
 function ColumnDialog({
   editing,
   creating,
+  error,
   onSave,
   onCancel,
 }: {
   editing: Column | undefined;
   creating: boolean;
+  error: string;
   onSave: (event: React.SyntheticEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }): React.JSX.Element | null {
@@ -71,6 +77,7 @@ function ColumnDialog({
         <h2 id="column-heading">
           {editing ? 'Изменить колонку' : 'Новая колонка'}
         </h2>
+        <DialogFeedback error={error} />
         <ColumnFields editing={editing} />
         <div className="dialog-actions">
           <button type="button" className="text-button" onClick={onCancel}>
@@ -133,6 +140,7 @@ function DeleteDialog({
   columns,
   deletingId,
   target,
+  error,
   onTarget,
   onDelete,
   onCancel,
@@ -140,6 +148,7 @@ function DeleteDialog({
   columns: readonly Column[];
   deletingId: string | undefined;
   target: string;
+  error: string;
   onTarget: (value: string) => void;
   onDelete: () => void;
   onCancel: () => void;
@@ -148,6 +157,7 @@ function DeleteDialog({
   return (
     <BoardModal labelledBy="delete-heading" onCancel={onCancel}>
       <h2 id="delete-heading">Удалить колонку?</h2>
+      <DialogFeedback error={error} />
       <p>Карточки будут перемещены в выбранную колонку.</p>
       <label htmlFor="delete-target">Переместить карточки в</label>
       <select
@@ -182,6 +192,7 @@ function WaitingDialog({
   open,
   reason,
   until,
+  error,
   onReason,
   onUntil,
   onConfirm,
@@ -190,6 +201,7 @@ function WaitingDialog({
   open: boolean;
   reason: string;
   until: string;
+  error: string;
   onReason: (value: string) => void;
   onUntil: (value: string) => void;
   onConfirm: (event: React.SyntheticEvent<HTMLFormElement>) => void;
@@ -200,6 +212,7 @@ function WaitingDialog({
     <BoardModal labelledBy="waiting-heading" onCancel={onCancel}>
       <form onSubmit={onConfirm}>
         <h2 id="waiting-heading">Почему задача ожидает?</h2>
+        <DialogFeedback error={error} />
         <WaitingFields
           reason={reason}
           until={until}
@@ -259,5 +272,18 @@ function WaitingFields({
         }}
       />
     </>
+  );
+}
+
+function DialogFeedback({
+  error,
+}: {
+  error: string;
+}): React.JSX.Element | null {
+  if (!error) return null;
+  return (
+    <p role="alert" className="board-error">
+      {error}
+    </p>
   );
 }
