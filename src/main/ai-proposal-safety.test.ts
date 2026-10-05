@@ -126,6 +126,33 @@ describe('AI task safety contract', () => {
     expect(result.rejectedCommands[0]?.reason).toBe('waiting-reason-required');
   });
 
+  it('rejects duplicate task ids in one proposal without changing snapshot tasks', () => {
+    const beforeTasks = structuredClone(snapshot.tasks);
+    const commands = [
+      {
+        kind: 'task.create',
+        task: { id: 'new', title: 'First', columnId: 'todo', subtasks: [] },
+      },
+      {
+        kind: 'task.create',
+        task: {
+          id: 'new',
+          title: 'Duplicate',
+          columnId: 'doing',
+          subtasks: [],
+        },
+      },
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ];
+    const result = validateProposal(proposal(commands), snapshot);
+
+    expect(result.validCommands).toEqual([commands[0], commands[2]]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 1, kind: 'task.create', reason: 'task-id-conflict' },
+    ]);
+    expect(snapshot.tasks).toEqual(beforeTasks);
+  });
+
   it('assigns unique sequential added orders to tasks created in one proposal', () => {
     const currentSnapshot = {
       ...snapshot,

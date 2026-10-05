@@ -79,6 +79,7 @@ export function validateProposal(
   }
   const validCommands: AiCommand[] = [];
   const rejectedCommands: RejectedAiCommand[] = [];
+  const knownTaskIds = new Set(snapshot.tasks.map((task) => task.id));
   parsed.data.commands.forEach((candidate, index) => {
     const parsedCommand = aiCommandSchema.safeParse(candidate);
     if (!parsedCommand.success) {
@@ -90,16 +91,30 @@ export function validateProposal(
       return;
     }
     const command = parsedCommand.data;
-    const reason = validateCommand(command, snapshot);
-    if (reason) rejectedCommands.push({ index, kind: command.kind, reason });
-    else validCommands.push(command);
+    const reason = validateCommand(command, snapshot, knownTaskIds);
+    if (reason) {
+      rejectedCommands.push({ index, kind: command.kind, reason });
+      return;
+    }
+    validCommands.push(command);
+    if (command.kind === 'task.create') knownTaskIds.add(command.task.id);
   });
   return { validCommands, rejectedCommands };
 }
+
 function commandKind(command: unknown): string {
   if (typeof command !== 'object' || command === null || !('kind' in command))
     return 'unknown';
   return typeof command.kind === 'string' ? command.kind : 'unknown';
+}
+function validateCommand(
+  command: AiCommand,
+  snapshot: AiSnapshot,
+  knownTaskIds: ReadonlySet<string>,
+): string | undefined {
+  return hasMissingTask(command, snapshot)
+    ? 'task-not-found'
+    : validateCommandKind(command, snapshot, knownTaskIds);
 }
 
 export function toStorageCommands(
@@ -120,15 +135,6 @@ export function toStorageCommands(
   return { commands: plannedCommands, source: 'ai' };
 }
 
-function validateCommand(
-  command: AiCommand,
-  snapshot: AiSnapshot,
-): string | undefined {
-  return hasMissingTask(command, snapshot)
-    ? 'task-not-found'
-    : validateCommandKind(command, snapshot);
-}
-
 function hasMissingTask(command: AiCommand, snapshot: AiSnapshot): boolean {
   const taskId = taskIdFor(command);
   return (
@@ -139,10 +145,11 @@ function hasMissingTask(command: AiCommand, snapshot: AiSnapshot): boolean {
 function validateCommandKind(
   command: AiCommand,
   snapshot: AiSnapshot,
+  knownTaskIds: ReadonlySet<string>,
 ): string | undefined {
   switch (command.kind) {
     case 'task.create':
-      return validateCreatedTask(command.task, snapshot);
+      return validateCreatedTask(command.task, snapshot, knownTaskIds);
     case 'task.update':
       return undefined;
     case 'task.move':
@@ -189,9 +196,9 @@ function taskIdFor(command: AiCommand): string | undefined {
 function validateCreatedTask(
   task: AiTaskCreation,
   snapshot: AiSnapshot,
+  knownTaskIds: ReadonlySet<string>,
 ): string | undefined {
-  if (snapshot.tasks.some((existing) => existing.id === task.id))
-    return 'task-id-conflict';
+  if (knownTaskIds.has(task.id)) return 'task-id-conflict';
   const column = snapshot.columns.find(
     (candidate) => candidate.id === task.columnId,
   );
