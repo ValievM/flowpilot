@@ -37,9 +37,15 @@ if (
   });
 }
 
+const TEST_NOW = '2026-10-05T12:00:00Z';
+const TEST_TODAY = Temporal.Instant.from(TEST_NOW)
+  .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+  .toPlainDate()
+  .toString();
+
 function renderApp(tasks: Parameters<typeof taskRecord>[0][] = []) {
   mockSystemTheme(false);
-  const fake = fakeApi(tasks.map(taskRecord));
+  const fake = fakeApi(tasks.map(taskRecord), () => TEST_NOW);
   Object.defineProperty(window, 'flowpilot', {
     configurable: true,
     value: fake.api,
@@ -47,7 +53,7 @@ function renderApp(tasks: Parameters<typeof taskRecord>[0][] = []) {
   return { ...render(<App />), ...fake };
 }
 
-const today = (): string => Temporal.Now.plainDateISO().toString();
+const today = (): string => TEST_TODAY;
 
 describe('persisted today and now screens', () => {
   beforeEach(() => {
@@ -132,7 +138,9 @@ describe('persisted today and now screens', () => {
   });
 
   it('does not offer tomorrow, waiting, or completed tasks as available work', async () => {
-    const tomorrow = Temporal.Now.plainDateISO().add({ days: 1 }).toString();
+    const tomorrow = Temporal.PlainDate.from(today())
+      .add({ days: 1 })
+      .toString();
     renderApp([
       { id: 'tomorrow', title: 'Завтрашняя задача', day: tomorrow },
       {
@@ -178,7 +186,9 @@ describe('persisted today and now screens', () => {
   });
 
   it('shows the scheduled-for-future reason in Сейчас', async () => {
-    const tomorrow = Temporal.Now.plainDateISO().add({ days: 1 }).toString();
+    const tomorrow = Temporal.PlainDate.from(today())
+      .add({ days: 1 })
+      .toString();
     renderApp([{ id: 'future-task', day: tomorrow }]);
     await screen.findByRole('heading', { name: 'Нет доступных дел' });
     fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
@@ -302,6 +312,25 @@ describe('persisted today and now screens', () => {
     expect(screen.getByLabelText('Что нужно сделать?')).toHaveValue(
       'Следующая задача',
     );
+  });
+  it('announces save failure without marking a valid title invalid', async () => {
+    const addButtonRef = createRef<HTMLButtonElement>();
+    const onSubmit = vi.fn().mockResolvedValue(false);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    const field = screen.getByLabelText('Что нужно сделать?');
+    fireEvent.change(field, { target: { value: 'Корректная задача' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Не удалось сохранить задачу',
+    );
+    expect(field).not.toHaveAttribute('aria-invalid', 'true');
   });
   it('shows a stale-retry load error without reporting a save failure', async () => {
     const fake = renderApp();

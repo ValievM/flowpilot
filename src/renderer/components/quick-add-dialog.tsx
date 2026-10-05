@@ -83,7 +83,6 @@ export function QuickAddDialog({
           required
           autoComplete="off"
           aria-describedby="new-task-help"
-          aria-invalid={Boolean(error)}
         />
         <p className="helper-text" id="new-task-help">
           Задача сохранится в «Сделать» на сегодня. Срок и подробности можно
