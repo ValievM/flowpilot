@@ -1,3 +1,5 @@
+import { AiRunner } from './ai/ai-runner';
+import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -277,9 +279,10 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('registers only the five public channels', () => {
+  it('registers the public IPC channels including AI run and cancellation', () => {
     const channels: string[] = [];
     const repository = openRepository();
+    const manualProvider = new ManualExchangeProvider();
     registerIpcHandlers(
       { handle: (channel) => channels.push(channel) },
       {
@@ -288,6 +291,8 @@ describe('IPC handlers', () => {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
         },
+        aiRunner: new AiRunner(manualProvider),
+        manualProvider,
       },
     );
     expect(channels).toEqual([
@@ -296,6 +301,10 @@ describe('IPC handlers', () => {
       'settings.get',
       'settings.set',
       'app.info',
+      'ai.run',
+      'ai.cancel',
+      'ai.prompt',
+      'ai.reply',
     ]);
     repository.close();
   });

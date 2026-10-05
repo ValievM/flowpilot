@@ -7,6 +7,7 @@ import {
 import type { Task, TaskStatus } from '../domain';
 import type { Snapshot } from '../storage';
 import type { Result } from './ipc-result';
+import type { Proposal } from './ai-commands';
 type IpcTaskStatus =
   | Exclude<TaskStatus, { kind: 'waiting' }>
   | { kind: 'waiting'; reason: string; until?: string };
@@ -30,7 +31,43 @@ export const ipcChannels = {
   settingsGet: 'settings.get',
   settingsSet: 'settings.set',
   appInfo: 'app.info',
+  aiRun: 'ai.run',
+  aiCancel: 'ai.cancel',
+  aiPrompt: 'ai.prompt',
+  aiReply: 'ai.reply',
 } as const;
+export const aiRequestSchema = z
+  .object({
+    operationId: z.string().min(1),
+    context: z.unknown(),
+    instruction: z.string().min(1),
+    responseSchema: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+export const aiCancelRequestSchema = z
+  .object({ operationId: z.string().min(1) })
+  .strict();
+export const aiReplyRequestSchema = z
+  .object({ operationId: z.string().min(1), text: z.string() })
+  .strict();
+export type AiIpcRequest = z.infer<typeof aiRequestSchema>;
+export type AiIpcResult =
+  | { readonly ok: true; readonly value: Proposal }
+  | {
+      readonly ok: false;
+      readonly error:
+        | 'AlreadyRunning'
+        | 'ProviderUnavailable'
+        | 'InvalidReply'
+        | 'Aborted'
+        | 'ValidationFailed';
+    };
+export type AiManualReplyResult =
+  | { readonly ok: true; readonly value: null }
+  | { readonly ok: false; readonly error: 'NotFound' | 'ValidationFailed' };
+export type AiCancelResult =
+  | { readonly ok: true; readonly value: null }
+  | { readonly ok: false; readonly error: 'ValidationFailed' };
 
 export const snapshotLoadRequestSchema = z.object({}).strict();
 export const commandsApplyRequestSchema = z
@@ -59,6 +96,15 @@ export type FlowPilotApi = {
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;
     set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
+  };
+  ai: {
+    run(request: AiIpcRequest): Promise<AiIpcResult>;
+    cancel(request: { operationId: string }): Promise<AiCancelResult>;
+    prompt(request: { operationId: string }): Promise<Result<string>>;
+    reply(request: {
+      operationId: string;
+      text: string;
+    }): Promise<AiManualReplyResult>;
   };
   app: {
     info(): Promise<Result<{ name: string; version: string }>>;
