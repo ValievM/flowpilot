@@ -135,4 +135,83 @@ describe('database migrations', () => {
     );
     repository.close();
   });
+  it('undoes a deleted column after upgrading a version-four database', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v4-undo-'));
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const database = new Database(path);
+    database.exec(initialSchema);
+    database.exec(attachmentIntegrity);
+    database.exec(historySchema);
+    database.exec(entityVersions);
+    database.pragma('user_version = 4');
+    database
+      .prepare(
+        'INSERT INTO change_log(id,revision,occurred_at,source,batch_id) VALUES(?,?,?,?,?)',
+      )
+      .run('create', 1, '2026-10-05T12:00:00Z', 'user', 'batch-1');
+    database
+      .prepare(
+        'INSERT INTO change_log_entities(entry_id,entity_kind,entity_id,state_before_json,state_after_json,version_after) VALUES(?,?,?,?,?,?)',
+      )
+      .run(
+        'create',
+        'column',
+        'custom',
+        null,
+        JSON.stringify({
+          id: 'custom',
+          name: 'Custom',
+          description: '',
+          state: 'todo',
+          built_in: 0,
+          position: 4,
+          version: 1,
+        }),
+        1,
+      );
+    database
+      .prepare(
+        'INSERT INTO change_log(id,revision,occurred_at,source,batch_id) VALUES(?,?,?,?,?)',
+      )
+      .run('delete', 2, '2026-10-05T12:00:00Z', 'user', 'batch-2');
+    database
+      .prepare(
+        'INSERT INTO change_log_entities(entry_id,entity_kind,entity_id,state_before_json,state_after_json,version_after) VALUES(?,?,?,?,?,?)',
+      )
+      .run(
+        'delete',
+        'column',
+        'custom',
+        JSON.stringify({
+          id: 'custom',
+          name: 'Custom',
+          description: '',
+          state: 'todo',
+          built_in: 0,
+          position: 4,
+          version: 1,
+        }),
+        null,
+        null,
+      );
+    database
+      .prepare('UPDATE metadata SET revision = 2 WHERE singleton = 1')
+      .run();
+    migrate(database, path);
+    database.close();
+
+    const repository = new Repository(path, {
+      now: () => Temporal.Instant.from('2026-10-05T12:00:00Z'),
+    });
+
+    expect(repository.undo('delete')).toMatchObject({
+      ok: true,
+      value: { revision: 3 },
+    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', name: 'Custom' }),
+    );
+    repository.close();
+  });
 });
