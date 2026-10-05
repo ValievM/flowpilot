@@ -36,6 +36,12 @@
   background: var(--panel);
 }
 
+.board-column-drop-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 var(--selection-stroke) var(--accent);
+}
+
 .board-column-heading {
   display: flex;
   justify-content: space-between;

@@ -1,5 +1,11 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   columns,
   createBoardApi,
@@ -10,6 +16,8 @@ import {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('board columns and empty states', () => {
@@ -60,17 +68,6 @@ describe('board columns and empty states', () => {
     expect(
       await screen.findAllByText('В этой колонке пока нет задач.'),
     ).toHaveLength(4);
-  });
-
-  it('shows unknown deadline volume without a risk claim', async () => {
-    const card = { ...task(), deadline: '2026-10-09' };
-    renderBoard(createBoardApi(snapshot([card])));
-    expect(
-      await screen.findByText('Срок есть, объём неизвестен'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Оценка остатка работы не указана.'),
-    ).toBeInTheDocument();
   });
 
   it('creates a persistent custom column with its semantic state', async () => {
@@ -154,16 +151,128 @@ describe('board columns and empty states', () => {
     expect(value.applyMock).not.toHaveBeenCalled();
   });
 
-  it('renders a retryable error if the real snapshot cannot load', async () => {
-    const value = createBoardApi();
-    value.loadMock.mockResolvedValue({ ok: false, error: 'InternalError' });
-    renderBoard(value);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Не удалось загрузить доску',
+  it('drops a task over another column and persists exactly one move', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      function (this: HTMLElement) {
+        const label = this.getAttribute('aria-label');
+        if (label === 'Делаю') return new DOMRect(200, 0, 160, 180);
+        if (label === 'Сделать') return new DOMRect(0, 0, 160, 180);
+        return new DOMRect(0, 0, 0, 0);
+      },
+    );
+    const value = renderBoard();
+    const taskCard = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    const doingColumn = screen.getByRole('region', { name: 'Делаю' });
+    fireEvent(taskCard, pointerEvent('pointerdown', 10, 10));
+    fireEvent(taskCard, pointerEvent('pointermove', 240, 40));
+    fireEvent(taskCard, pointerEvent('pointermove', 240, 40));
+    await waitFor(() => {
+      expect(doingColumn).toHaveAttribute('data-drop-active', 'true');
+      expect(doingColumn).toHaveClass('board-column-drop-active');
+    });
+    fireEvent(taskCard, pointerEvent('pointerup', 240, 40));
+    await waitFor(() => {
+      expect(value.applyMock).toHaveBeenCalledTimes(1);
+      expect(value.applyMock).toHaveBeenCalledWith({
+        commands: [
+          {
+            kind: 'task.move',
+            id: 'task',
+            columnId: 'doing',
+            status: { kind: 'doing' },
+          },
+        ],
+        expectedRevision: 12,
+      });
+    });
+  });
+
+  it('moves down between columns with the narrow-layout keyboard drag sensor', async () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 900,
+    });
+    const value = renderBoard();
+    const taskCard = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    taskCard.focus();
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() =>
+      expect(taskCard).toHaveAttribute('aria-pressed', 'true'),
+    );
+    fireEvent.keyDown(taskCard, { key: 'ArrowDown', code: 'ArrowDown' });
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() => {
+      expect(value.applyMock).toHaveBeenCalledTimes(1);
+      expect(value.applyMock).toHaveBeenCalledWith({
+        commands: [
+          {
+            kind: 'task.move',
+            id: 'task',
+            columnId: 'doing',
+            status: { kind: 'doing' },
+          },
+        ],
+        expectedRevision: 12,
+      });
+    });
+  });
+
+  it('announces a waiting-column drop as requiring confirmation, not success', async () => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: 1280,
+    });
+    const value = renderBoard();
+    const taskCard = await screen.findByRole('article', {
+      name: 'Задача: Написать отчёт',
+    });
+    taskCard.focus();
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    await waitFor(() =>
+      expect(taskCard).toHaveAttribute('aria-pressed', 'true'),
+    );
+    fireEvent.keyDown(taskCard, { key: 'ArrowRight', code: 'ArrowRight' });
+    fireEvent.keyDown(taskCard, { key: 'ArrowRight', code: 'ArrowRight' });
+    fireEvent.keyDown(taskCard, { key: ' ', code: 'Space' });
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Почему задача ожидает?',
+    });
+    expect(screen.getByRole('status')).not.toHaveTextContent('перемещена');
+    expect(value.applyMock).not.toHaveBeenCalled();
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Почему задача ожидает?' }),
+      ).toBeNull();
+    });
+    expect(screen.queryByText('Изменения сохранены.')).toBeNull();
+  });
+
+  it('does not open a cancellable dialog when deleting an empty column', async () => {
+    const custom = {
+      id: 'custom',
+      name: 'Своя',
+      description: '',
+      state: 'todo' as const,
+      builtIn: false,
+    };
+    const value = renderBoard(
+      createBoardApi({ ...snapshot([]), columns: [...columns, custom] }),
+    );
+    const section = await screen.findByRole('region', { name: 'Своя' });
+    fireEvent.click(
+      within(section).getByRole('button', { name: 'Удалить колонку' }),
     );
     expect(
-      screen.getByRole('button', { name: 'Повторить' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('dialog', { name: 'Удалить колонку?' }),
+    ).toBeNull();
+    await waitFor(() => {
+      expect(value.applyMock).toHaveBeenCalledTimes(1);
+    });
   });
 });
 

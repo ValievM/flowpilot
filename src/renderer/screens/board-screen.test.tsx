@@ -5,7 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   columns,
   createBoardApi,
@@ -16,6 +16,7 @@ import {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe('board task movement', () => {
@@ -113,6 +114,7 @@ describe('board task movement', () => {
         expectedRevision: 12,
       });
     });
+    expect(await screen.findByText('Изменения сохранены.')).toBeInTheDocument();
   });
 
   it('requires a non-empty reason before moving into waiting', async () => {
@@ -247,6 +249,34 @@ describe('board task movement', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Не удалось загрузить доску',
     );
+  });
+
+  it('shows unknown deadline volume without a risk claim', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T12:00:00Z'));
+    const card = { ...task(), deadline: '2026-10-09' };
+    renderBoard(createBoardApi(snapshot([card])));
+    expect(
+      await screen.findByText('Срок есть, объём неизвестен'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Оценка остатка работы не указана.'),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a retryable error if the real snapshot cannot load', async () => {
+    const value = createBoardApi();
+    value.loadMock.mockResolvedValue({
+      ok: false,
+      error: 'InternalError',
+    });
+    renderBoard(value);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Не удалось загрузить доску',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Повторить' }),
+    ).toBeInTheDocument();
   });
 });
 

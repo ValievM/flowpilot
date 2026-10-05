@@ -112,9 +112,12 @@ function BoardTaskColumns({
       onMove={(id, column) => void actions.move(id, column)}
       onRename={ui.setEditingColumn}
       onDelete={(column, hasTasks) => {
+        if (!hasTasks) {
+          void actions.deleteColumn(column.id);
+          return;
+        }
         ui.setDeletingId(column.id);
         ui.setDeleteTarget('');
-        if (!hasTasks) void actions.deleteColumn(column.id);
       }}
     />
   );

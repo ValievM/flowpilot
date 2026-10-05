@@ -807,7 +807,7 @@ test('opens the board editor modally and restores focus after Escape', async () 
   await expect(trigger).toBeFocused();
 });
 
-test('moves a persisted task from the board UI and reloads the saved state', async () => {
+test('moves a persisted task with keyboard and pointer drops', async () => {
   const created = await page.evaluate(() =>
     window.flowpilot.commands.apply({
       commands: [
@@ -837,23 +837,49 @@ test('moves a persisted task from the board UI and reloads the saved state', asy
     .click();
   const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
   await expect(card).toBeVisible();
-  await card.getByRole('button', { name: 'Переместить в…' }).click();
-  await page.getByRole('menuitem', { name: 'Делаю' }).click();
+  await page.setViewportSize({ width: 900, height: 800 });
+  expect(await page.evaluate(() => window.innerWidth)).toBe(900);
+  await card.focus();
+  await card.press('Space');
+  await card.press('ArrowDown');
+  await card.press('Space');
   await expect(
     page.getByRole('region', { name: 'Делаю' }).getByRole('article'),
+  ).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const titleBox = await card
+    .getByRole('heading', { name: 'Проверить перенос' })
+    .boundingBox();
+  const doneBox = await page
+    .getByRole('region', { name: 'Готово' })
+    .boundingBox();
+  if (!titleBox || !doneBox)
+    throw new Error('Board drag targets are not visible');
+  await page.mouse.move(
+    titleBox.x + titleBox.width / 2,
+    titleBox.y + titleBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    doneBox.x + doneBox.width / 2,
+    doneBox.y + doneBox.height / 2,
+    {
+      steps: 10,
+    },
+  );
+  await page.mouse.up();
+  await expect(
+    page.getByRole('region', { name: 'Готово' }).getByRole('article'),
   ).toBeVisible();
   const saved = await page.evaluate(() => window.flowpilot.snapshot.load());
   expect(saved).toMatchObject({
     ok: true,
     value: {
       tasks: [
-        {
-          id: 'board-smoke-task',
-          columnId: 'doing',
-          status: { kind: 'doing' },
-        },
+        { id: 'board-smoke-task', columnId: 'done', status: { kind: 'done' } },
       ],
-      revision: 2,
+      revision: 3,
     },
   });
 });

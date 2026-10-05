@@ -67,6 +67,10 @@ export function BoardDragContext({
           onDragCancel: ({ active }) =>
             `Перемещение карточки «${taskName(active.id, tasks)}» отменено.`,
         },
+        screenReaderInstructions: {
+          draggable:
+            'Чтобы переместить карточку, нажмите пробел, используйте стрелки для выбора колонки, затем нажмите пробел. Нажмите Escape, чтобы отменить перемещение.',
+        },
       }}
       sensors={sensors}
       collisionDetection={boardCollisionDetection}
@@ -106,7 +110,13 @@ function announceDragEnd(
 ): string {
   const name = taskName(taskId, tasks);
   if (!columnId) return `Карточка «${name}» не перемещена.`;
-  return `Карточка «${name}» перемещена в колонку «${columnName(columnId, columns)}».`;
+  const destination = columns.find(
+    (column) => column.id === readDndId(columnId, 'column:'),
+  );
+  const target = destination ? ` в колонку «${destination.name}»` : '';
+  return destination?.state === 'waiting'
+    ? `Для переноса карточки «${name}»${target} требуется подтверждение причины.`
+    : `Перенос карточки «${name}»${target} выполняется; результат будет объявлен после сохранения.`;
 }
 
 function columnName(id: string | number, columns: readonly Column[]): string {
@@ -120,24 +130,34 @@ function boardColumnKeyboardCoordinates(
   tasks: IpcSnapshot['tasks'],
   keyboardTarget: React.RefObject<string | undefined>,
 ): { x: number; y: number } | undefined {
-  if (event.code !== 'ArrowRight' && event.code !== 'ArrowLeft') return;
+  const movement = keyboardColumnOffset(event.key, window.innerWidth <= 900);
+  if (!movement) return;
   const activeTaskId = readDndId(active, 'task:');
   const activeTask = tasks.find((task) => task.id === activeTaskId);
   const sourceId =
     keyboardTarget.current ??
-    context.over?.id ??
-    (activeTask ? `column:${activeTask.columnId}` : undefined);
-  const containers = context.droppableContainers.getEnabled();
+    (activeTask ? `column:${activeTask.columnId}` : context.over?.id);
+  const containers = context.droppableContainers
+    .getEnabled()
+    .filter((container) => readDndId(container.id, 'column:'));
   const currentIndex = containers.findIndex(
     (container) => container.id === sourceId,
   );
-  const target =
-    containers[currentIndex + (event.code === 'ArrowRight' ? 1 : -1)];
+  const target = containers[currentIndex + movement];
   if (!target) return;
   keyboardTarget.current = String(target.id);
   const rect = context.droppableRects.get(target.id);
   if (!rect) return;
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+function keyboardColumnOffset(
+  key: string,
+  vertical: boolean,
+): number | undefined {
+  const nextKey = vertical ? 'ArrowDown' : 'ArrowRight';
+  const previousKey = vertical ? 'ArrowUp' : 'ArrowLeft';
+  return key === nextKey ? 1 : key === previousKey ? -1 : undefined;
 }
 
 const boardCollisionDetection: CollisionDetection = (args) => {
@@ -178,7 +198,7 @@ export function BoardDroppableColumn({
   return (
     <section
       ref={setNodeRef}
-      className={className}
+      className={isOver ? `${className} board-column-drop-active` : className}
       aria-label={label}
       data-drop-active={isOver || undefined}
     >
@@ -186,7 +206,6 @@ export function BoardDroppableColumn({
     </section>
   );
 }
-
 export function BoardDraggableTask({
   id,
   className,

@@ -75,4 +75,14 @@ describe('board accessibility', () => {
       });
     });
   });
+
+  it('provides Russian instructions for keyboard task movement', async () => {
+    renderBoard();
+    await screen.findByRole('article', { name: 'Задача: Написать отчёт' });
+    expect(
+      screen.getByText(
+        'Чтобы переместить карточку, нажмите пробел, используйте стрелки для выбора колонки, затем нажмите пробел. Нажмите Escape, чтобы отменить перемещение.',
+      ),
+    ).toBeInTheDocument();
+  });
 });
