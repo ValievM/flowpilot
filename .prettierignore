@@ -7,4 +7,5 @@ playwright-report/
 test-results/
 **/__snapshots__/
 **/*.snap
-docs/design/
+docs/
+src/renderer/styles/tokens.css
