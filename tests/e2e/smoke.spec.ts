@@ -26,7 +26,9 @@ test.beforeEach(async () => {
     width: SNAPSHOT_WINDOW.width,
     height: SNAPSHOT_WINDOW.height,
   });
-  await expect(page.getByRole('heading', { name: 'FlowPilot' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Сегодня, 5 октября', exact: true }),
+  ).toBeVisible();
 });
 
 test.afterEach(async () => {
@@ -34,9 +36,7 @@ test.afterEach(async () => {
 });
 
 test('opens the app without exposing Node globals', async () => {
-  await expect(
-    page.getByText('Ваш день начинается с ясного плана.'),
-  ).toBeVisible();
+  await expect(page.getByText('Сохранено')).toBeVisible();
   expect(
     await page.evaluate(
       () => typeof (window as Window & { require?: unknown }).require,
@@ -49,14 +49,46 @@ test('opens the app without exposing Node globals', async () => {
   ).toBe('undefined');
 });
 
-for (const theme of ['light', 'dark'] as const) {
-  test(`matches the ${theme} theme snapshot`, async () => {
-    await page.evaluate((selectedTheme) => {
-      document.documentElement.dataset.theme = selectedTheme;
-    }, theme);
-    // macOS renderers can disagree on an isolated edge pixel.
-    await expect(page).toHaveScreenshot(`welcome-${theme}.png`, {
-      maxDiffPixelRatio: 0.00001,
+test('shows fixture tasks and keyboard accessible navigation', async () => {
+  await expect(
+    page.getByText('Курсовая: собрать рабочий прототип'),
+  ).toBeVisible();
+  await expect(page.getByText('Риск не успеть')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Сейчас' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Сейчас' })).toBeVisible();
+});
+
+test('has no horizontal overflow at 900 pixels', async () => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(900);
+  await expect(
+    page.getByRole('heading', { name: 'Собрать поиск и карточку книги' }),
+  ).toBeVisible();
+});
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} Today snapshot at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.evaluate(() => {
+        window.localStorage.clear();
+      });
+      await page.reload();
+      expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+      const themeClicks = theme === 'light' ? 1 : 2;
+      for (let click = 0; click < themeClicks; click += 1) {
+        await page.getByRole('button', { name: /Тема:/ }).click();
+      }
+      // macOS renderers can disagree on an isolated edge pixel.
+      await expect(page).toHaveScreenshot(
+        `today-${theme}-${width.toString()}.png`,
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
+      );
     });
-  });
+  }
 }
