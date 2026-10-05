@@ -37,6 +37,15 @@ describe('repeating series', () => {
       instancesOn(series(), [], today.subtract({ days: 1 })),
     ).toBeUndefined();
   });
+  it('F-06: rejects empty and non-ISO weekday sets', () => {
+    expect(instancesOn(series({ weekdays: [] }), [], today)).toBeUndefined();
+    expect(
+      instancesOn(series({ weekdays: [0, 3] }), [], today),
+    ).toBeUndefined();
+    expect(
+      instancesOn(series({ weekdays: [3, 8] }), [], today),
+    ).toBeUndefined();
+  });
 
   it('F-06: keeps a timed instance visible before it becomes available', () => {
     const current = instancesOn(
@@ -125,13 +134,21 @@ describe('repeating series', () => {
     expect(instancesOn(fixed, [], today)?.time?.toString()).toBe('18:00:00');
   });
 
-  it('F-06: respects start and end dates', () => {
-    expect(
-      instancesOn(series({ startsOn: today.add({ days: 1 }) }), [], today),
-    ).toBeUndefined();
-    expect(
-      instancesOn(series({ endsOn: today.subtract({ days: 1 }) }), [], today),
-    ).toBeUndefined();
+  it('F-06: respects start and end dates for instances and missed dates', () => {
+    const startsTomorrow = series({ startsOn: today.add({ days: 1 }) });
+    const monday = Temporal.PlainDate.from('2026-10-05');
+    const endedMonday = series({
+      startsOn: monday,
+      endsOn: monday,
+      weekdays: [1, 2],
+    });
+    expect(instancesOn(startsTomorrow, [], today)).toBeUndefined();
+    expect(instancesOn(endedMonday, [], today)).toBeUndefined();
+    expect(missed(startsTomorrow, [], today)).toEqual([]);
+    expect(missed(endedMonday, [], today)).toEqual([
+      { seriesId: 'training', date: monday, state: 'missed' },
+    ]);
+    expect(skipGroups([startsTomorrow], [], today)).toEqual([]);
   });
 
   it('F-06: retains all matching dates across forty days in one group', () => {

@@ -9,8 +9,18 @@ import type {
   SkipGroup,
 } from './repeat';
 
+function hasValidWeekdays(series: Series): boolean {
+  return (
+    series.weekdays.length > 0 &&
+    series.weekdays.every(
+      (weekday) => Number.isInteger(weekday) && weekday >= 1 && weekday <= 7,
+    )
+  );
+}
+
 function isScheduled(series: Series, date: TemporalTypes.PlainDate): boolean {
   return (
+    hasValidWeekdays(series) &&
     Temporal.PlainDate.compare(date, series.startsOn) >= 0 &&
     (!series.endsOn || Temporal.PlainDate.compare(date, series.endsOn) <= 0) &&
     series.weekdays.includes(date.dayOfWeek)
