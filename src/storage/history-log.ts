@@ -60,7 +60,7 @@ export function readHistory(
       id: string;
       revision: number;
       occurred_at: string;
-      source: 'user' | 'ai' | 'undo';
+      source: 'user' | 'ai' | 'undo' | 'restore';
       batch_id: string;
       undone_entry_id: string | null;
     }[]

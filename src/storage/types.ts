@@ -10,7 +10,7 @@ export type HistoryEntry = {
   id: string;
   revision: number;
   occurredAt: string;
-  source: 'user' | 'ai' | 'undo';
+  source: 'user' | 'ai' | 'undo' | 'restore';
   batchId: string;
   undoneEntryId: string | null;
   entities: readonly {

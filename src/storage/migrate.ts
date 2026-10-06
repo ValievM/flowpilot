@@ -6,6 +6,7 @@ import historySchema from './migrations/0003_change_log.sql?raw';
 import entityVersions from './migrations/0004_entity_versions.sql?raw';
 import columnGenerations from './migrations/0005_column_generations.sql?raw';
 import legacyTombstoneGenerations from './migrations/0006_legacy_tombstone_generations.sql?raw';
+import restoreHistory from './migrations/0007_restore_history.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -14,6 +15,7 @@ const MIGRATIONS = [
   { version: 4, sql: entityVersions },
   { version: 5, sql: columnGenerations },
   { version: 6, sql: legacyTombstoneGenerations },
+  { version: 7, sql: restoreHistory },
 ] as const;
 
 export function migrate(database: Database.Database, path: string): void {
