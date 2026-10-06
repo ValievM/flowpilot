@@ -37,7 +37,7 @@ describe('startup diagnostics', () => {
     });
   });
 
-  it('shows a safe cause without exposing unexpected error details', () => {
+  it('shows a safe actionable cause instead of exposing unexpected error details', () => {
     const diagnostic = startupDiagnostic(
       new Error('profile sentinel: access denied'),
     );

@@ -1,6 +1,5 @@
 @import url('./today.css');
 @import url('./screens.css');
-@import url('./responsive.css');
 
 *,
 *::before,
@@ -63,7 +62,8 @@ input:focus-visible {
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
+  height: 100%;
   flex-direction: column;
   gap: var(--space-32);
   padding: var(--space-24) var(--space-12);
@@ -124,6 +124,9 @@ svg {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .nav-item svg {
@@ -219,6 +222,9 @@ svg {
   border-radius: var(--r2);
   background: var(--panel);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .button:hover {

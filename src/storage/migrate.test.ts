@@ -215,8 +215,11 @@ describe('database migrations', () => {
     );
     repository.close();
   });
-  it('rejects a foreign schema without changing its database file', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-foreign-schema-'));
+
+  it('rejects a database without a FlowPilot version without changing it', () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'flowpilot-foreign-database-'),
+    );
     directories.push(directory);
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
@@ -225,12 +228,10 @@ describe('database migrations', () => {
     const before = createHash('sha256')
       .update(readFileSync(path))
       .digest('hex');
-    const foreignDatabase = new Database(path);
 
-    expect(() => {
-      migrate(foreignDatabase, path);
-    }).toThrow('Foreign database schema is not supported');
-    foreignDatabase.close();
+    expect(
+      () => new Repository(path, { now: () => Temporal.Now.instant() }),
+    ).toThrow('Foreign database schema is not supported');
 
     expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(
       before,

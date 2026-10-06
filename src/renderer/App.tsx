@@ -4,17 +4,15 @@ import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
-import { TaskSummary } from './components/task-summary';
 import { TopBar } from './components/top-bar';
-import { BoardScreen } from './screens/board-screen';
-import { NowScreen } from './screens/now-screen';
-import { SettingsScreen } from './screens/settings-screen';
-import { TodayScreen } from './screens/today-screen';
-import { taskSummaryData } from './task-summary-data';
+import { ScreenContent } from './screen-content';
+import type { ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
 import { useCurrentTime } from './use-current-time';
 import type { LocalClock } from './use-current-time';
+import { useReducedMotion } from './use-reduced-motion';
 import { usePersistedTasks } from './use-persisted-tasks';
+import type { MotionChoice } from './use-reduced-motion';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
 import { addTask, startTask } from './task-commands';
@@ -25,13 +23,14 @@ function localDateLabel(date: TemporalTypes.PlainDate): string {
 }
 
 interface AppModel {
-  readonly theme: ReturnType<typeof useTheme>[0];
+  readonly theme: ThemeChoice;
+  readonly setTheme: (theme: ThemeChoice) => void;
+  readonly motionChoice: MotionChoice;
+  readonly setMotionChoice: (choice: MotionChoice) => void;
   readonly view: View;
   readonly setView: (view: View) => void;
   readonly quickAddOpen: boolean;
   readonly setQuickAddOpen: (open: boolean) => void;
-  readonly reduceMotion: boolean;
-  readonly setReduceMotion: (enabled: boolean) => void;
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
@@ -43,20 +42,14 @@ interface AppModel {
 
 function useAppModel(initialTheme: ThemeChoice): AppModel {
   const [theme, setTheme] = useTheme(initialTheme);
+  const [motionChoice, setMotionChoice] = useReducedMotion();
   const [view, setView] = React.useState<View>('today');
   const [quickAddOpen, setQuickAddOpen] = React.useState(false);
-  const [reduceMotion, setReduceMotion] = React.useState(false);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
   const clock = useCurrentTime();
   const state = usePersistedTasks();
   const views = taskViews(state.tasks, clock);
   useQuickAddShortcut(quickAddOpen, setQuickAddOpen);
-  React.useEffect(() => {
-    document.documentElement.toggleAttribute(
-      'data-reduce-motion',
-      reduceMotion,
-    );
-  }, [reduceMotion]);
   const cycleTheme = (): void => {
     setTheme((current) =>
       current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
@@ -64,12 +57,13 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   };
   return {
     theme,
+    setTheme,
+    motionChoice,
+    setMotionChoice,
     view,
     setView,
     quickAddOpen,
     setQuickAddOpen,
-    reduceMotion,
-    setReduceMotion,
     addButtonRef,
     state,
     views,
@@ -78,72 +72,6 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     startTask: (task) => startTask(state, task),
     addTask: (title) => addTask(state, title, views.today.toString()),
   };
-}
-
-interface ScreenProps {
-  readonly view: View;
-  readonly tasks: readonly Task[];
-  readonly hasTasks: boolean;
-  readonly hasUndatedTasks: boolean;
-  readonly today: TemporalTypes.PlainDate;
-  readonly todayLabel: string;
-  readonly available: readonly Task[];
-  readonly workdays: ReadonlySet<number>;
-  readonly loading: boolean;
-  readonly reduceMotion: boolean;
-  readonly setReduceMotion: (value: boolean) => void;
-  readonly onViewChange: (view: View) => void;
-  readonly onStart: (task: Task) => void;
-}
-
-function ScreenContent(props: ScreenProps): React.JSX.Element {
-  if (props.view === 'today')
-    return (
-      <TodayScreen
-        tasks={props.tasks}
-        hasTasks={props.hasTasks}
-        hasUndatedTasks={props.hasUndatedTasks}
-        available={props.available}
-        workdays={props.workdays}
-        today={props.today}
-        todayLabel={props.todayLabel}
-        onViewChange={props.onViewChange}
-        onStart={props.onStart}
-      />
-    );
-
-  if (props.view === 'now')
-    return (
-      <NowScreen
-        task={props.available[0]}
-        today={props.today}
-        hasTasks={props.hasTasks}
-        hasUndatedTasks={props.hasUndatedTasks}
-        workdays={props.workdays}
-        isLoading={props.loading}
-        onStart={props.onStart}
-      />
-    );
-  if (props.view === 'board')
-    return <BoardScreen tasks={props.tasks.map(taskSummaryData)} />;
-  if (props.view === 'all')
-    return (
-      <section className="simple-screen">
-        <p className="eyebrow">ЛИЧНОЕ / ВСЕ ЗАДАЧИ</p>
-        <h1>Все задачи</h1>
-        <div className="all-task-list">
-          {props.tasks.map((task) => (
-            <TaskSummary key={task.id} task={taskSummaryData(task)} />
-          ))}
-        </div>
-      </section>
-    );
-  return (
-    <SettingsScreen
-      reduceMotion={props.reduceMotion}
-      onReduceMotionChange={props.setReduceMotion}
-    />
-  );
 }
 
 function LoadingState(): React.JSX.Element {
@@ -253,8 +181,12 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     available: views.available,
     workdays: state.workdays,
     loading: state.isLoading,
-    reduceMotion: model.reduceMotion,
-    setReduceMotion: model.setReduceMotion,
+    theme: model.theme,
+    onThemeChange: model.setTheme,
+    motionChoice: model.motionChoice,
+    onMotionChoiceChange: model.setMotionChoice,
+    onWorkdaysChange: (workdays) => state.updateWorkdays(workdays),
+    saveError: state.settingsError,
     onViewChange: model.setView,
     onStart: (task) => void model.startTask(task),
   };
@@ -271,7 +203,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
         <TopBar
           view={view}
           saved={state.isSaved}
-          error={state.commandError}
+          error={state.commandError ?? state.settingsError}
           onAddTask={() => {
             model.setQuickAddOpen(true);
           }}

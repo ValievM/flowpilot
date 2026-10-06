@@ -1,9 +1,9 @@
-import { vi } from 'vitest';
 import type { Temporal } from 'temporal-polyfill';
 import type {
   CommandsApplyRequest,
   FlowPilotApi,
   IpcSnapshot,
+  SettingsSetRequest,
 } from '../../shared/contracts';
 import type { Result } from '../../shared/ipc-result';
 
@@ -124,10 +124,12 @@ const columns: IpcSnapshot['columns'] = [
 interface FakeState {
   current: IpcSnapshot;
   readonly calls: CommandsApplyRequest[];
+  readonly settingsCalls: SettingsSetRequest[];
   staleOnce: boolean;
   rejectAll: boolean;
   rejectRetry: boolean;
   loadFailure: boolean;
+  settingsFailure: boolean;
   changedByConflict: boolean;
 }
 
@@ -186,14 +188,30 @@ function apiApply(
   }
   return Promise.resolve({ ok: true, value: applyCommands(state, request) });
 }
+function apiSetSetting(
+  state: FakeState,
+  request: SettingsSetRequest,
+): Promise<Result<IpcSnapshot>> {
+  state.settingsCalls.push(request);
+  if (state.settingsFailure)
+    return Promise.resolve({ ok: false, error: 'InternalError' });
+  state.current = {
+    ...state.current,
+    settings: { ...state.current.settings, [request.key]: request.value },
+    revision: state.current.revision + 1,
+  };
+  return Promise.resolve({ ok: true, value: state.current });
+}
 
 export interface FakeFlowPilot {
   readonly api: FlowPilotApi;
   readonly calls: CommandsApplyRequest[];
+  readonly settingsCalls: SettingsSetRequest[];
   setStaleOnce(): void;
   setAlwaysReject(): void;
   setRejectRetry(): void;
   setLoadFailure(failed?: boolean): void;
+  setSettingsFailure(failed?: boolean): void;
   snapshot(): IpcSnapshot;
 }
 
@@ -210,8 +228,8 @@ function fakeApiFor(
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
     settings: {
-      get: () => Promise.resolve({ ok: true, value: {} }),
-      set: () => Promise.resolve({ ok: false, error: 'InternalError' }),
+      get: () => Promise.resolve({ ok: true, value: state.current.settings }),
+      set: (request) => apiSetSetting(state, request),
     },
     ai: {
       run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
@@ -236,25 +254,29 @@ function fakeApiFor(
 export function fakeApi(
   tasks: readonly TestTask[] = [],
   clock: () => string | undefined = () => undefined,
+  workdays: readonly number[] = [1, 2, 3, 4, 5],
 ): FakeFlowPilot {
   const state: FakeState = {
     current: {
       columns,
       tasks,
-      settings: { workdays: [1, 2, 3, 4, 5] },
+      settings: { workdays },
       revision: 0,
     },
     calls: [],
+    settingsCalls: [],
     staleOnce: false,
     rejectAll: false,
     rejectRetry: false,
     loadFailure: false,
+    settingsFailure: false,
     changedByConflict: false,
   };
   const api = fakeApiFor(state, clock);
   return {
     api,
     calls: state.calls,
+    settingsCalls: state.settingsCalls,
     setStaleOnce: () => {
       state.staleOnce = true;
     },
@@ -267,17 +289,9 @@ export function fakeApi(
     setLoadFailure: (failed = true) => {
       state.loadFailure = failed;
     },
+    setSettingsFailure: (failed = true) => {
+      state.settingsFailure = failed;
+    },
     snapshot: () => state.current,
   };
-}
-
-export function mockSystemTheme(matches: boolean): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockReturnValue({
-      matches,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }),
-  );
 }

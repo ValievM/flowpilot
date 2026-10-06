@@ -1,5 +1,6 @@
 import { createRef } from 'react';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -11,12 +12,10 @@ import { Temporal } from 'temporal-polyfill';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { QuickAddDialog } from './components/quick-add-dialog';
-import {
-  fakeApi,
-  mockSystemTheme,
-  taskRecord,
-} from './test-support/fake-flowpilot';
+import { fakeApi, taskRecord } from './test-support/fake-flowpilot';
+import { mockSystemTheme } from './test-support/mock-system-theme';
 import { isThemeChoice } from './theme/use-theme';
+import { isMotionChoice } from './use-reduced-motion';
 
 if (
   Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal') ===
@@ -62,6 +61,8 @@ describe('persisted today and now screens', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-motion-choice');
+    document.documentElement.removeAttribute('data-reduce-motion');
     vi.restoreAllMocks();
   });
 
@@ -149,6 +150,276 @@ describe('persisted today and now screens', () => {
     expect(
       within(nav).getByRole('button', { name: 'Сегодня' }),
     ).toHaveAttribute('aria-current', 'page');
+  });
+  it('opens saved theme, workday, and motion settings with accessible choices', async () => {
+    const app = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue(
+      'system',
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Уменьшить движение' }),
+    ).toHaveValue('system');
+    const group = screen.getByRole('group', {
+      name: 'Дни недели, учитываемые при расчёте срока',
+    });
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(7);
+    for (const [day, checked] of [
+      ['Понедельник', true],
+      ['Вторник', true],
+      ['Среда', true],
+      ['Четверг', true],
+      ['Пятница', true],
+      ['Суббота', false],
+      ['Воскресенье', false],
+    ] as const) {
+      expect(screen.getByRole('checkbox', { name: day })).toHaveProperty(
+        'checked',
+        checked,
+      );
+    }
+    expect(app.settingsCalls).toEqual([]);
+  });
+
+  it('persists theme changes and keeps the system preference available', async () => {
+    const changeSystemTheme = mockSystemTheme(true);
+    const app = fakeApi();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
+      target: { value: 'dark' },
+    });
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(window.localStorage.getItem('flowpilot-theme')).toBe('dark');
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue('dark');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
+      target: { value: 'system' },
+    });
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    act(() => {
+      changeSystemTheme(false);
+    });
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
+    expect(isThemeChoice('ultraviolet')).toBe(false);
+  });
+
+  it.each([
+    ['Доска', 'Доска'],
+    ['Все задачи', 'Все задачи'],
+  ])(
+    'updates the deadline risk marker in the %s view when workdays change',
+    async (viewLabel, heading) => {
+      const app = renderApp([
+        {
+          id: 'view-risk',
+          title: 'Risk view task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 4 },
+        },
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+      expect(
+        await screen.findByRole('heading', { name: 'Risk view task' }),
+      ).toBeVisible();
+      expect(screen.getByRole('heading', { name: heading })).toBeVisible();
+      expect(
+        screen.queryByText(/До срока .*запас исчерпан/),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Пятница' }));
+      await waitFor(() => {
+        expect(app.snapshot().settings.workdays).toEqual([1, 2, 3, 4]);
+      });
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+
+      expect(
+        await screen.findByText(
+          /До срока 4 рабочих дня, оценка остатка 4 рабочих дня: запас исчерпан/,
+        ),
+      ).toBeVisible();
+    },
+  );
+  it.each([['Доска'], ['Все задачи']])(
+    'shows neutral unknown and semantic risk styles and titles in the %s view',
+    async (viewLabel) => {
+      renderApp([
+        {
+          id: 'unknown-risk',
+          title: 'Unknown estimate task',
+          deadline: '2026-10-09',
+        },
+        {
+          id: 'tight-risk',
+          title: 'Tight deadline task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 5 },
+        },
+        {
+          id: 'short-risk',
+          title: 'Short deadline task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 6 },
+        },
+        {
+          id: 'overdue-risk',
+          title: 'Overdue deadline task',
+          deadline: '2026-10-04',
+          estimate: { unit: 'workdays', value: 2 },
+        },
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+
+      const unknownRisk = await screen.findByText(
+        'Срок есть, объём неизвестен. По приблизительной оценке.',
+      );
+      expect(unknownRisk).toHaveAttribute('data-risk-kind', 'unknown');
+      expect(unknownRisk).toHaveClass('risk-label', 'risk-unknown');
+      expect(unknownRisk).not.toHaveClass('is-risk');
+
+      const tightRisk = screen.getByText(
+        /До срока 5 рабочих дней, оценка остатка 5 рабочих дней: запас исчерпан/,
+      );
+      expect(tightRisk).toHaveAttribute('data-risk-kind', 'tight');
+      expect(tightRisk).toHaveClass('risk-label', 'risk-tight', 'is-risk');
+      expect(tightRisk).toHaveAttribute('title', 'Риск не успеть');
+      const shortRisk = screen.getByText(/при этой оценке срок не выдержать/);
+      expect(shortRisk).toHaveAttribute('data-risk-kind', 'short');
+      expect(shortRisk).toHaveClass('risk-label', 'risk-short', 'is-risk');
+      expect(shortRisk).toHaveAttribute('title', 'Риск не успеть');
+
+      const overdueRisk = screen.getByText(
+        'Дата срока — 04.10.2026. По приблизительной оценке.',
+      );
+      expect(overdueRisk).toHaveAttribute('data-risk-kind', 'overdue');
+      expect(overdueRisk).toHaveClass('risk-label', 'risk-overdue', 'is-risk');
+      expect(overdueRisk).toHaveAttribute('title', 'Срок прошёл');
+    },
+  );
+
+  it('persists workdays, reloads them, and recalculates visible deadline risk', async () => {
+    const app = fakeApi(
+      [
+        taskRecord({
+          id: 'workday-risk',
+          day: today(),
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 4 },
+        }),
+      ],
+      () => TEST_NOW,
+    );
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'workday-risk', level: 3 });
+    expect(screen.queryByText(/Риск не успеть/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    await waitFor(() => {
+      expect(app.settingsCalls).toEqual([
+        { key: 'workdays', value: [2, 3, 4, 5], expectedRevision: 0 },
+      ]);
+    });
+    expect(app.snapshot().settings.workdays).toEqual([2, 3, 4, 5]);
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    expect(screen.getByText(/Риск не успеть/)).toBeVisible();
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'workday-risk', level: 3 });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(
+      screen.getByRole('checkbox', { name: 'Понедельник' }),
+    ).not.toBeChecked();
+  });
+
+  it('rejects an empty workday set without saving or changing the selected day', async () => {
+    const app = fakeApi([], () => TEST_NOW, [1]);
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    expect(
+      await screen.findByText('Выберите хотя бы один рабочий день.'),
+    ).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Понедельник' })).toBeChecked();
+    expect(app.settingsCalls).toEqual([]);
+  });
+
+  it('shows a settings save failure and retains the persisted value', async () => {
+    const app = renderApp();
+    app.setSettingsFailure();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Пятница' }));
+    const alerts = await screen.findAllByText(
+      'Не удалось сохранить рабочие дни. Настройка не изменена; попробуйте снова.',
+    );
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(screen.getByRole('checkbox', { name: 'Пятница' })).toBeChecked();
+    expect(app.snapshot().settings.workdays).toEqual([1, 2, 3, 4, 5]);
+    expect(screen.getByRole('status')).toHaveTextContent('Ошибка сохранения');
+  });
+
+  it('defaults reduced motion to the system and persists manual overrides', async () => {
+    const changeSystemMotion = mockSystemTheme(true, false);
+    const fake = fakeApi();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(window.localStorage.getItem('flowpilot-reduce-motion')).toBeNull();
+    expect(document.documentElement).toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    act(() => {
+      changeSystemMotion(false);
+    });
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    act(() => {
+      changeSystemMotion(true);
+    });
+    expect(document.documentElement).toHaveAttribute('data-reduce-motion');
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Уменьшить движение' }),
+      {
+        target: { value: 'full' },
+      },
+    );
+    expect(window.localStorage.getItem('flowpilot-reduce-motion')).toBe('full');
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement).toHaveAttribute(
+      'data-motion-choice',
+      'full',
+    );
+    expect(isMotionChoice('none')).toBe(false);
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement).toHaveAttribute(
+      'data-motion-choice',
+      'full',
+    );
   });
 
   it('shows empty persisted state and never uses sample tasks', async () => {

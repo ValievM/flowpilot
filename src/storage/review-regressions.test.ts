@@ -86,7 +86,14 @@ describe('review regressions', () => {
     );
     repository.apply([{ kind: 'task.create', task }], 1);
     const result = repository.apply(
-      [{ kind: 'column.delete', id: 'custom', targetColumnId: 'waiting' }],
+      [
+        {
+          kind: 'column.delete',
+          id: 'custom',
+          targetColumnId: 'waiting',
+          waiting: { reason: 'Ждёт ответа' },
+        },
+      ],
       2,
     );
 
@@ -97,7 +104,7 @@ describe('review regressions', () => {
     expect(movedTask.columnId).toBe('waiting');
     expect(movedTask.status.kind).toBe('waiting');
     if (movedTask.status.kind === 'waiting')
-      expect(movedTask.status.reason).toBeTruthy();
+      expect(movedTask.status.reason).toBe('Ждёт ответа');
     repository.close();
   });
 });

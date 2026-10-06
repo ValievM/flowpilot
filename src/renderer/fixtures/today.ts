@@ -1,3 +1,5 @@
+import type { RiskKind } from '../../domain/risk/risk';
+
 export type TodayTask = {
   id: string;
   title: string;
@@ -6,6 +8,8 @@ export type TodayTask = {
   estimate: string;
   state: 'todo' | 'doing' | 'waiting' | 'done';
   risk?: string;
+  riskKind?: Exclude<RiskKind, 'none' | 'ok'>;
+  riskTitle?: string;
   step?: string;
 };
 

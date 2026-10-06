@@ -6,6 +6,7 @@ import { App } from './App';
 import { isThemeChoice } from './theme/use-theme';
 import './styles/tokens.css';
 import './styles/app.css';
+import './styles/responsive.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Renderer root is missing');

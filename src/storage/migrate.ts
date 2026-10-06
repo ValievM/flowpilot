@@ -22,6 +22,7 @@ export class ForeignDatabaseError extends Error {
   }
 }
 
+
 export function migrate(database: Database.Database, path: string): void {
   const current = readUserVersion(database);
   const latest = MIGRATIONS.at(-1)?.version ?? 0;

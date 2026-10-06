@@ -249,6 +249,86 @@ test('shows a saved task and keyboard accessible navigation', async () => {
   ).toBeVisible();
 });
 
+test('shows neutral unknown and danger risk colors on Board and All in Electron', async () => {
+  const created = await page.evaluate(
+    ({ day, deadline }) =>
+      window.flowpilot.commands.apply({
+        expectedRevision: 0,
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'unknown-risk',
+              title: 'Объём неизвестен',
+              description: '',
+              status: { kind: 'todo' },
+              columnId: 'todo',
+              day,
+              deadline,
+              subtasks: [],
+              comments: [],
+              attachments: [],
+              addedOrder: 0,
+            },
+          },
+          {
+            kind: 'task.create',
+            task: {
+              id: 'tight-risk',
+              title: 'Запас исчерпан',
+              description: '',
+              status: { kind: 'todo' },
+              columnId: 'todo',
+              day,
+              deadline,
+              estimate: { unit: 'workdays', value: 5 },
+              subtasks: [],
+              comments: [],
+              attachments: [],
+              addedOrder: 1,
+            },
+          },
+        ],
+      }),
+    { day: TODAY, deadline: '2026-10-09' },
+  );
+  expect(created).toMatchObject({ ok: true });
+  await page.reload();
+
+  for (const view of ['Доска', 'Все задачи']) {
+    await page
+      .getByRole('navigation', { name: 'Представления' })
+      .getByRole('button', { name: view })
+      .click();
+    const unknown = page.locator('[data-risk-kind="unknown"]');
+    const tight = page.locator('[data-risk-kind="tight"]');
+    await expect(unknown).toBeVisible();
+    await expect(unknown).toHaveClass(/risk-unknown/);
+    await expect(tight).toBeVisible();
+    await expect(tight).toHaveClass(/is-risk/);
+    await expect(tight).toHaveAttribute('title', 'Риск не успеть');
+    const colors = {
+      unknown: await unknown.evaluate(
+        (element) => getComputedStyle(element).color,
+      ),
+      tight: await tight.evaluate((element) => getComputedStyle(element).color),
+      expected: await page.evaluate(() => {
+        const measure = (token: string): string => {
+          const probe = document.createElement('span');
+          probe.style.color = `var(${token})`;
+          document.body.append(probe);
+          const color = getComputedStyle(probe).color;
+          probe.remove();
+          return color;
+        };
+        return { neutral: measure('--muted'), danger: measure('--danger') };
+      }),
+    };
+    expect(colors.unknown).toBe(colors.expected.neutral);
+    expect(colors.tight).toBe(colors.expected.danger);
+  }
+});
+
 test('has no horizontal overflow at 900 pixels with a long task title', async () => {
   await page.setViewportSize({ width: 900, height: 800 });
   await page.getByRole('button', { name: 'Задача' }).click();
@@ -474,6 +554,164 @@ test('creates and starts a task through persisted Today and Now flows', async ()
     },
   });
 });
+
+test('persists settings and applies reduced motion to control transitions', async () => {
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  const theme = page.getByRole('combobox', { name: 'Тема' });
+  await theme.selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('flowpilot-theme')))
+    .toBe('dark');
+  const friday = page.getByRole('checkbox', { name: 'Пятница' });
+  await friday.click();
+  await expect(friday).not.toBeChecked();
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const result = await window.flowpilot.snapshot.load();
+        return result.ok ? result.value.settings.workdays : undefined;
+      }),
+    )
+    .toEqual([1, 2, 3, 4]);
+  const motion = page.getByRole('combobox', { name: 'Уменьшить движение' });
+  await motion.selectOption('reduce');
+  await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
+  await expect
+    .poll(() =>
+      page
+        .getByRole('button', { name: 'Задача' })
+        .evaluate((element) => getComputedStyle(element).transitionDuration),
+    )
+    .toBe('0s');
+  await motion.selectOption('full');
+  await expect(page.locator('html')).not.toHaveAttribute('data-reduce-motion');
+  await expect
+    .poll(() =>
+      page
+        .getByRole('button', { name: 'Задача' })
+        .evaluate((element) => getComputedStyle(element).transitionDuration),
+    )
+    .toBe('0.14s, 0.14s');
+  await motion.selectOption('reduce');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Настройки' })).toBeVisible();
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await expect(
+    page.getByRole('checkbox', { name: 'Пятница' }),
+  ).not.toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Тема' })).toHaveValue(
+    'dark',
+  );
+  await expect(motion).toHaveValue('reduce');
+  await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
+});
+
+for (const width of [760, 600]) {
+  test(`keeps the workspace visible below the sidebar at ${width.toString()}px`, async () => {
+    await page.setViewportSize({ width, height: 800 });
+    const sidebar = await page.locator('.sidebar').boundingBox();
+    const workspace = await page.locator('.workspace').boundingBox();
+    if (!sidebar || !workspace)
+      throw new Error('Боковая панель или рабочая область не отображается.');
+    await expect(page.locator('.sidebar')).toHaveCSS('flex-direction', 'row');
+    expect(sidebar.height).toBeLessThan(800);
+    expect(workspace.y).toBeLessThan(800);
+  });
+}
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.getByRole('button', { name: 'Настройки' }).click();
+      await page.getByRole('combobox', { name: 'Тема' }).selectOption(theme);
+      expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+      await page.evaluate(() => {
+        window.getSelection()?.removeAllRanges();
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      const themeChoice = page.getByRole('combobox', { name: 'Тема' });
+      await themeChoice.focus();
+      await page.keyboard.press('Tab');
+      await expect(
+        page.getByRole('combobox', { name: 'Уменьшить движение' }),
+      ).toBeFocused();
+      await expect
+        .poll(() =>
+          page
+            .getByRole('combobox', { name: 'Уменьшить движение' })
+            .evaluate((element) => getComputedStyle(element).outlineStyle),
+        )
+        .toBe('solid');
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      await expect
+        .poll(() =>
+          page.getByRole('combobox', { name: 'Тема' }).evaluate((element) => {
+            const styles = getComputedStyle(element);
+            return {
+              height: styles.height,
+              borderColor: styles.borderColor,
+              appearance: styles.appearance,
+              backgroundImage: styles.backgroundImage,
+            };
+          }),
+        )
+        .toMatchObject({
+          height: '36px',
+          appearance: 'none',
+        });
+      expect(
+        await page
+          .getByRole('checkbox', { name: 'Понедельник' })
+          .evaluate((element) => {
+            const reference = document.createElement('input');
+            reference.type = 'checkbox';
+            reference.style.accentColor = 'var(--accent)';
+            document.body.append(reference);
+            const matchesToken =
+              getComputedStyle(element).accentColor ===
+              getComputedStyle(reference).accentColor;
+            reference.remove();
+            return matchesToken;
+          }),
+      ).toBe(true);
+      const fieldset = page.getByRole('group', {
+        name: 'Дни недели, учитываемые при расчёте срока',
+      });
+      const card = page
+        .getByRole('heading', { name: 'Рабочие дни' })
+        .locator('..');
+      const fieldsetBounds = await fieldset.boundingBox();
+      const cardBounds = await card.boundingBox();
+      if (!fieldsetBounds || !cardBounds)
+        throw new Error('Настройка рабочих дней не отображается.');
+      expect(fieldsetBounds.x).toBeGreaterThan(cardBounds.x);
+      expect(fieldsetBounds.x + fieldsetBounds.width).toBeLessThan(
+        cardBounds.x + cardBounds.width,
+      );
+      const sidebar = await page.locator('.sidebar').boundingBox();
+      const content = await page.locator('.workspace').boundingBox();
+      if (!sidebar || !content)
+        throw new Error('Боковая панель или содержимое не отображается.');
+      expect(sidebar.height).toBeGreaterThanOrEqual(content.height);
+      await expect(page).toHaveScreenshot(
+        `settings-${theme}-${width.toString()}.png`,
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
+      );
+    });
+  }
+}
 
 for (const screen of ['today', 'now'] as const) {
   for (const width of [900, 1280]) {
