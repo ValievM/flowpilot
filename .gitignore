@@ -14,3 +14,4 @@ test-results/
 *.sqlite3
 .prompts/
 **/bin/
+src/storage/backup/openat-native/build/

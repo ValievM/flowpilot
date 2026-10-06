@@ -32,8 +32,7 @@ const taskSchema = z
     description: z.string().optional(),
     status: statusSchema,
     columnId: z.string().min(1),
-    typeId: z.string().min(1).optional(),
-    disciplineId: z.string().min(1).optional(),
+    // typeId, disciplineId, and aiRank remain rejected until #40/#46 persist them.
     day: dateSchema,
     time: timeSchema,
     deadline: dateSchema,
@@ -82,25 +81,45 @@ const nonEmptyWorkdays = z
   .max(7)
   .refine((days) => new Set(days).size === days.length);
 
+const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
+  theme: themeChoice,
   aiMode: z.enum(['auto', 'confirm']),
+};
+const genericSettingValueSchemas: Readonly<Record<string, z.ZodType>> = {
+  workdays: nonEmptyWorkdays,
 };
 export const settingFields = {
   key: z.string().min(1),
   value: z.unknown(),
 };
 
-export function validateSettingValue(
+function validateSetting(
   setting: { key: string; value: unknown },
   context: z.RefinementCtx,
+  schemas: Readonly<Record<string, z.ZodType>>,
 ): void {
-  const valueSchema = Object.hasOwn(settingValueSchemas, setting.key)
-    ? settingValueSchemas[setting.key]
+  const valueSchema = Object.hasOwn(schemas, setting.key)
+    ? schemas[setting.key]
     : undefined;
   if (!valueSchema?.safeParse(setting.value).success) {
     context.addIssue({ code: 'custom', message: 'Invalid setting value' });
   }
+}
+
+export function validateSettingValue(
+  setting: { key: string; value: unknown },
+  context: z.RefinementCtx,
+): void {
+  validateSetting(setting, context, settingValueSchemas);
+}
+
+export function validateGenericSettingValue(
+  setting: { key: string; value: unknown },
+  context: z.RefinementCtx,
+): void {
+  validateSetting(setting, context, genericSettingValueSchemas);
 }
 const ipcTaskSchema = taskSchema
   .extend({ attachments: z.array(z.never()) })
@@ -193,12 +212,23 @@ const columnDeleteSchema = z
     kind: z.literal('column.delete'),
     id: z.string().min(1),
     targetColumnId: z.string().min(1).optional(),
+    waiting: z
+      .object({
+        reason: z.string().trim().min(1),
+        until: dateValueSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
-const settingCommandSchema = z
+const settingCommandFields = z
   .object({ ...settingFields, kind: z.literal('setting.set') })
-  .strict()
-  .superRefine(validateSettingValue);
+  .strict();
+const settingCommandSchema =
+  settingCommandFields.superRefine(validateSettingValue);
+const genericSettingCommandSchema = settingCommandFields.superRefine(
+  validateGenericSettingValue,
+);
 const aiRankCommandSchema = z
   .object({
     kind: z.literal('task.setAiRank'),
@@ -233,5 +263,5 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
-  settingCommandSchema,
+  genericSettingCommandSchema,
 ]);

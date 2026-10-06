@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
+import { appInfoResponseSchema } from '../shared/contracts';
 import { Repository } from '../storage';
 import {
   applyCommands,
@@ -158,14 +159,14 @@ describe('IPC handlers', () => {
     const repository = openRepository();
     expect(
       setSetting(
-        { key: 'theme', value: 'dark', expectedRevision: 0 },
+        { key: 'unknown', value: 'dark', expectedRevision: 0 },
         { repository },
       ),
     ).toEqual({ ok: false, error: 'ValidationFailed' });
     expect(
       applyCommands(
         {
-          commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+          commands: [{ kind: 'setting.set', key: 'unknown', value: 'dark' }],
           expectedRevision: 0,
         },
         { repository },
@@ -173,6 +174,31 @@ describe('IPC handlers', () => {
     ).toEqual({ ok: false, error: 'ValidationFailed' });
     expect(repository.load().revision).toBe(0);
     expect(Object.hasOwn(repository.load().settings, 'theme')).toBe(false);
+    repository.close();
+  });
+
+  it('rejects generic theme writes without changing revision or history', () => {
+    const repository = openRepository();
+    const initial = repository.load();
+    const before = repository.history(10).entries;
+    expect(
+      setSetting(
+        { key: 'theme', value: 'light', expectedRevision: 0 },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(
+      applyCommands(
+        {
+          commands: [{ kind: 'setting.set', key: 'theme', value: 'light' }],
+          expectedRevision: 0,
+        },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(initial.revision);
+    expect(repository.load().settings).toEqual(initial.settings);
+    expect(repository.history(10).entries).toEqual(before);
     repository.close();
   });
 
@@ -214,30 +240,42 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('exposes settings and app information through validated results', () => {
+  it('exposes app information with the main clock timestamp', () => {
     const repository = openRepository();
+    const deps = {
+      getName: () => 'FlowPilot',
+      getVersion: () => '0.1.0',
+      getNow: () => '2026-10-05T12:00:00Z',
+    };
     expect(getSettings({}, { repository }).ok).toBe(true);
-    expect(
-      getAppInfo({}, { getName: () => 'FlowPilot', getVersion: () => '0.1.0' }),
-    ).toEqual({
-      ok: true,
-      value: { name: 'FlowPilot', version: '0.1.0' },
-    });
-    expect(
-      getAppInfo(
-        {},
-        {
-          getName: () => {
-            throw new Error('runtime failure');
-          },
-          getVersion: () => '0.1.0',
-        },
-      ),
-    ).toEqual({ ok: false, error: 'InternalError' });
     expect(loadSnapshot({ path: 'denied' }, { repository })).toEqual({
       ok: false,
       error: 'ValidationFailed',
     });
+    expect(getAppInfo({}, deps)).toEqual({
+      ok: true,
+      value: {
+        name: 'FlowPilot',
+        version: '0.1.0',
+        now: '2026-10-05T12:00:00Z',
+      },
+    });
+    expect(getAppInfo({}, { ...deps, getNow: () => 'invalid' })).toEqual({
+      ok: false,
+      error: 'InternalError',
+    });
+    expect(getAppInfo({ extra: true }, deps)).toEqual({
+      ok: false,
+      error: 'ValidationFailed',
+    });
+    expect(
+      appInfoResponseSchema.safeParse({
+        name: 'FlowPilot',
+        version: '0.1.0',
+        now: '2026-10-05T12:00:00Z',
+        unexpected: true,
+      }).success,
+    ).toBe(false);
     repository.close();
   });
 
@@ -252,12 +290,17 @@ describe('IPC handlers', () => {
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
+          getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner: new AiRunner(manualProvider),
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
     expect(channels).toEqual([
+      'appearance.initialize',
+      'appearance.ready',
+      'appearance.set-theme',
       'snapshot.load',
       'commands.apply',
       'settings.get',
@@ -333,9 +376,11 @@ describe('IPC handlers', () => {
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
+          getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner,
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
 

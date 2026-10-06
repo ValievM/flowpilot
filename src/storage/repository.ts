@@ -43,6 +43,7 @@ const rejectedAiCommandsSchema = z.array(
 );
 
 export class Repository {
+  private readonly profilePath: string;
   private readonly database: Database.Database;
   private readonly attachments: AttachmentStore;
 
@@ -50,6 +51,7 @@ export class Repository {
     path: string,
     private readonly clock: Clock,
   ) {
+    this.profilePath = path;
     this.database = new Database(path);
     try {
       this.database.pragma('busy_timeout = 5000');
@@ -191,12 +193,12 @@ export class Repository {
   }
 
   undo(entryId?: string): UndoResult {
-    return undoEntry(
-      this.database,
-      this.attachments,
+    return undoEntry({
+      database: this.database,
+      attachmentFiles: this.attachments,
       entryId,
-      this.clock.now().toString(),
-    );
+      now: this.clock.now().toString(),
+    });
   }
   close(): void {
     this.database.close();

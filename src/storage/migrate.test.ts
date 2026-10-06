@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -45,7 +46,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 8 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
@@ -61,7 +62,7 @@ describe('database migrations', () => {
     database.close();
   });
   it('preserves legacy applied operations while adding replay details', () => {
-    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v7-'));
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v8-'));
     directories.push(directory);
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
@@ -77,11 +78,11 @@ describe('database migrations', () => {
         'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
       )
       .run('existing-operation', 'existing-proposal', 4);
-    database.pragma('user_version = 7');
+    database.pragma('user_version = 8');
 
     migrate(database, path);
 
-    expect(database.pragma('user_version')).toEqual([{ user_version: 8 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
     expect(
       database
         .prepare(
@@ -249,5 +250,27 @@ describe('database migrations', () => {
       expect.objectContaining({ id: 'custom', name: 'Custom' }),
     );
     repository.close();
+  });
+
+  it('rejects a database without a FlowPilot version without changing it', () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'flowpilot-foreign-database-'),
+    );
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const database = new Database(path);
+    database.exec('CREATE TABLE tasks (id TEXT PRIMARY KEY)');
+    database.close();
+    const before = createHash('sha256')
+      .update(readFileSync(path))
+      .digest('hex');
+
+    expect(
+      () => new Repository(path, { now: () => Temporal.Now.instant() }),
+    ).toThrow('Foreign database schema is not supported');
+
+    expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(
+      before,
+    );
   });
 });

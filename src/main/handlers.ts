@@ -1,10 +1,12 @@
 import type { Repository, Snapshot, StorageCommand } from '../storage';
 import {
   appInfoRequestSchema,
+  appInfoResponseSchema,
   commandsApplyRequestSchema,
   settingsGetRequestSchema,
   settingsSetRequestSchema,
   snapshotLoadRequestSchema,
+  type AppInfo,
   type IpcSnapshot,
 } from '../shared/contracts';
 import type { ErrorCode, Result } from '../shared/ipc-result';
@@ -95,15 +97,23 @@ export function setSetting(
 
 export function getAppInfo(
   request: unknown,
-  deps: { getName(): string; getVersion(): string },
-): Result<{ name: string; version: string }> {
+  deps: {
+    getName(): string;
+    getVersion(): string;
+    getNow(): string;
+  },
+): Result<AppInfo> {
   if (!appInfoRequestSchema.safeParse(request).success)
     return { ok: false, error: 'ValidationFailed' };
   try {
-    return {
-      ok: true,
-      value: { name: deps.getName(), version: deps.getVersion() },
-    };
+    const result = appInfoResponseSchema.safeParse({
+      name: deps.getName(),
+      version: deps.getVersion(),
+      now: deps.getNow(),
+    });
+    return result.success
+      ? { ok: true, value: result.data }
+      : { ok: false, error: 'InternalError' };
   } catch {
     return { ok: false, error: 'InternalError' };
   }

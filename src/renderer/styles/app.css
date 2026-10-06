@@ -1,6 +1,5 @@
 @import url('./today.css');
 @import url('./screens.css');
-@import url('./responsive.css');
 
 *,
 *::before,
@@ -38,17 +37,33 @@ input:focus-visible {
   outline-offset: var(--space-4);
 }
 
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.drag-region
+  :is(button, input, select, textarea, a, [role='menu'], [role='menuitem']) {
+  -webkit-app-region: no-drag;
+}
+
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+  grid-template-columns: var(--size-titlebar-sidebar) minmax(0, 1fr);
+}
+
+.sidebar-titlebar-drag {
+  height: var(--size-topbar);
+  margin-block: calc(-1 * var(--space-24)) calc(-1 * var(--space-32));
+  -webkit-app-region: drag;
 }
 
 .sidebar {
   position: sticky;
   top: 0;
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
+  height: 100%;
   flex-direction: column;
   gap: var(--space-32);
   padding: var(--space-24) var(--space-12);
@@ -109,6 +124,9 @@ svg {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .nav-item svg {
@@ -204,6 +222,9 @@ svg {
   border-radius: var(--r2);
   background: var(--panel);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .button:hover {
@@ -225,4 +246,13 @@ svg {
 .add-icon {
   font-size: var(--type-section);
   line-height: 1;
+}
+
+:root[data-full-screen] .app-shell {
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+}
+
+:root[data-full-screen] .sidebar-titlebar-drag {
+  height: 0;
+  margin: 0;
 }

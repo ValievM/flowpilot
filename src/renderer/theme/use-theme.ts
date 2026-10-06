@@ -1,23 +1,57 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-
-export type ThemeChoice = 'system' | 'light' | 'dark';
-
-const themeStorageKey = 'flowpilot-theme';
+import type { ThemeChoice } from '../../shared/contracts';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 export function isThemeChoice(value: unknown): value is ThemeChoice {
   return value === 'system' || value === 'light' || value === 'dark';
 }
-
-function initialTheme(): ThemeChoice {
-  const stored = window.localStorage.getItem(themeStorageKey);
-  return isThemeChoice(stored) ? stored : 'system';
+interface ThemeSaveState {
+  readonly persistedTheme: { current: ThemeChoice };
+  readonly latestRequest: { current: number };
+  readonly saveQueue: { current: Promise<void> };
+  readonly setTheme: Dispatch<SetStateAction<ThemeChoice>>;
 }
 
-export function useTheme(): readonly [
-  ThemeChoice,
-  Dispatch<SetStateAction<ThemeChoice>>,
-] {
-  const [theme, setTheme] = useState<ThemeChoice>(initialTheme);
+function queueThemeSave(
+  theme: ThemeChoice,
+  requestId: number,
+  state: ThemeSaveState,
+): void {
+  state.saveQueue.current = state.saveQueue.current
+    .then(async () => {
+      const result = await window.flowpilot.appearance.setTheme({ theme });
+      if (result.ok) {
+        state.persistedTheme.current = theme;
+        return;
+      }
+      if (requestId === state.latestRequest.current) {
+        state.setTheme((current) =>
+          current === theme ? state.persistedTheme.current : current,
+        );
+      }
+    })
+    .catch(() => {
+      if (requestId === state.latestRequest.current) {
+        state.setTheme((current) =>
+          current === theme ? state.persistedTheme.current : current,
+        );
+      }
+    });
+}
+
+export function useTheme(
+  initialChoice: ThemeChoice,
+): readonly [ThemeChoice, Dispatch<SetStateAction<ThemeChoice>>] {
+  const [theme, setTheme] = useState<ThemeChoice>(initialChoice);
+  const isFirstRender = useRef(true);
+  const persistedTheme = useRef(initialChoice);
+  const latestRequest = useRef(0);
+  const saveQueue = useRef(Promise.resolve());
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -25,16 +59,24 @@ export function useTheme(): readonly [
       document.documentElement.dataset.theme =
         theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
     };
-    applyTheme();
     media.addEventListener('change', applyTheme);
-    if (theme === 'system') {
-      window.localStorage.removeItem(themeStorageKey);
-    } else {
-      window.localStorage.setItem(themeStorageKey, theme);
-    }
+    applyTheme();
     return () => {
       media.removeEventListener('change', applyTheme);
     };
+  }, [theme]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    queueThemeSave(theme, ++latestRequest.current, {
+      persistedTheme,
+      latestRequest,
+      saveQueue,
+      setTheme,
+    });
   }, [theme]);
 
   return [theme, setTheme];

@@ -1,6 +1,9 @@
 import type Database from 'better-sqlite3';
-import type { StorageCommand } from './types';
+import { removeColumn, type TaskColumn } from '../domain';
 import { advanceColumnGeneration } from './column-generations';
+import { loadTask, type TaskRow } from './snapshot-tasks';
+import { dateText } from './sql-values';
+import type { StorageCommand } from './types';
 
 export function executeColumnCommand(
   database: Database.Database,
@@ -14,7 +17,7 @@ export function executeColumnCommand(
       renameColumn(database, command);
       return;
     case 'column.delete':
-      deleteColumn(database, command.id, command.targetColumnId);
+      deleteColumn(database, command);
       return;
     case 'setting.set':
       database
@@ -69,37 +72,51 @@ function renameColumn(
 
 function deleteColumn(
   database: Database.Database,
-  id: string,
-  targetId?: string,
+  command: Extract<StorageCommand, { kind: 'column.delete' }>,
 ): void {
-  const column = database
-    .prepare('SELECT built_in FROM columns WHERE id = ?')
-    .get(id) as { built_in: number } | undefined;
-  if (!column || column.built_in === 1)
-    throw new Error('column not found or built-in');
-  const taskCount = (
-    database
-      .prepare('SELECT COUNT(*) AS count FROM tasks WHERE column_id = ?')
-      .get(id) as { count: number }
-  ).count;
-  if (taskCount > 0 && !targetId)
-    throw new Error('target column required for non-empty column');
-  if (targetId) {
-    if (targetId === id) throw new Error('target column must be different');
-    const target = database
-      .prepare('SELECT state FROM columns WHERE id = ?')
-      .get(targetId) as { state: string } | undefined;
-    if (!target) throw new Error('target column not found');
-    database
-      .prepare(
-        `UPDATE tasks SET column_id = ?, status_kind = ?, waiting_reason = CASE WHEN ? = 'waiting' THEN COALESCE(waiting_reason, 'Перенесено в колонку ожидания') ELSE NULL END,
-      waiting_until = CASE WHEN ? = 'waiting' THEN waiting_until ELSE NULL END, version = version + 1 WHERE column_id = ?`,
-      )
-      .run(targetId, target.state, target.state, target.state, id);
+  const columnRows = database
+    .prepare(
+      'SELECT id,name,description,state,built_in FROM columns ORDER BY position',
+    )
+    .all() as {
+    id: string;
+    name: string;
+    description: string;
+    state: TaskColumn['state'];
+    built_in: number;
+  }[];
+  const columns = columnRows.map(({ built_in, ...column }) => ({
+    ...column,
+    builtIn: built_in === 1,
+  }));
+  const taskRows = database
+    .prepare('SELECT * FROM tasks WHERE column_id = ? ORDER BY position,id')
+    .all(command.id) as TaskRow[];
+  const tasks = taskRows.map((row) => loadTask(database, row));
+  const removed = removeColumn(columns, tasks, command.id, {
+    ...(command.targetColumnId
+      ? { targetColumnId: command.targetColumnId }
+      : {}),
+    ...(command.waiting ? { waiting: command.waiting } : {}),
+  });
+  if (!removed.ok) throw new Error(removed.error);
+  const updateTask = database.prepare(
+    `UPDATE tasks SET column_id = ?, status_kind = ?, waiting_reason = ?,
+      waiting_until = ?, version = version + 1 WHERE id = ?`,
+  );
+  for (const task of removed.tasks) {
+    updateTask.run(
+      task.columnId,
+      task.status.kind,
+      task.status.kind === 'waiting' ? task.status.reason : null,
+      task.status.kind === 'waiting' ? dateText(task.status.until) : null,
+      task.id,
+    );
   }
-  advanceColumnGeneration(database, id);
+  advanceColumnGeneration(database, command.id);
   requireChanged(
-    database.prepare('DELETE FROM columns WHERE id = ?').run(id).changes,
+    database.prepare('DELETE FROM columns WHERE id = ?').run(command.id)
+      .changes,
     'column not found',
   );
 }

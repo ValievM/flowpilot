@@ -63,7 +63,11 @@ describe('AI task safety contract', () => {
       const result = validateProposal(
         proposal([
           { kind: 'task.update', id: 'task-1', changes: { [field]: value } },
-          { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+          {
+            kind: 'comment.add',
+            taskId: 'task-1',
+            comment: { id: 'safe-note', text: 'Note' },
+          },
         ]),
         snapshot,
       );
@@ -100,12 +104,18 @@ describe('AI task safety contract', () => {
     const result = validateProposal(
       proposal([
         { kind: 'task.create', task: { ...taskInput, id: 'task-1' } },
-        { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+        {
+          kind: 'comment.add',
+          taskId: 'task-1',
+          comment: { id: 'safe-note', text: 'Note' },
+        },
       ]),
       snapshot,
     );
     expect(result.validCommands).toHaveLength(1);
-    expect(result.rejectedCommands[0]?.reason).toBe('task-id-conflict');
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'task.create', reason: 'task-id-conflict' },
+    ]);
   });
 
   it('rejects waiting-column creation without a waiting reason', () => {
@@ -163,7 +173,11 @@ describe('AI task safety contract', () => {
         taskId: 'task-1',
         comment: { id: 'new-comment', text: 'Duplicate' },
       },
-      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'independent-comment', text: 'Independent' },
+      },
     ];
     const result = validateProposal(proposal(commands), snapshot);
 
@@ -212,7 +226,11 @@ describe('AI task safety contract', () => {
         taskId: 'task-1',
         comment: { id: 'comment-new', text: 'New' },
       },
-      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'independent-comment', text: 'Independent' },
+      },
     ];
     const result = validateProposal(proposal(commands), currentSnapshot);
 
@@ -242,9 +260,9 @@ describe('AI task safety contract', () => {
       },
     };
     const independent = {
-      kind: 'task.setAiRank',
+      kind: 'comment.add',
       taskId: 'task-1',
-      rank: 2,
+      comment: { id: 'independent-comment', text: 'Independent' },
     };
     const result = validateProposal(proposal([create, independent]), snapshot);
 
@@ -270,7 +288,11 @@ describe('AI task safety contract', () => {
           subtasks: [],
         },
       },
-      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+      {
+        kind: 'comment.add',
+        taskId: 'task-1',
+        comment: { id: 'independent-comment', text: 'Independent' },
+      },
     ];
     const result = validateProposal(proposal(commands), snapshot);
 
@@ -312,8 +334,6 @@ describe('AI task safety contract', () => {
       id: 'new',
       title: 'New',
       columnId: 'doing',
-      typeId: 'type-1',
-      disciplineId: 'discipline-1',
       subtasks: [{ id: 'sub-1', title: 'Subtask', completed: false }],
       comment: { id: 'comment-1', text: 'Context' },
     };
@@ -329,8 +349,6 @@ describe('AI task safety contract', () => {
             id: input.id,
             title: input.title,
             columnId: input.columnId,
-            typeId: input.typeId,
-            disciplineId: input.disciplineId,
             subtasks: input.subtasks,
             status: { kind: 'doing' },
             comments: [input.comment],

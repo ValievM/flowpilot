@@ -54,7 +54,7 @@ const proposal = (
 });
 
 describe('AI proposal contract', () => {
-  it('accepts three well-formed commands as one valid proposal', () => {
+  it('rejects unsupported fields while keeping valid commands', () => {
     const result = validateProposal(
       proposal([
         { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
@@ -67,8 +67,10 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(3);
-    expect(result.rejectedCommands).toEqual([]);
+    expect(result.validCommands).toHaveLength(2);
+    expect(result.rejectedCommands).toEqual([
+      { index: 1, kind: 'task.classify', reason: 'not-persisted-yet' },
+    ]);
   });
   it('keeps valid commands and rejects hallucinated task identifiers by name', () => {
     const result = validateProposal(
@@ -83,9 +85,12 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(2);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 1, kind: 'comment.add', reason: 'task-not-found' },
+      { index: 2, kind: 'task.classify', reason: 'not-persisted-yet' },
     ]);
   });
 
@@ -110,7 +115,9 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(1);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.classify', reason: 'invalid-command' },
     ]);
@@ -134,7 +141,7 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.rejectedCommands[0]?.reason).toBe('type-not-found');
+    expect(result.rejectedCommands[0]?.reason).toBe('not-persisted-yet');
   });
 
   it('requires an explicit reason when moving into waiting', () => {
@@ -159,7 +166,7 @@ describe('AI proposal contract', () => {
     expect(aiCommandSchema.safeParse(command).success).toBe(false);
   });
 
-  it('rejects task creation with unknown type ids without dropping remaining commands', () => {
+  it('rejects task creation with type ids not yet persisted', () => {
     const command = {
       kind: 'task.create',
       task: {
@@ -177,8 +184,12 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(1);
-    expect(result.rejectedCommands[0]?.reason).toBe('type-not-found');
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'task.create', reason: 'not-persisted-yet' },
+    ]);
   });
 
   it('uses stale revision and rule versions to reject all commands', () => {

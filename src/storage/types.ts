@@ -5,12 +5,13 @@ import type {
   TaskStatus,
   Subtask,
   TaskComment,
+  WaitingDetails,
 } from '../domain';
 export type HistoryEntry = {
   id: string;
   revision: number;
   occurredAt: string;
-  source: 'user' | 'ai' | 'undo';
+  source: 'user' | 'ai' | 'undo' | 'restore';
   batchId: string;
   undoneEntryId: string | null;
   entities: readonly {
@@ -76,7 +77,12 @@ export type StorageCommand =
   | { kind: 'task.setAiRank'; taskId: string; rank: number }
   | { kind: 'column.create'; column: TaskColumn }
   | { kind: 'column.rename'; id: string; name: string; description: string }
-  | { kind: 'column.delete'; id: string; targetColumnId?: string }
+  | {
+      kind: 'column.delete';
+      id: string;
+      targetColumnId?: string;
+      waiting?: WaitingDetails;
+    }
   | { kind: 'setting.set'; key: string; value: unknown };
 
 export interface RejectedAiCommand {

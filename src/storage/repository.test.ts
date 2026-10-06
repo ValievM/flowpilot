@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
+import initialSchema from './migrations/0001_init.sql?raw';
 import { Repository } from './index';
+import { removeColumn } from '../domain';
+import { ipcCommandSchema } from '../shared/command-schema';
 
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
@@ -27,7 +30,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 8 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);
@@ -178,7 +181,342 @@ describe('Repository', () => {
     ]);
     repository.close();
   });
+  it('deletes an empty custom column without a target', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [
+        {
+          kind: 'column.create',
+          column: {
+            id: 'custom',
+            name: 'Custom',
+            description: '',
+            state: 'todo',
+            builtIn: false,
+          },
+        },
+      ],
+      0,
+    );
 
+    expect(
+      repository.apply([{ kind: 'column.delete', id: 'custom' }], 1),
+    ).toEqual({ ok: true, value: { revision: 2 } });
+    expect(repository.load().columns.map(({ id }) => id)).not.toContain(
+      'custom',
+    );
+    repository.close();
+  });
+
+  it('requires a waiting reason and preserves all state when absent', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [
+        {
+          kind: 'column.create',
+          column: {
+            id: 'custom',
+            name: 'Custom',
+            description: '',
+            state: 'waiting',
+            builtIn: false,
+          },
+        },
+      ],
+      0,
+    );
+    repository.apply(
+      [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'task-1',
+            title: 'Task',
+            status: {
+              kind: 'waiting',
+              reason: 'Исходная причина',
+              until: Temporal.PlainDate.from('2026-10-07'),
+            },
+            columnId: 'custom',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 1,
+          },
+        },
+      ],
+      1,
+    );
+    const before = repository.load();
+    const history = repository.history(10);
+
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'column.delete',
+            id: 'custom',
+            targetColumnId: 'waiting',
+          },
+        ],
+        2,
+      ),
+    ).toEqual({
+      ok: false,
+      error: { kind: 'InvalidCommand', message: 'waiting-reason-required' },
+    });
+    expect(repository.load()).toEqual(before);
+    expect(repository.history(10)).toEqual(history);
+    repository.close();
+  });
+
+  it('applies waiting details and undo restores previous waiting state', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [
+        {
+          kind: 'column.create',
+          column: {
+            id: 'custom',
+            name: 'Custom',
+            description: '',
+            state: 'waiting',
+            builtIn: false,
+          },
+        },
+      ],
+      0,
+    );
+    repository.apply(
+      [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'task-1',
+            title: 'Task one',
+            status: {
+              kind: 'waiting',
+              reason: 'Исходная причина 1',
+              until: Temporal.PlainDate.from('2026-10-07'),
+            },
+            columnId: 'custom',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 1,
+          },
+        },
+        {
+          kind: 'task.create',
+          task: {
+            id: 'task-2',
+            title: 'Task two',
+            status: {
+              kind: 'waiting',
+              reason: 'Исходная причина 2',
+              until: Temporal.PlainDate.from('2026-10-09'),
+            },
+            columnId: 'custom',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 2,
+          },
+        },
+      ],
+      1,
+    );
+
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', state: 'waiting' }),
+    );
+
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'column.delete',
+            id: 'custom',
+            targetColumnId: 'waiting',
+            waiting: {
+              reason: 'Ждёт ответа',
+              until: Temporal.PlainDate.from('2026-10-08'),
+            },
+          },
+        ],
+        2,
+      ),
+    ).toEqual({ ok: true, value: { revision: 3 } });
+    expect(repository.load().tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'task-1',
+          columnId: 'waiting',
+          status: {
+            kind: 'waiting',
+            reason: 'Ждёт ответа',
+            until: Temporal.PlainDate.from('2026-10-08'),
+          },
+        }),
+        expect.objectContaining({
+          id: 'task-2',
+          columnId: 'waiting',
+          status: {
+            kind: 'waiting',
+            reason: 'Ждёт ответа',
+            until: Temporal.PlainDate.from('2026-10-08'),
+          },
+        }),
+      ]),
+    );
+    expect(repository.load().columns).not.toContainEqual(
+      expect.objectContaining({ id: 'custom' }),
+    );
+    const deletion = repository
+      .history(10)
+      .entries.find(({ revision }) => revision === 3);
+    expect(deletion).toBeDefined();
+    expect(repository.undo(deletion?.id)).toMatchObject({ ok: true });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', state: 'waiting' }),
+    );
+    expect(repository.load().tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'task-1',
+          columnId: 'custom',
+          status: {
+            kind: 'waiting',
+            reason: 'Исходная причина 1',
+            until: Temporal.PlainDate.from('2026-10-07'),
+          },
+        }),
+        expect.objectContaining({
+          id: 'task-2',
+          columnId: 'custom',
+          status: {
+            kind: 'waiting',
+            reason: 'Исходная причина 2',
+            until: Temporal.PlainDate.from('2026-10-09'),
+          },
+        }),
+      ]),
+    );
+    repository.close();
+  });
+
+  it('uses domain column removal semantics for varied task states', () => {
+    const combinations = [
+      {
+        status: { kind: 'todo' as const },
+        target: 'doing',
+        expected: { kind: 'doing' },
+      },
+      {
+        status: {
+          kind: 'waiting' as const,
+          reason: 'Было',
+          until: Temporal.PlainDate.from('2026-10-09'),
+        },
+        target: 'doing',
+        expected: { kind: 'doing' },
+      },
+      {
+        status: { kind: 'doing' as const },
+        target: 'waiting',
+        waiting: {
+          reason: 'Причина',
+          until: Temporal.PlainDate.from('2026-10-08'),
+        },
+        expected: {
+          kind: 'waiting',
+          reason: 'Причина',
+          until: Temporal.PlainDate.from('2026-10-08'),
+        },
+      },
+      {
+        status: { kind: 'done' as const },
+        target: 'todo',
+        expected: { kind: 'todo' },
+      },
+      {
+        status: { kind: 'waiting' as const, reason: 'Старая причина' },
+        target: 'waiting',
+        waiting: { reason: 'Новая причина' },
+        expected: { kind: 'waiting', reason: 'Новая причина' },
+      },
+    ];
+
+    for (const [index, combination] of combinations.entries()) {
+      const { repository } = openRepository();
+      const columnId = `custom-${String(index)}`;
+      const target = combination.target;
+      const source = {
+        id: columnId,
+        name: 'Custom',
+        description: '',
+        state: combination.status.kind,
+        builtIn: false,
+      };
+      const columns = [...repository.load().columns, source];
+      repository.apply([{ kind: 'column.create', column: source }], 0);
+      const task = {
+        id: `task-${String(index)}`,
+        title: 'Task',
+        status: combination.status,
+        columnId,
+        subtasks: [],
+        comments: [],
+        attachments: [],
+        addedOrder: 1,
+      };
+      repository.apply([{ kind: 'task.create', task }], 1);
+      const options = {
+        targetColumnId: target,
+        ...(combination.waiting ? { waiting: combination.waiting } : {}),
+      };
+      const expected = removeColumn(columns, [task], columnId, options);
+      const applied = repository.apply(
+        [
+          {
+            kind: 'column.delete',
+            id: columnId,
+            targetColumnId: target,
+            ...(combination.waiting ? { waiting: combination.waiting } : {}),
+          },
+        ],
+        2,
+      );
+      expect(applied.ok).toBe(true);
+      expect(repository.load().columns).toEqual(
+        expected.ok ? expected.columns : [],
+      );
+      expect(repository.load().tasks[0]).toMatchObject({
+        ...(expected.ok ? expected.tasks[0] : {}),
+        status: combination.expected,
+      });
+      repository.close();
+    }
+  });
+
+  it('rejects unknown column-delete waiting fields over IPC', () => {
+    expect(
+      ipcCommandSchema.safeParse({
+        kind: 'column.delete',
+        id: 'custom',
+        targetColumnId: 'waiting',
+        waiting: { reason: 'Ждёт', until: '2026-10-08' },
+      }).success,
+    ).toBe(true);
+    expect(
+      ipcCommandSchema.safeParse({
+        kind: 'column.delete',
+        id: 'custom',
+        targetColumnId: 'waiting',
+        waiting: { reason: 'Ждёт', unexpected: true },
+      }).success,
+    ).toBe(false);
+  });
   it('rejects a database newer than the known migrations without changing it', () => {
     const { repository, path } = openRepository();
     repository.close();
@@ -196,16 +534,17 @@ describe('Repository', () => {
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
     database.pragma('journal_mode = WAL');
-    database.exec(
-      "CREATE TABLE legacy_data (value TEXT); INSERT INTO legacy_data VALUES ('preserved')",
-    );
-    const backup = `${path}.bak-v0`;
+    database.exec(initialSchema);
+    database.pragma('user_version = 1');
+    const backup = `${path}.bak-v1`;
     const migrated = new Repository(path, clock);
     database.close();
     const backupDatabase = new Database(backup);
     expect(
-      backupDatabase.prepare('SELECT value FROM legacy_data').get(),
-    ).toEqual({ value: 'preserved' });
+      backupDatabase
+        .prepare('SELECT name FROM columns WHERE id = ?')
+        .get('todo'),
+    ).toEqual({ name: 'Сделать' });
     expect(readFileSync(backup).byteLength).toBeGreaterThan(0);
     backupDatabase.close();
     migrated.close();

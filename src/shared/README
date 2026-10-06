@@ -11,7 +11,8 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
 - `settings.get()` (`settings.get`): empty strict request; returns settings.
 - `settings.set()` (`settings.set`): strict
   `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
-- `app.info()` (`app.info`): empty strict request; returns `{ name, version }`.
+- `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
+  where `now` is the ISO timestamp from the main-process clock.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
 `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
@@ -32,6 +33,8 @@ AI `task.update` accepts only user-editable fields. AI `task.create` uses a
 separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without
 accepting system fields from the proposal.
+Task fields may enter the model only with a migration, storage write, read path,
+command schema, and invariant test in the same change.
 
 AI calls are explicit through `ai.run()` and `ai.cancel()`. The main-process
 `ai.run()` boundary serializes Temporal date and time values to canonical ISO
