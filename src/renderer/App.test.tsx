@@ -198,6 +198,53 @@ describe('persisted today and now screens', () => {
     expect(screen.getByText(/назначены на будущее/i)).toBeVisible();
   });
 
+  it.each([
+    [
+      'value error',
+      () => Promise.resolve({ ok: false as const, error: 'InternalError' }),
+    ],
+    ['rejected promise', () => Promise.reject(new Error('IPC unavailable'))],
+  ])(
+    'shows task data and retries a %s clock failure',
+    async (_name, firstInfo) => {
+      mockSystemTheme(false);
+      const fake = fakeApi(
+        [taskRecord({ id: 'clock-task', day: today() })],
+        () => TEST_NOW,
+      );
+      const loadTime = fake.api.app.info.bind(fake.api.app);
+      const info = vi
+        .fn()
+        .mockImplementationOnce(firstInfo)
+        .mockImplementation(() => loadTime());
+      fake.api.app.info = info;
+      Object.defineProperty(window, 'flowpilot', {
+        configurable: true,
+        value: fake.api,
+      });
+      render(<App />);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /не удалось получить текущее время/i,
+      );
+      expect(
+        await screen.findByRole('heading', { name: 'clock-task', level: 3 }),
+      ).toBeVisible();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Повторить получение времени' }),
+      );
+
+      await waitFor(() => {
+        expect(info).toHaveBeenCalledTimes(2);
+      });
+      expect(
+        screen.queryByText(/не удалось получить текущее время/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'clock-task', level: 3 }),
+      ).toBeVisible();
+    },
+  );
   it('rolls yesterday work over at midnight without remounting', async () => {
     mockSystemTheme(false);
     const atLocalTime = (day: string, time: string): string =>

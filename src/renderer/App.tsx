@@ -12,6 +12,7 @@ import { TodayScreen } from './screens/today-screen';
 import { taskSummaryData } from './task-summary-data';
 import { taskViews } from './task-views';
 import { useCurrentTime } from './use-current-time';
+import type { LocalClock } from './use-current-time';
 import { usePersistedTasks } from './use-persisted-tasks';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
@@ -33,7 +34,7 @@ interface AppModel {
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
-  readonly clockReady: boolean;
+  readonly clock: LocalClock;
   readonly cycleTheme: () => void;
   readonly startTask: (task: Task) => Promise<void>;
   readonly addTask: (title: string) => Promise<boolean>;
@@ -71,7 +72,7 @@ function useAppModel(): AppModel {
     addButtonRef,
     state,
     views,
-    clockReady: clock.isReady,
+    clock,
     cycleTheme,
     startTask: (task) => startTask(state, task),
     addTask: (title) => addTask(state, title, views.today.toString()),
@@ -172,7 +173,10 @@ function ErrorState({
 
 function shouldShowLoading(model: AppModel): boolean {
   const { state } = model;
-  return !model.clockReady || (state.isLoading && state.tasks.length === 0);
+  return (
+    (!model.clock.isReady && !model.clock.error) ||
+    (state.isLoading && state.tasks.length === 0)
+  );
 }
 function MainContent({
   model,
@@ -200,6 +204,14 @@ function MainContent({
           view === 'board' || view === 'all' ? views.all : views.todayTasks
         }
       />
+      {model.clock.error && (
+        <p className="load-error" role="alert">
+          {model.clock.error}
+          <button className="button" type="button" onClick={model.clock.retry}>
+            Повторить получение времени
+          </button>
+        </p>
+      )}
       {state.isLoading && (
         <p className="refresh-status" role="status">
           Обновляем данные…

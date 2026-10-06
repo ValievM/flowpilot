@@ -299,6 +299,11 @@ for (const screen of ['today', 'now'] as const) {
   for (const width of [900, 1280]) {
     for (const theme of ['light', 'dark'] as const) {
       test(`matches ${theme} ${screen} snapshot at ${width.toString()}px`, async () => {
+        expect(
+          await page.evaluate(
+            () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+          ),
+        ).toBe('UTC');
         await page.setViewportSize({ width, height: 800 });
         const seeded = await page.evaluate(
           ({ today, deadline }) =>
