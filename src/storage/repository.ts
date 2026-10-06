@@ -1,10 +1,24 @@
 import Database from 'better-sqlite3';
+import { dirname } from 'node:path';
+import {
+  AttachmentStore,
+  type AttachmentRecord,
+} from './attachments/attachment-store';
+import { readHistory } from './history-log';
+import { undoEntry } from './history-undo';
 import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
-import type { ApplyResult, Clock, Snapshot, StorageCommand } from './types';
 import type { TaskColumn } from '../domain';
+import type {
+  ApplyResult,
+  Clock,
+  HistoryPage,
+  Snapshot,
+  StorageCommand,
+  UndoResult,
+} from './types';
 
 type ColumnRow = {
   id: string;
@@ -16,6 +30,7 @@ type ColumnRow = {
 
 export class Repository {
   private readonly database: Database.Database;
+  private readonly attachments: AttachmentStore;
 
   constructor(
     path: string,
@@ -27,6 +42,12 @@ export class Repository {
       migrate(this.database, path);
       this.database.pragma('foreign_keys = ON');
       this.database.pragma('journal_mode = WAL');
+      this.attachments = new AttachmentStore(
+        this.database,
+        dirname(path),
+        this.clock,
+      );
+      this.attachments.recoverInterruptedRemovals();
     } catch (error) {
       this.database.close();
       throw error;
@@ -59,7 +80,17 @@ export class Repository {
   apply(
     commands: readonly StorageCommand[],
     expectedRevision: number,
+    options: { source?: 'user' | 'ai' } = {},
   ): ApplyResult {
+    if (commands.length === 0) {
+      const actual = readRevision(this.database);
+      if (actual !== expectedRevision)
+        return {
+          ok: false,
+          error: { kind: 'StaleRevision', expected: expectedRevision, actual },
+        };
+      return { ok: true, value: { revision: actual } };
+    }
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
     );
@@ -71,14 +102,44 @@ export class Repository {
           message: `Invalid ${invalid.kind} command`,
         },
       };
-    return applyCommands(
-      this.database,
+    const prepared = new Map<number, AttachmentRecord>();
+    for (const [index, command] of commands.entries()) {
+      if (command.kind !== 'attachment.add') continue;
+      const result = this.attachments.prepare(
+        command.taskId,
+        command.sourcePath,
+      );
+      if (!result.ok) {
+        for (const file of prepared.values()) this.attachments.discard(file.id);
+        return {
+          ok: false,
+          error: { kind: 'InvalidCommand', message: result.error.kind },
+        };
+      }
+      prepared.set(index, result.value);
+    }
+    return applyCommands(this.database, {
       commands,
       expectedRevision,
+      now: this.clock.now().toString(),
+      attachmentFiles: this.attachments,
+      preparedAttachments: prepared,
+      source: options.source ?? 'user',
+    });
+  }
+
+  history(limit: number, before?: string): HistoryPage {
+    return { entries: readHistory(this.database, limit, before) };
+  }
+
+  undo(entryId?: string): UndoResult {
+    return undoEntry(
+      this.database,
+      this.attachments,
+      entryId,
       this.clock.now().toString(),
     );
   }
-
   close(): void {
     this.database.close();
   }

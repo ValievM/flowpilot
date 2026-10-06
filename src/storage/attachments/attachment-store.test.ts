@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -137,17 +138,20 @@ describe('AttachmentStore', () => {
     expect(store.verify(added.value.id)).toEqual({ kind: 'Missing' });
   });
 
-  it('removes the disk file and its database record', () => {
+  it('keeps trash files during orphan collection', () => {
     const { database, directory, store } = openStorage();
-    const source = join(directory, 'remove.txt');
-    writeFileSync(source, 'remove');
-    const added = store.add('task-1', source);
-    if (!added.ok) throw new Error('Expected attachment to be added');
-    expect(store.remove(added.value.id)).toBe(true);
-    expect(store.getPath(added.value.id)).toBeUndefined();
+    const source = join(directory, 'trash.txt');
+    writeFileSync(source, 'trash');
+    const placed = store.prepare('task-1', source);
+    if (!placed.ok) throw new Error('Expected attachment to be prepared');
+    expect(store.moveToTrash(placed.value.id)).toBe(true);
     expect(
       database.prepare('SELECT count(*) AS count FROM attachments').get(),
     ).toEqual({ count: 0 });
+    const trashed = join(directory, 'attachments', '.trash', placed.value.id);
+    expect(existsSync(trashed)).toBe(true);
+    expect(store.gc()).toBe(0);
+    expect(existsSync(trashed)).toBe(true);
   });
 
   it('leaves no record or temporary file when copying fails', () => {
