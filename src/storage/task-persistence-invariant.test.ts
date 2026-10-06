@@ -68,9 +68,6 @@ describe('Task persistence invariant', () => {
     };
     expect(taskFieldsComplete).toBe(true);
     expect(taskFields).toHaveLength(Object.keys(task).length);
-    expect(commandSchema.safeParse({ kind: 'task.create', task }).success).toBe(
-      false,
-    );
     const { typeId, disciplineId, aiRank, ...persistedTask } = task;
     expect(typeId).toBe('type-1');
     expect(disciplineId).toBe('discipline-1');
@@ -88,7 +85,7 @@ describe('Task persistence invariant', () => {
     reopened.close();
   });
 
-  it('rejects unpersisted create and update fields without changing revision', () => {
+  it('rejects each unpersisted create field without changing the repository', () => {
     const directory = mkdtempSync(join(tmpdir(), 'flowpilot-task-fields-'));
     directories.push(directory);
     const repository = new Repository(join(directory, 'tasks.sqlite'), clock);
@@ -103,23 +100,66 @@ describe('Task persistence invariant', () => {
       addedOrder: 0,
     };
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
-    const snapshotBeforeRejectedCreate = repository.load();
-    const revision = snapshotBeforeRejectedCreate.revision;
-    const rejectedCreate = repository.apply(
-      [
-        {
+    const rejectedCreates = [
+      {
+        field: 'typeId',
+        command: {
           kind: 'task.create',
-          task: { ...task, id: 'task-2', typeId: 'type-1' },
+          task: { ...task, id: 'task-type', typeId: 'type-1' },
         },
-      ],
-      revision,
-    );
-    expect(rejectedCreate).toMatchObject({
-      ok: false,
-      error: { kind: 'InvalidCommand' },
-    });
-    expect(repository.load()).toEqual(snapshotBeforeRejectedCreate);
-    expect(repository.load().revision).toBe(revision);
+      },
+      {
+        field: 'disciplineId',
+        command: {
+          kind: 'task.create',
+          task: {
+            ...task,
+            id: 'task-discipline',
+            disciplineId: 'discipline-1',
+          },
+        },
+      },
+      {
+        field: 'aiRank',
+        command: {
+          kind: 'task.create',
+          task: { ...task, id: 'task-rank', aiRank: 1 },
+        },
+      },
+    ] as const;
+    for (const { field, command } of rejectedCreates) {
+      const snapshotBefore = repository.load();
+      const revision = snapshotBefore.revision;
+      expect(
+        commandSchema.safeParse(command).success,
+        `${field} schema rejection`,
+      ).toBe(false);
+      expect(repository.apply([command], revision)).toMatchObject({
+        ok: false,
+        error: { kind: 'InvalidCommand' },
+      });
+      expect(repository.load()).toEqual(snapshotBefore);
+      expect(repository.load().revision).toBe(revision);
+    }
+    repository.close();
+  });
+
+  it('rejects unpersisted update fields without changing the repository', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-task-fields-'));
+    directories.push(directory);
+    const repository = new Repository(join(directory, 'tasks.sqlite'), clock);
+    const task: Task = {
+      id: 'task-1',
+      title: 'Task',
+      status: { kind: 'todo' },
+      columnId: 'todo',
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      addedOrder: 0,
+    };
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    const revision = repository.load().revision;
     for (const field of rejectedFields) {
       const snapshotBeforeRejectedUpdate = repository.load();
       const rejectedUpdate = repository.apply(
