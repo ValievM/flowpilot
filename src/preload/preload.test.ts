@@ -29,6 +29,7 @@ describe('preload bridge', () => {
     expect(calls).toBe(1);
     expect(name).toBe('flowpilot');
     expect(Object.keys(api).sort()).toEqual([
+      'ai',
       'app',
       'commands',
       'settings',

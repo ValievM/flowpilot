@@ -1,3 +1,5 @@
+import { AiRunner } from './ai/ai-runner';
+import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +14,10 @@ import {
   setSetting,
 } from './handlers';
 import { registerIpcHandlers } from './ipc-handlers';
+import type { IpcMainInvokeEvent } from 'electron';
+import type { AiIpcResult } from '../shared/contracts';
+import { ipcChannels } from '../shared/contracts';
+import { createStartupAiRunner } from './ai/startup-ai-runner';
 
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
@@ -235,9 +241,10 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('registers only the five public channels', () => {
+  it('registers the public IPC channels including AI run and cancellation', () => {
     const channels: string[] = [];
     const repository = openRepository();
+    const manualProvider = new ManualExchangeProvider();
     registerIpcHandlers(
       { handle: (channel) => channels.push(channel) },
       {
@@ -246,6 +253,8 @@ describe('IPC handlers', () => {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
         },
+        aiRunner: new AiRunner(manualProvider),
+        manualProvider,
       },
     );
     expect(channels).toEqual([
@@ -254,7 +263,137 @@ describe('IPC handlers', () => {
       'settings.get',
       'settings.set',
       'app.info',
+      'ai.run',
+      'ai.cancel',
+      'ai.prompt',
+      'ai.reply',
     ]);
+    repository.close();
+  });
+  it('returns a scripted test fake reply through startup and ai.run IPC', async () => {
+    const repository = openRepository();
+    const manualProvider = new ManualExchangeProvider();
+    const proposal = {
+      id: 'scripted-proposal',
+      baseRevision: 1,
+      ruleVersions: {},
+      commands: [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'scripted-task',
+            title: 'Scripted task',
+            columnId: 'todo',
+            subtasks: [],
+            day: '2026-10-06',
+            time: '09:30',
+            deadline: '2026-10-09',
+          },
+        },
+        {
+          kind: 'task.update',
+          id: 'scripted-task',
+          changes: {
+            day: '2026-10-07',
+            time: '14:45',
+            deadline: '2026-10-10',
+          },
+        },
+        {
+          kind: 'task.move',
+          id: 'scripted-task',
+          columnId: 'waiting',
+          status: { kind: 'waiting', reason: 'Blocked', until: '2026-10-12' },
+        },
+      ],
+      rationale: 'Scripted test reply',
+      unknowns: [],
+      createdAt: '2026-10-05T12:00:00Z',
+    };
+    const aiRunner = createStartupAiRunner(
+      false,
+      {
+        FLOWPILOT_TEST: '1',
+        FLOWPILOT_TEST_AI_REPLY: JSON.stringify(proposal),
+      },
+      manualProvider,
+    );
+    const handlers = new Map<
+      string,
+      (event: IpcMainInvokeEvent, request: unknown) => unknown
+    >();
+    registerIpcHandlers(
+      {
+        handle: (channel, handler) => {
+          handlers.set(channel, handler);
+        },
+      },
+      {
+        repository,
+        appInfo: {
+          getName: () => 'FlowPilot',
+          getVersion: () => '0.1.0',
+        },
+        aiRunner,
+        manualProvider,
+      },
+    );
+
+    // The IPC handler ignores Electron's event, so an empty event is safe here.
+    const result = await handlers.get(ipcChannels.aiRun)?.(
+      {} as IpcMainInvokeEvent,
+      {
+        operationId: 'startup-scripted',
+        context: { tasks: [{ id: 'task-1' }] },
+        instruction: 'Return the scripted proposal',
+        responseSchema: { type: 'object' },
+      },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ...proposal,
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'scripted-task',
+              title: 'Scripted task',
+              columnId: 'todo',
+              subtasks: [],
+              day: '2026-10-06',
+              time: '09:30:00',
+              deadline: '2026-10-09',
+            },
+          },
+          {
+            kind: 'task.update',
+            id: 'scripted-task',
+            changes: {
+              day: '2026-10-07',
+              time: '14:45:00',
+              deadline: '2026-10-10',
+            },
+          },
+          {
+            kind: 'task.move',
+            id: 'scripted-task',
+            columnId: 'waiting',
+            status: { kind: 'waiting', reason: 'Blocked', until: '2026-10-12' },
+          },
+        ],
+      },
+    });
+    expect(JSON.parse(JSON.stringify(result))).toEqual(result);
+    // Safe: this is the public result of the registered AI IPC handler.
+    const ipcResult = result as AiIpcResult;
+    if (!ipcResult.ok) throw new Error('Expected a successful AI proposal');
+    const move = ipcResult.value.commands[2];
+    if (move?.kind !== 'task.move' || move.status?.kind !== 'waiting')
+      throw new Error('Expected the waiting task move command');
+    expect(move.status.until).toBe('2026-10-12');
+    expect(move.status.until).not.toBeInstanceOf(Temporal.PlainDate);
     repository.close();
   });
 });
