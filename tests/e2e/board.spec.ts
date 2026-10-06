@@ -15,6 +15,8 @@ let page!: Page;
 let profilePath: string;
 
 test.beforeEach(async () => {
+  const isPointerMoveTest =
+    test.info().title === 'moves a persisted task with a pointer drop';
   profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
   app = await electron.launch({
     args: [
@@ -24,6 +26,7 @@ test.beforeEach(async () => {
     ],
     env: {
       ...process.env,
+      ...(isPointerMoveTest ? { FLOWPILOT_E2E: '0' } : {}),
       FLOWPILOT_TEST: '1',
       FLOWPILOT_TEST_NOW: '2026-10-05T12:00:00Z',
       FLOWPILOT_TEST_PROFILE: profilePath,
@@ -130,6 +133,77 @@ test('moves a persisted task with the narrow-layout keyboard', async () => {
           id: 'board-smoke-task',
           columnId: 'doing',
           status: { kind: 'doing' },
+        },
+      ],
+      revision: 2,
+    },
+  });
+});
+
+test('moves a persisted task with a pointer drop', async () => {
+  const created = await page.evaluate(() =>
+    window.flowpilot.commands.apply({
+      commands: [
+        {
+          kind: 'task.create',
+          task: {
+            id: 'board-pointer-task',
+            title: 'Проверить перенос',
+            description: '',
+            status: { kind: 'todo' },
+            columnId: 'todo',
+            day: '2026-10-05',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 0,
+          },
+        },
+      ],
+      expectedRevision: 0,
+    }),
+  );
+  expect(created).toMatchObject({ ok: true, value: { revision: 1 } });
+  const windowVisible = await app?.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible(),
+  );
+  expect(windowVisible).toBe(true);
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Доска' })
+    .click();
+  const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
+  const titleBox = await card
+    .getByRole('heading', { name: 'Проверить перенос' })
+    .boundingBox();
+  const doneBox = await page
+    .getByRole('region', { name: 'Готово' })
+    .boundingBox();
+  if (!titleBox || !doneBox)
+    throw new Error('Board drag targets are not visible');
+  await page.mouse.move(
+    titleBox.x + titleBox.width / 2,
+    titleBox.y + titleBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    doneBox.x + doneBox.width / 2,
+    doneBox.y + doneBox.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(
+    page.getByRole('region', { name: 'Готово' }).getByRole('article'),
+  ).toBeVisible();
+  const saved = await page.evaluate(() => window.flowpilot.snapshot.load());
+  expect(saved).toMatchObject({
+    ok: true,
+    value: {
+      tasks: [
+        {
+          id: 'board-pointer-task',
+          columnId: 'done',
+          status: { kind: 'done' },
         },
       ],
       revision: 2,
