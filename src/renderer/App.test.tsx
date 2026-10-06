@@ -197,6 +197,62 @@ describe('persisted today and now screens', () => {
       ).toBeVisible();
     },
   );
+  it.each([['Доска'], ['Все задачи']])(
+    'shows neutral unknown and semantic risk styles and titles in the %s view',
+    async (viewLabel) => {
+      renderApp([
+        {
+          id: 'unknown-risk',
+          title: 'Unknown estimate task',
+          deadline: '2026-10-09',
+        },
+        {
+          id: 'tight-risk',
+          title: 'Tight deadline task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 5 },
+        },
+        {
+          id: 'short-risk',
+          title: 'Short deadline task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 6 },
+        },
+        {
+          id: 'overdue-risk',
+          title: 'Overdue deadline task',
+          deadline: '2026-10-04',
+          estimate: { unit: 'workdays', value: 2 },
+        },
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+
+      const unknownRisk = await screen.findByText(
+        'Срок есть, объём неизвестен. По приблизительной оценке.',
+      );
+      expect(unknownRisk).toHaveAttribute('data-risk-kind', 'unknown');
+      expect(unknownRisk).toHaveClass('risk-label', 'risk-unknown');
+      expect(unknownRisk).not.toHaveClass('is-risk');
+
+      const tightRisk = screen.getByText(
+        /До срока 5 рабочих дней, оценка остатка 5 рабочих дней: запас исчерпан/,
+      );
+      expect(tightRisk).toHaveAttribute('data-risk-kind', 'tight');
+      expect(tightRisk).toHaveClass('risk-label', 'risk-tight', 'is-risk');
+      expect(tightRisk).toHaveAttribute('title', 'Риск не успеть');
+      const shortRisk = screen.getByText(/при этой оценке срок не выдержать/);
+      expect(shortRisk).toHaveAttribute('data-risk-kind', 'short');
+      expect(shortRisk).toHaveClass('risk-label', 'risk-short', 'is-risk');
+      expect(shortRisk).toHaveAttribute('title', 'Риск не успеть');
+
+      const overdueRisk = screen.getByText(
+        'Дата срока — 04.10.2026. По приблизительной оценке.',
+      );
+      expect(overdueRisk).toHaveAttribute('data-risk-kind', 'overdue');
+      expect(overdueRisk).toHaveClass('risk-label', 'risk-overdue', 'is-risk');
+      expect(overdueRisk).toHaveAttribute('title', 'Срок прошёл');
+    },
+  );
 
   it('persists workdays, reloads them, and recalculates visible deadline risk', async () => {
     const app = fakeApi(

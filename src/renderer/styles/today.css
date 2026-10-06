@@ -187,6 +187,16 @@ h1 {
   line-height: var(--type-line-body);
 }
 
+.risk-label.risk-unknown {
+  color: var(--muted);
+}
+
+.risk-label.risk-tight,
+.risk-label.risk-short,
+.risk-label.risk-overdue {
+  color: var(--danger);
+}
+
 .risk-label strong {
   white-space: nowrap;
 }
