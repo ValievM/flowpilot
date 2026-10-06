@@ -159,14 +159,14 @@ describe('IPC handlers', () => {
     const repository = openRepository();
     expect(
       setSetting(
-        { key: 'theme', value: 'dark', expectedRevision: 0 },
+        { key: 'unknown', value: 'dark', expectedRevision: 0 },
         { repository },
       ),
     ).toEqual({ ok: false, error: 'ValidationFailed' });
     expect(
       applyCommands(
         {
-          commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+          commands: [{ kind: 'setting.set', key: 'unknown', value: 'dark' }],
           expectedRevision: 0,
         },
         { repository },
@@ -272,6 +272,7 @@ describe('IPC handlers', () => {
       },
     );
     expect(channels).toEqual([
+      'appearance.set-theme',
       'snapshot.load',
       'commands.apply',
       'settings.get',

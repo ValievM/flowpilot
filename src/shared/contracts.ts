@@ -78,7 +78,12 @@ export const ipcChannels = {
   aiCancel: 'ai.cancel',
   aiPrompt: 'ai.prompt',
   aiReply: 'ai.reply',
+  appearanceSetTheme: 'appearance.set-theme',
 } as const;
+export const appearanceThemeRequestSchema = z
+  .object({ theme: z.enum(['system', 'light', 'dark']) })
+  .strict();
+export type ThemeChoice = z.infer<typeof appearanceThemeRequestSchema>['theme'];
 export const aiRequestSchema = z
   .object({
     operationId: z.string().min(1),
@@ -139,8 +144,12 @@ export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
+export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
 
 export type FlowPilotApi = {
+  appearance: {
+    setTheme(request: ThemeChoiceRequest): Promise<Result<null>>;
+  };
   snapshot: { load(): Promise<Result<IpcSnapshot>> };
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;

@@ -1,5 +1,6 @@
-import type { IpcMain } from 'electron';
+import { nativeTheme, type IpcMain } from 'electron';
 import { ipcChannels } from '../shared/contracts';
+import { applyAppearanceTheme } from './appearance';
 import type { Repository } from '../storage/repository';
 import {
   applyCommands,
@@ -32,6 +33,12 @@ export function registerIpcHandlers(
   ipc: Pick<IpcMain, 'handle'>,
   deps: RegistrationDependencies,
 ): void {
+  ipc.handle(ipcChannels.appearanceSetTheme, (_event, request: unknown) =>
+    applyAppearanceTheme(request, {
+      repository: deps.repository,
+      nativeTheme,
+    }),
+  );
   ipc.handle(ipcChannels.snapshotLoad, (_event, request: unknown) =>
     loadSnapshot(request, deps),
   );

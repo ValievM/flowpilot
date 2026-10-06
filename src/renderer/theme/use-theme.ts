@@ -1,6 +1,11 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-
-export type ThemeChoice = 'system' | 'light' | 'dark';
+import type { ThemeChoice } from '../../shared/contracts';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 
 const themeStorageKey = 'flowpilot-theme';
 
@@ -18,6 +23,7 @@ export function useTheme(): readonly [
   Dispatch<SetStateAction<ThemeChoice>>,
 ] {
   const [theme, setTheme] = useState<ThemeChoice>(initialTheme);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -25,12 +31,17 @@ export function useTheme(): readonly [
       document.documentElement.dataset.theme =
         theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
     };
-    applyTheme();
     media.addEventListener('change', applyTheme);
+    applyTheme();
     if (theme === 'system') {
       window.localStorage.removeItem(themeStorageKey);
     } else {
       window.localStorage.setItem(themeStorageKey, theme);
+    }
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    } else {
+      void window.flowpilot.appearance.setTheme({ theme });
     }
     return () => {
       media.removeEventListener('change', applyTheme);

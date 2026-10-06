@@ -80,6 +80,14 @@ describe('persisted today and now screens', () => {
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(window.localStorage.getItem('flowpilot-theme')).toBe('light');
   });
+  it('marks the titlebar action as non-draggable', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const addButton = screen.getByRole('button', { name: 'Задача' });
+
+    expect(addButton).toHaveClass('no-drag');
+    expect(addButton.closest('.drag-region')).not.toBeNull();
+  });
 
   it('rejects unknown theme values and keeps navigation keyboard accessible', async () => {
     expect(isThemeChoice('ultraviolet')).toBe(false);

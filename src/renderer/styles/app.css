@@ -38,10 +38,25 @@ input:focus-visible {
   outline-offset: var(--space-4);
 }
 
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.drag-region
+  :is(button, input, select, textarea, a, [role='menu'], [role='menuitem']) {
+  -webkit-app-region: no-drag;
+}
+
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+  grid-template-columns: var(--size-titlebar-sidebar) minmax(0, 1fr);
+}
+
+.sidebar-titlebar-drag {
+  height: var(--size-topbar);
+  margin-block: calc(-1 * var(--space-24)) calc(-1 * var(--space-32));
+  -webkit-app-region: drag;
 }
 
 .sidebar {
@@ -225,4 +240,13 @@ svg {
 .add-icon {
   font-size: var(--type-section);
   line-height: 1;
+}
+
+:root[data-full-screen] .app-shell {
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+}
+
+:root[data-full-screen] .sidebar-titlebar-drag {
+  height: 0;
+  margin: 0;
 }

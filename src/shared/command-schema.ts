@@ -81,8 +81,10 @@ const nonEmptyWorkdays = z
   .max(7)
   .refine((days) => new Set(days).size === days.length);
 
+const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
+  theme: themeChoice,
 };
 export const settingFields = {
   key: z.string().min(1),

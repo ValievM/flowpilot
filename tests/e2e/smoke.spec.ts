@@ -267,6 +267,79 @@ test('has no horizontal overflow at 900 pixels with a long task title', async ()
   ).toBeVisible();
 });
 
+test('keeps the titlebar drag region away from actions at the minimum width', async () => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  expect(await page.evaluate(() => window.innerWidth)).toBe(900);
+  await expect(
+    page.getByText('Моё пространство', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Представления' })
+      .getByRole('button', {
+        name: 'Сегодня',
+      }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Задача' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Что нужно сделать?')).toBeFocused();
+  expect(
+    await page
+      .getByRole('button', { name: 'Задача' })
+      .evaluate((button) =>
+        getComputedStyle(button).getPropertyValue('-webkit-app-region'),
+      ),
+  ).toBe('no-drag');
+});
+
+test('persists the selected frame theme and applies it before reopening', async () => {
+  const themeButton = page.getByRole('button', { name: /Тема:/ });
+  await themeButton.click();
+  await expect
+    .poll(async () => page.evaluate(() => window.flowpilot.settings.get()))
+    .toMatchObject({ ok: true, value: { theme: 'light' } });
+  await app?.close();
+  await startApp(TEST_NOW);
+  expect(
+    await app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+  ).toBe('light');
+});
+test('removes the titlebar inset in native full screen', async () => {
+  await app?.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setFullScreen(true);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.hasAttribute('data-full-screen'),
+      ),
+    )
+    .toBe(true);
+  await app?.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setFullScreen(false);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.hasAttribute('data-full-screen'),
+      ),
+    )
+    .toBe(false);
+});
+test('keeps the navigation titlebar clear across supported widths', async () => {
+  for (const width of [900, 1280, 1440, 1728]) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+    const bounds = await page.getByLabel('Хлебные крошки').boundingBox();
+    expect(bounds?.x).toBeGreaterThanOrEqual(104);
+    await expect(
+      page.getByText('Моё пространство', { exact: true }),
+    ).toBeVisible();
+  }
+});
 test('creates and starts a task through persisted Today and Now flows', async () => {
   await page.getByRole('button', { name: 'Задача' }).click();
   await page.getByLabel('Что нужно сделать?').fill('Проверить быстрый ввод');

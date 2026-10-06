@@ -202,6 +202,9 @@ function fakeApiFor(
   clock: () => string | undefined,
 ): FlowPilotApi {
   return {
+    appearance: {
+      setTheme: () => Promise.resolve({ ok: true, value: null }),
+    },
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
     settings: {

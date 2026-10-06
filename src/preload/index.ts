@@ -12,6 +12,7 @@ import {
   type AiIpcResult,
   type AiCancelResult,
   type AiManualReplyResult,
+  type ThemeChoiceRequest,
 } from '../shared/contracts';
 import type { Result } from '../shared/ipc-result';
 // Electron types invoke as untyped; main validates requests and returns this FlowPilotApi contract.
@@ -20,6 +21,12 @@ const api: FlowPilotApi = Object.freeze({
     load: () =>
       ipcRenderer.invoke(ipcChannels.snapshotLoad, {}) as Promise<
         Result<IpcSnapshot>
+      >,
+  },
+  appearance: {
+    setTheme: (request: ThemeChoiceRequest) =>
+      ipcRenderer.invoke(ipcChannels.appearanceSetTheme, request) as Promise<
+        Result<null>
       >,
   },
   commands: {
