@@ -1,24 +1,22 @@
+import { createRef } from 'react';
 import {
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
-import { App } from './App';
+import { Temporal } from 'temporal-polyfill';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { App } from './App';
+import { QuickAddDialog } from './components/quick-add-dialog';
+import {
+  fakeApi,
+  mockSystemTheme,
+  taskRecord,
+} from './test-support/fake-flowpilot';
 import { isThemeChoice } from './theme/use-theme';
-
-function mockSystemTheme(matches: boolean): void {
-  vi.stubGlobal(
-    'matchMedia',
-    vi.fn().mockReturnValue({
-      matches,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    }),
-  );
-}
 
 if (
   Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal') ===
@@ -39,7 +37,25 @@ if (
   });
 }
 
-describe('app shell', () => {
+const TEST_NOW = '2026-10-05T12:00:00Z';
+const TEST_TODAY = Temporal.Instant.from(TEST_NOW)
+  .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+  .toPlainDate()
+  .toString();
+
+function renderApp(tasks: Parameters<typeof taskRecord>[0][] = []) {
+  mockSystemTheme(false);
+  const fake = fakeApi(tasks.map(taskRecord), () => TEST_NOW);
+  Object.defineProperty(window, 'flowpilot', {
+    configurable: true,
+    value: fake.api,
+  });
+  return { ...render(<App />), ...fake };
+}
+
+const today = (): string => TEST_TODAY;
+
+describe('persisted today and now screens', () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -49,94 +65,414 @@ describe('app shell', () => {
     vi.restoreAllMocks();
   });
 
-  it('follows system theme and persists a manual choice under the correct key', () => {
+  it('follows system theme and persists a manual choice', async () => {
     mockSystemTheme(true);
+    const fake = fakeApi();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
     render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
     expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
     expect(document.documentElement.dataset.theme).toBe('dark');
     fireEvent.click(screen.getByRole('button', { name: /Тема:/ }));
     expect(document.documentElement.dataset.theme).toBe('light');
     expect(window.localStorage.getItem('flowpilot-theme')).toBe('light');
-    expect(Object.keys(window.localStorage)).toEqual(['flowpilot-theme']);
   });
 
-  it('rejects unknown theme values', () => {
+  it('rejects unknown theme values and keeps navigation keyboard accessible', async () => {
     expect(isThemeChoice('ultraviolet')).toBe(false);
     expect(isThemeChoice('dark')).toBe(true);
-  });
-
-  it('provides keyboard-focusable navigation and accessible icon buttons', () => {
-    mockSystemTheme(false);
-    render(<App />);
-    const navigation = screen.getByRole('navigation', {
-      name: 'Представления',
-    });
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const nav = screen.getByRole('navigation', { name: 'Представления' });
     expect(
-      within(navigation)
+      within(nav)
         .getAllByRole('button')
         .every((button) => button.tabIndex === 0),
     ).toBe(true);
     expect(
-      within(navigation).getByRole('button', { name: 'Сегодня' }),
+      within(nav).getByRole('button', { name: 'Сегодня' }),
     ).toHaveAttribute('aria-current', 'page');
-    fireEvent.keyDown(document, { key: 'k', metaKey: true });
-    expect(screen.getByRole('dialog', { name: 'Новая задача' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Закрыть' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Что нужно сделать?')).toHaveFocus();
   });
 
-  it('shows fixture tasks, an explanatory risk, and the next-step panel', () => {
-    mockSystemTheme(false);
-    render(<App />);
+  it('shows empty persisted state and never uses sample tasks', async () => {
+    renderApp();
     expect(
-      screen.getByRole('heading', { name: 'Очередь на сегодня' }),
+      await screen.findByRole('heading', { name: 'Сегодня пока пусто' }),
     ).toBeVisible();
     expect(
-      screen.getByText('Курсовая: собрать рабочий прототип'),
+      screen.queryByText('Курсовая: собрать рабочий прототип'),
+    ).not.toBeInTheDocument();
+  });
+  it('shows the matching empty state in Сейчас when the saved snapshot is empty', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.getByRole('heading', { name: 'Сегодня пока пусто' }),
     ).toBeVisible();
-    expect(screen.getByText(/следующий шаг/i)).toBeVisible();
     expect(
-      screen.getAllByText(/до срока 5 рабочих дней, оценка остатка — 5/i),
-    ).toHaveLength(2);
+      screen.getByText(
+        'Добавьте задачу — она сохранится и появится в сегодняшнем списке.',
+      ),
+    ).toBeVisible();
     expect(
-      screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' }),
+      screen.queryByText(/ожидают ответа, завершены или назначены на будущее/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a saved today task in Сегодня and Сейчас', async () => {
+    renderApp([{ id: 'today-task', title: 'Текущая задача', day: today() }]);
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Текущая задача',
+        level: 3,
+      }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.getByRole('heading', { name: 'Текущая задача' }),
     ).toBeVisible();
   });
 
-  it('changes view with the keyboard-focusable navigation', () => {
-    mockSystemTheme(false);
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
-    expect(screen.getByRole('heading', { name: 'Все задачи' })).toBeVisible();
+  it('does not offer tomorrow, waiting, or completed tasks as available work', async () => {
+    const tomorrow = Temporal.PlainDate.from(today())
+      .add({ days: 1 })
+      .toString();
+    renderApp([
+      { id: 'tomorrow', title: 'Завтрашняя задача', day: tomorrow },
+      {
+        id: 'waiting',
+        day: today(),
+        status: { kind: 'waiting', reason: 'Ответ' },
+      },
+      { id: 'done', day: today(), status: { kind: 'done' } },
+    ]);
     expect(
-      screen.getByRole('navigation', { name: 'Представления' }),
-    ).toContainElement(screen.getByRole('button', { name: 'Все задачи' }));
+      await screen.findByRole('heading', { name: 'Нет доступных дел' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/ожидают ответа, уже готовы или назначены на будущее/i),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.queryByRole('heading', { name: 'Завтрашняя задача' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Взять в работу' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('adds a task from the quick-add dialog', () => {
+  it('explains an unassigned unfinished task in Сейчас', async () => {
+    renderApp([{ id: 'undated-task' }]);
+    await screen.findByRole('heading', { name: 'Нет доступных дел' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.getByRole('heading', { name: 'Нет доступных дел' }),
+    ).toBeVisible();
+    expect(screen.getByText(/есть задачи без назначенного дня/i)).toBeVisible();
+    expect(screen.queryByText(/назначены на будущее/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an apply error when starting a task is rejected', async () => {
+    const app = renderApp([{ id: 'rejected-task', day: today() }]);
+    await screen.findByRole('heading', { name: 'rejected-task', level: 3 });
+    app.setAlwaysReject();
+    fireEvent.click(screen.getByRole('button', { name: 'Взять в работу' }));
+    expect(await screen.findByText(/данные не изменены/i)).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Ошибка сохранения');
+  });
+
+  it('shows the scheduled-for-future reason in Сейчас', async () => {
+    const tomorrow = Temporal.PlainDate.from(today())
+      .add({ days: 1 })
+      .toString();
+    renderApp([{ id: 'future-task', day: tomorrow }]);
+    await screen.findByRole('heading', { name: 'Нет доступных дел' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сейчас' }));
+    expect(
+      screen.getByRole('heading', { name: 'Нет доступных дел' }),
+    ).toBeVisible();
+    expect(screen.getByText(/назначены на будущее/i)).toBeVisible();
+  });
+
+  it.each([
+    [
+      'value error',
+      () => Promise.resolve({ ok: false as const, error: 'InternalError' }),
+    ],
+    ['rejected promise', () => Promise.reject(new Error('IPC unavailable'))],
+  ])(
+    'shows task data and retries a %s clock failure',
+    async (_name, firstInfo) => {
+      mockSystemTheme(false);
+      const fake = fakeApi(
+        [taskRecord({ id: 'clock-task', day: today() })],
+        () => TEST_NOW,
+      );
+      const loadTime = fake.api.app.info.bind(fake.api.app);
+      const info = vi
+        .fn()
+        .mockImplementationOnce(firstInfo)
+        .mockImplementation(() => loadTime());
+      fake.api.app.info = info;
+      Object.defineProperty(window, 'flowpilot', {
+        configurable: true,
+        value: fake.api,
+      });
+      render(<App />);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /не удалось получить текущее время/i,
+      );
+      expect(
+        await screen.findByRole('heading', { name: 'clock-task', level: 3 }),
+      ).toBeVisible();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Повторить получение времени' }),
+      );
+
+      await waitFor(() => {
+        expect(info).toHaveBeenCalledTimes(2);
+      });
+      expect(
+        screen.queryByText(/не удалось получить текущее время/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'clock-task', level: 3 }),
+      ).toBeVisible();
+    },
+  );
+  it('rolls yesterday work over at midnight without remounting', async () => {
     mockSystemTheme(false);
+    const atLocalTime = (day: string, time: string): string =>
+      Temporal.PlainDate.from(day)
+        .toZonedDateTime({
+          timeZone: Temporal.Now.timeZoneId(),
+          plainTime: Temporal.PlainTime.from(time),
+        })
+        .toInstant()
+        .toString();
+    let now = atLocalTime('2026-10-05', '23:59');
+    const fake = fakeApi(
+      [
+        taskRecord({
+          id: 'midnight-task',
+          title: 'Вчерашнее дело',
+          day: '2026-10-05',
+          status: { kind: 'doing' },
+        }),
+      ],
+      () => now,
+    );
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
     render(<App />);
+    expect(
+      await screen.findByRole('heading', { name: /5 октября/i }),
+    ).toBeVisible();
+    now = atLocalTime('2026-10-06', '00:00');
+    fireEvent.focus(window);
+    expect(
+      await screen.findByRole('heading', { name: /6 октября/i }),
+    ).toBeVisible();
+    expect(screen.getByText('Перенесено со вчера.')).toBeVisible();
+  });
+
+  it('keeps snapshot-load failures separate from command-save status', async () => {
+    mockSystemTheme(false);
+    const fake = fakeApi();
+    fake.setLoadFailure();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /не удалось загрузить сохранённые задачи/i,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Сохранено');
+    expect(screen.queryByText('Ошибка сохранения')).not.toBeInTheDocument();
+  });
+  it('shows loading then recovers after retrying a source error', async () => {
+    mockSystemTheme(false);
+    const fake = fakeApi();
+    fake.setLoadFailure();
+    const load = vi.spyOn(fake.api.snapshot, 'load');
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    expect(screen.getByText(/загружаем сохранённые задачи/i)).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /не удалось загрузить сохранённые задачи/i,
+    );
+    fake.setLoadFailure(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
+    await waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Сегодня пока пусто' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('retains text typed during an asynchronous save', async () => {
+    let resolveSave!: (saved: boolean) => void;
+    const close = vi.fn();
+    const addButtonRef = createRef<HTMLButtonElement>();
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const app = render(
+      <QuickAddDialog
+        open
+        onClose={close}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    const field = screen.getByLabelText('Что нужно сделать?');
+    fireEvent.change(field, { target: { value: 'Отправленная задача' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    fireEvent.change(field, { target: { value: 'Следующая задача' } });
+    resolveSave(true);
+    await waitFor(() => {
+      expect(close).toHaveBeenCalledOnce();
+    });
+    app.rerender(
+      <QuickAddDialog
+        open
+        onClose={close}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    expect(screen.getByLabelText('Что нужно сделать?')).toHaveValue(
+      'Следующая задача',
+    );
+  });
+  it('announces save failure without marking a valid title invalid', async () => {
+    const addButtonRef = createRef<HTMLButtonElement>();
+    const onSubmit = vi.fn().mockResolvedValue(false);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={onSubmit}
+        addButtonRef={addButtonRef}
+      />,
+    );
+    const field = screen.getByLabelText('Что нужно сделать?');
+    fireEvent.change(field, { target: { value: 'Корректная задача' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Не удалось сохранить задачу',
+    );
+    expect(field).not.toHaveAttribute('aria-invalid', 'true');
+  });
+  it('shows a stale-retry load error without reporting a save failure', async () => {
+    const fake = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fake.setStaleOnce();
+    fake.setLoadFailure();
     fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
     fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
-      target: { value: 'Подготовить заметки' },
+      target: { value: 'Сохранить после конфликта' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
-    expect(screen.getByText('Подготовить заметки')).toBeVisible();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText(/не удалось загрузить/i)).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Сохранено');
+    expect(screen.queryByText('Ошибка сохранения')).not.toBeInTheDocument();
   });
 
-  it('marks the next task as in progress when started', () => {
-    mockSystemTheme(false);
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Начать задачу' }));
-    const coursework = screen
-      .getByRole('heading', { name: 'Курсовая: собрать рабочий прототип' })
-      .closest('li');
-    if (!coursework)
-      throw new Error('Coursework task is missing from the queue');
-    expect(within(coursework).getByText('В работе')).toBeVisible();
+  it('creates through commands.apply using the current revision and default day/column', async () => {
+    const app = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    const input = screen.getByLabelText('Что нужно сделать?');
+    const submit = screen.getByRole('button', { name: 'Добавить задачу' });
+    expect(submit).toBeDisabled();
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(input, { target: { value: 'Новая задача' } });
+    fireEvent.click(submit);
+    await screen.findByRole('heading', { name: 'Новая задача', level: 3 });
+    expect(app.calls[0]?.expectedRevision).toBe(0);
+    expect(app.calls[0]?.commands[0]).toMatchObject({
+      kind: 'task.create',
+      task: { title: 'Новая задача', columnId: 'todo', day: today() },
+    });
+  });
+
+  it('reloads once for stale revisions, then retains entered text on a retry failure', async () => {
+    const stale = renderApp();
+    stale.setStaleOnce();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Повторить сохранение' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
+    await waitFor(() => {
+      expect(stale.snapshot().tasks[0]?.title).toBe('Повторить сохранение');
+    });
+    expect(stale.calls).toHaveLength(2);
+    expect(stale.calls[1]?.expectedRevision).toBe(1);
+
+    cleanup();
+
+    const retryFail = renderApp();
+    retryFail.setStaleOnce();
+    retryFail.setRejectRetry();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    const field = screen.getByLabelText('Что нужно сделать?');
+    fireEvent.change(field, { target: { value: 'Не терять текст' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить задачу' }));
     expect(
-      screen.getByRole('heading', { name: 'Собрать поиск и карточку книги' }),
+      await screen.findByText(/не удалось сохранить задачу/i),
     ).toBeVisible();
+    expect(field).toHaveValue('Не терять текст');
+    expect(retryFail.calls).toHaveLength(2);
+  });
+
+  it('opens quick input with Cmd+K, closes with Escape, and restores focus', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const add = screen.getByRole('button', { name: 'Задача' });
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    expect(screen.getByRole('dialog', { name: 'Новая задача' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Закрыть' }),
+    ).toHaveAccessibleName();
+    expect(screen.getByLabelText('Что нужно сделать?')).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(add).toHaveFocus();
+  });
+
+  it('moves the selected task into the persisted doing column', async () => {
+    const app = renderApp([{ id: 'move-me', day: today() }]);
+    await screen.findByRole('heading', { name: 'move-me', level: 3 });
+    fireEvent.click(screen.getByRole('button', { name: 'Взять в работу' }));
+    await waitFor(() => {
+      expect(app.snapshot().tasks[0]?.status.kind).toBe('doing');
+    });
+    expect(app.calls[0]?.commands[0]).toMatchObject({
+      kind: 'task.move',
+      id: 'move-me',
+      columnId: 'doing',
+    });
   });
 });

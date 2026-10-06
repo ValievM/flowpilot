@@ -128,9 +128,18 @@ export const settingsSetRequestSchema = z
   .strict()
   .superRefine(validateSettingValue);
 export const appInfoRequestSchema = z.object({}).strict();
+export const appInfoResponseSchema = z
+  .object({
+    name: z.string(),
+    version: z.string(),
+    now: z.iso.datetime(),
+  })
+  .strict();
+export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
+
 export type FlowPilotApi = {
   snapshot: { load(): Promise<Result<IpcSnapshot>> };
   commands: {
@@ -150,6 +159,6 @@ export type FlowPilotApi = {
     }): Promise<AiManualReplyResult>;
   };
   app: {
-    info(): Promise<Result<{ name: string; version: string }>>;
+    info(): Promise<Result<AppInfo>>;
   };
 };

@@ -187,6 +187,10 @@ h1 {
   line-height: var(--type-line-body);
 }
 
+.risk-label strong {
+  white-space: nowrap;
+}
+
 .risk-icon {
   flex: none;
   font-weight: var(--type-weight-strong);
@@ -205,6 +209,12 @@ h1 {
   font-weight: var(--type-weight-medium);
   line-height: var(--type-line-body);
   overflow-wrap: anywhere;
+}
+
+.empty-state p,
+.loading-state p,
+.error-state p {
+  color: var(--muted);
 }
 
 .next-description,
@@ -233,4 +243,38 @@ h1 {
 .start-button {
   width: 100%;
   margin-top: var(--space-20);
+}
+
+.risk-label.is-risk {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  border-left: var(--selection-stroke) solid var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.saved-status.has-error {
+  color: var(--danger);
+}
+
+.empty-state,
+.loading-state,
+.error-state {
+  padding: var(--space-32);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+  background: var(--panel);
+}
+
+.field-error {
+  color: var(--danger);
+}
+
+.now-screen .next-step {
+  max-width: var(--panel-max);
+}
+
+.refresh-status {
+  color: var(--muted);
 }

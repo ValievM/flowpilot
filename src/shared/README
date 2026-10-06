@@ -11,7 +11,8 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
 - `settings.get()` (`settings.get`): empty strict request; returns settings.
 - `settings.set()` (`settings.set`): strict
   `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
-- `app.info()` (`app.info`): empty strict request; returns `{ name, version }`.
+- `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
+  where `now` is the ISO timestamp from the main-process clock.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
 `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and

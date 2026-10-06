@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
+import { appInfoResponseSchema } from '../shared/contracts';
 import { Repository } from '../storage';
 import {
   applyCommands,
@@ -214,30 +215,42 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('exposes settings and app information through validated results', () => {
+  it('exposes app information with the main clock timestamp', () => {
     const repository = openRepository();
+    const deps = {
+      getName: () => 'FlowPilot',
+      getVersion: () => '0.1.0',
+      getNow: () => '2026-10-05T12:00:00Z',
+    };
     expect(getSettings({}, { repository }).ok).toBe(true);
-    expect(
-      getAppInfo({}, { getName: () => 'FlowPilot', getVersion: () => '0.1.0' }),
-    ).toEqual({
-      ok: true,
-      value: { name: 'FlowPilot', version: '0.1.0' },
-    });
-    expect(
-      getAppInfo(
-        {},
-        {
-          getName: () => {
-            throw new Error('runtime failure');
-          },
-          getVersion: () => '0.1.0',
-        },
-      ),
-    ).toEqual({ ok: false, error: 'InternalError' });
     expect(loadSnapshot({ path: 'denied' }, { repository })).toEqual({
       ok: false,
       error: 'ValidationFailed',
     });
+    expect(getAppInfo({}, deps)).toEqual({
+      ok: true,
+      value: {
+        name: 'FlowPilot',
+        version: '0.1.0',
+        now: '2026-10-05T12:00:00Z',
+      },
+    });
+    expect(getAppInfo({}, { ...deps, getNow: () => 'invalid' })).toEqual({
+      ok: false,
+      error: 'InternalError',
+    });
+    expect(getAppInfo({ extra: true }, deps)).toEqual({
+      ok: false,
+      error: 'ValidationFailed',
+    });
+    expect(
+      appInfoResponseSchema.safeParse({
+        name: 'FlowPilot',
+        version: '0.1.0',
+        now: '2026-10-05T12:00:00Z',
+        unexpected: true,
+      }).success,
+    ).toBe(false);
     repository.close();
   });
 
@@ -252,6 +265,7 @@ describe('IPC handlers', () => {
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
+          getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner: new AiRunner(manualProvider),
         manualProvider,

@@ -3,6 +3,7 @@ import { contextBridge } from 'electron';
 import { ipcRenderer } from 'electron';
 import {
   ipcChannels,
+  type AppInfo,
   type FlowPilotApi,
   type CommandsApplyRequest,
   type SettingsSetRequest,
@@ -57,9 +58,7 @@ const api: FlowPilotApi = Object.freeze({
   },
   app: {
     info: () =>
-      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<
-        Result<{ name: string; version: string }>
-      >,
+      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<Result<AppInfo>>,
   },
 });
 

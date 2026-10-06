@@ -19,7 +19,11 @@ import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
 
 type RegistrationDependencies = {
   readonly repository: Repository;
-  readonly appInfo: { getName(): string; getVersion(): string };
+  readonly appInfo: {
+    getName(): string;
+    getVersion(): string;
+    getNow(): string;
+  };
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
 };
