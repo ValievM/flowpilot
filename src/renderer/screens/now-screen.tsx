@@ -13,6 +13,7 @@ interface NowScreenProps {
   readonly hasTasks: boolean;
   readonly hasUndatedTasks: boolean;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 function NoAvailableTask({
@@ -72,6 +73,7 @@ export function NowScreen({
   workdays,
   isLoading,
   onStart,
+  onOpenTask,
   hasTasks,
   hasUndatedTasks,
 }: NowScreenProps): React.JSX.Element {
@@ -101,6 +103,15 @@ export function NowScreen({
           }}
         >
           {task.status.kind === 'doing' ? 'Продолжить' : 'Взять в работу'}
+        </button>
+        <button
+          className="button"
+          type="button"
+          onClick={(event) => {
+            onOpenTask(task.id, event.currentTarget);
+          }}
+        >
+          Открыть задачу
         </button>
       </article>
     </section>

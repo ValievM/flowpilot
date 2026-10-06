@@ -16,6 +16,7 @@ interface TodayScreenProps {
   readonly todayLabel: string;
   readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 function taskState(task: Task): string {
@@ -36,11 +37,13 @@ function TaskRow({
   today,
   workdays,
   index,
+  onOpenTask,
 }: {
   readonly task: Task;
   readonly today: Temporal.PlainDate;
   readonly workdays: ReadonlySet<number>;
   readonly index: number;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   const risk = deadlineRisk(task, today, workdays);
   const riskText = deadlineMessage(risk);
@@ -78,6 +81,15 @@ function TaskRow({
       <span className={`state-label state-${task.status.kind}`}>
         {taskState(task)}
       </span>
+      <button
+        className="button"
+        type="button"
+        onClick={(event) => {
+          onOpenTask(task.id, event.currentTarget);
+        }}
+      >
+        Открыть задачу
+      </button>
     </li>
   );
 }
@@ -158,11 +170,11 @@ export function TodayScreen({
   hasUndatedTasks,
   available,
   workdays,
-
   today,
   todayLabel,
   onViewChange,
   onStart,
+  onOpenTask,
 }: TodayScreenProps): React.JSX.Element {
   const nextTask = available[0];
   const nextRisk = nextTask
@@ -195,6 +207,7 @@ export function TodayScreen({
                 today={today}
                 workdays={workdays}
                 index={index}
+                onOpenTask={onOpenTask}
               />
             ))}
           </ol>

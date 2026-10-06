@@ -181,6 +181,11 @@ function toIpcStatus(
 
 export function renderBoard(value = createBoardApi()): MockBoardApi {
   window.flowpilot = value;
-  render(<BoardScreen today={Temporal.PlainDate.from('2026-10-06')} />);
+  render(
+    <BoardScreen
+      today={Temporal.PlainDate.from('2026-10-06')}
+      onOpenTask={() => undefined}
+    />,
+  );
   return value;
 }
