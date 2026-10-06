@@ -1,5 +1,6 @@
 import React from 'react';
-import { isThemeChoice, type ThemeChoice } from '../theme/use-theme';
+import { isThemeChoice } from '../theme/use-theme';
+import type { ThemeChoice } from '../../shared/contracts';
 import { isMotionChoice, type MotionChoice } from '../use-reduced-motion';
 
 const WEEKDAYS = [

@@ -30,7 +30,7 @@ export function TopBar({
       ? 'Сохранено'
       : 'Сохраняем…';
   return (
-    <header className="topbar">
+    <header className="topbar drag-region">
       <div className="breadcrumbs" aria-label="Хлебные крошки">
         <span>Моё пространство</span>
         <span aria-hidden="true">/</span>
@@ -45,7 +45,7 @@ export function TopBar({
           {status}
         </span>
         <button
-          className="button button-primary add-button"
+          className="button button-primary add-button no-drag"
           ref={addButtonRef}
           type="button"
           onClick={onAddTask}

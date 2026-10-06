@@ -66,9 +66,10 @@ describe('persisted today and now screens', () => {
     vi.restoreAllMocks();
   });
 
-  it('follows system theme and persists a manual choice', async () => {
+  it('uses the main appearance API for manual theme choices', async () => {
     mockSystemTheme(true);
     const fake = fakeApi();
+    const setTheme = vi.spyOn(fake.api.appearance, 'setTheme');
     Object.defineProperty(window, 'flowpilot', {
       configurable: true,
       value: fake.api,
@@ -79,7 +80,60 @@ describe('persisted today and now screens', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
     fireEvent.click(screen.getByRole('button', { name: /Тема:/ }));
     expect(document.documentElement.dataset.theme).toBe('light');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBe('light');
+    await waitFor(() => {
+      expect(setTheme).toHaveBeenCalledWith({ theme: 'light' });
+    });
+    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
+  });
+  it('keeps the persisted appearance after a failed theme save and retries', async () => {
+    mockSystemTheme(true);
+    const fake = fakeApi();
+    let persistedTheme = 'system';
+    let nativeTheme = persistedTheme;
+    const setTheme = vi
+      .spyOn(fake.api.appearance, 'setTheme')
+      .mockImplementationOnce(() =>
+        Promise.resolve({ ok: false, error: 'InternalError' }),
+      )
+      .mockImplementation(({ theme }) => {
+        persistedTheme = theme;
+        nativeTheme = theme;
+        return Promise.resolve({ ok: true, value: null });
+      });
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    const themeButton = screen.getByRole('button', {
+      name: 'Тема: как в системе',
+    });
+    fireEvent.click(themeButton);
+    await waitFor(() => {
+      expect(setTheme).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(persistedTheme).toBe('system');
+      expect(nativeTheme).toBe('system');
+      expect(document.documentElement.dataset.theme).toBe('dark');
+      expect(themeButton).toHaveAccessibleName('Тема: как в системе');
+    });
+
+    fireEvent.click(themeButton);
+    await waitFor(() => {
+      expect(persistedTheme).toBe('light');
+      expect(nativeTheme).toBe('light');
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(themeButton).toHaveAccessibleName('Тема: светлая');
+    });
+  });
+  it('marks the titlebar action as non-draggable', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const addButton = screen.getByRole('button', { name: 'Задача' });
+
+    expect(addButton).toHaveClass('no-drag');
+    expect(addButton.closest('.drag-region')).not.toBeNull();
   });
 
   it('rejects unknown theme values and keeps navigation keyboard accessible', async () => {
@@ -141,10 +195,11 @@ describe('persisted today and now screens', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
       target: { value: 'dark' },
     });
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBe('dark');
+    await waitFor(() => {
+      expect(app.snapshot().settings.theme).toBe('dark');
+    });
     cleanup();
-    render(<App />);
+    render(<App initialTheme="dark" />);
     await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
     fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
     expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue('dark');
@@ -156,7 +211,9 @@ describe('persisted today and now screens', () => {
       changeSystemTheme(false);
     });
     expect(document.documentElement.dataset.theme).toBe('light');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
+    await waitFor(() => {
+      expect(app.snapshot().settings.theme).toBe('system');
+    });
     expect(isThemeChoice('ultraviolet')).toBe(false);
   });
 

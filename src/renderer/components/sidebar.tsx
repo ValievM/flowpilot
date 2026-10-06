@@ -1,6 +1,6 @@
 import React from 'react';
 import { Icon } from './icon';
-import type { ThemeChoice } from '../theme/use-theme';
+import type { ThemeChoice } from '../../shared/contracts';
 import type { View } from '../types';
 
 const views: readonly { id: View; label: string; icon: string }[] = [
@@ -45,6 +45,7 @@ export function Sidebar({
         : 'тёмная';
   return (
     <aside className="sidebar" aria-label="Основная панель">
+      <div className="sidebar-titlebar-drag" aria-hidden="true" />
       <a
         className="brand"
         href="#today"

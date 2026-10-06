@@ -159,14 +159,14 @@ describe('IPC handlers', () => {
     const repository = openRepository();
     expect(
       setSetting(
-        { key: 'theme', value: 'dark', expectedRevision: 0 },
+        { key: 'unknown', value: 'dark', expectedRevision: 0 },
         { repository },
       ),
     ).toEqual({ ok: false, error: 'ValidationFailed' });
     expect(
       applyCommands(
         {
-          commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+          commands: [{ kind: 'setting.set', key: 'unknown', value: 'dark' }],
           expectedRevision: 0,
         },
         { repository },
@@ -174,6 +174,31 @@ describe('IPC handlers', () => {
     ).toEqual({ ok: false, error: 'ValidationFailed' });
     expect(repository.load().revision).toBe(0);
     expect(Object.hasOwn(repository.load().settings, 'theme')).toBe(false);
+    repository.close();
+  });
+
+  it('rejects generic theme writes without changing revision or history', () => {
+    const repository = openRepository();
+    const initial = repository.load();
+    const before = repository.history(10).entries;
+    expect(
+      setSetting(
+        { key: 'theme', value: 'light', expectedRevision: 0 },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(
+      applyCommands(
+        {
+          commands: [{ kind: 'setting.set', key: 'theme', value: 'light' }],
+          expectedRevision: 0,
+        },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(initial.revision);
+    expect(repository.load().settings).toEqual(initial.settings);
+    expect(repository.history(10).entries).toEqual(before);
     repository.close();
   });
 
@@ -269,9 +294,13 @@ describe('IPC handlers', () => {
         },
         aiRunner: new AiRunner(manualProvider),
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
     expect(channels).toEqual([
+      'appearance.initialize',
+      'appearance.ready',
+      'appearance.set-theme',
       'snapshot.load',
       'commands.apply',
       'settings.get',
@@ -351,6 +380,7 @@ describe('IPC handlers', () => {
         },
         aiRunner,
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
 

@@ -15,7 +15,6 @@ const MIGRATIONS = [
   { version: 5, sql: columnGenerations },
   { version: 6, sql: legacyTombstoneGenerations },
 ] as const;
-
 export class ForeignDatabaseError extends Error {
   constructor() {
     super('Foreign database schema is not supported');

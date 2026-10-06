@@ -81,7 +81,12 @@ const nonEmptyWorkdays = z
   .max(7)
   .refine((days) => new Set(days).size === days.length);
 
+const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
+  workdays: nonEmptyWorkdays,
+  theme: themeChoice,
+};
+const genericSettingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
 };
 export const settingFields = {
@@ -89,16 +94,31 @@ export const settingFields = {
   value: z.unknown(),
 };
 
-export function validateSettingValue(
+function validateSetting(
   setting: { key: string; value: unknown },
   context: z.RefinementCtx,
+  schemas: Readonly<Record<string, z.ZodType>>,
 ): void {
-  const valueSchema = Object.hasOwn(settingValueSchemas, setting.key)
-    ? settingValueSchemas[setting.key]
+  const valueSchema = Object.hasOwn(schemas, setting.key)
+    ? schemas[setting.key]
     : undefined;
   if (!valueSchema?.safeParse(setting.value).success) {
     context.addIssue({ code: 'custom', message: 'Invalid setting value' });
   }
+}
+
+export function validateSettingValue(
+  setting: { key: string; value: unknown },
+  context: z.RefinementCtx,
+): void {
+  validateSetting(setting, context, settingValueSchemas);
+}
+
+export function validateGenericSettingValue(
+  setting: { key: string; value: unknown },
+  context: z.RefinementCtx,
+): void {
+  validateSetting(setting, context, genericSettingValueSchemas);
 }
 const ipcTaskSchema = taskSchema
   .extend({ attachments: z.array(z.never()) })
@@ -200,10 +220,14 @@ const columnDeleteSchema = z
       .optional(),
   })
   .strict();
-const settingCommandSchema = z
+const settingCommandFields = z
   .object({ ...settingFields, kind: z.literal('setting.set') })
-  .strict()
-  .superRefine(validateSettingValue);
+  .strict();
+const settingCommandSchema =
+  settingCommandFields.superRefine(validateSettingValue);
+const genericSettingCommandSchema = settingCommandFields.superRefine(
+  validateGenericSettingValue,
+);
 
 export const commandSchema = z.discriminatedUnion('kind', [
   taskCreateSchema,
@@ -230,5 +254,5 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
-  settingCommandSchema,
+  genericSettingCommandSchema,
 ]);

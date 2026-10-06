@@ -347,6 +347,180 @@ test('has no horizontal overflow at 900 pixels with a long task title', async ()
   ).toBeVisible();
 });
 
+test('keeps the titlebar drag region away from actions at the minimum width', async () => {
+  await page.setViewportSize({ width: 900, height: 800 });
+  expect(await page.evaluate(() => window.innerWidth)).toBe(900);
+  await expect(
+    page.getByText('Моё пространство', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Представления' })
+      .getByRole('button', {
+        name: 'Сегодня',
+      }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Задача' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Что нужно сделать?')).toBeFocused();
+  expect(
+    await page
+      .getByRole('button', { name: 'Задача' })
+      .evaluate((button) =>
+        getComputedStyle(button).getPropertyValue('-webkit-app-region'),
+      ),
+  ).toBe('no-drag');
+});
+
+test('persists the selected frame theme and applies it before reopening', async () => {
+  const themeButton = page.getByRole('button', { name: /Тема:/ });
+  await themeButton.click();
+  await expect
+    .poll(async () => page.evaluate(() => window.flowpilot.settings.get()))
+    .toMatchObject({ ok: true, value: { theme: 'light' } });
+  await app?.close();
+  await startApp(TEST_NOW);
+  expect(
+    await app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+  ).toBe('light');
+});
+
+test('migrates a legacy renderer theme before the first visible frame', async () => {
+  const initialProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+  }));
+  expect(initialProfile.settings).toMatchObject({ ok: true });
+  if (initialProfile.settings.ok) {
+    expect(Object.hasOwn(initialProfile.settings.value, 'theme')).toBe(false);
+  }
+  expect(initialProfile.snapshot).toMatchObject({
+    ok: true,
+    value: { revision: 0 },
+  });
+  await page.evaluate(() => {
+    window.localStorage.setItem('flowpilot-theme', 'light');
+  });
+  await app?.close();
+
+  await startApp(TEST_NOW);
+  const firstFrameVisible = await app?.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible(),
+  );
+  const firstFrameNativeTheme = await app?.evaluate(
+    ({ nativeTheme }) => nativeTheme.themeSource,
+  );
+  const firstFrameRendererTheme = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
+  expect({
+    visible: firstFrameVisible,
+    nativeTheme: firstFrameNativeTheme,
+    rendererTheme: firstFrameRendererTheme,
+  }).toEqual({
+    visible: process.env.FLOWPILOT_E2E !== '1',
+    nativeTheme: 'light',
+    rendererTheme: 'light',
+  });
+  const migratedProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+    legacyTheme: window.localStorage.getItem('flowpilot-theme'),
+  }));
+  expect(migratedProfile).toMatchObject({
+    settings: { ok: true, value: { theme: 'light' } },
+    snapshot: { ok: true, value: { revision: 1 } },
+    legacyTheme: null,
+  });
+});
+
+test('rejects generic theme writes without changing the live appearance', async () => {
+  const nativeThemeBefore = await app?.evaluate(
+    ({ nativeTheme }) => nativeTheme.themeSource,
+  );
+  const rendererThemeBefore = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
+  const windowVisible = await app?.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible(),
+  );
+  expect(windowVisible).toBe(process.env.FLOWPILOT_E2E !== '1');
+  const settingsBefore = await page.evaluate(() =>
+    window.flowpilot.settings.get(),
+  );
+  const attempts = await page.evaluate(async () => {
+    const setting = await window.flowpilot.settings.set({
+      key: 'theme',
+      value: 'light',
+      expectedRevision: 0,
+    });
+    const snapshot = await window.flowpilot.snapshot.load();
+    if (!snapshot.ok) {
+      throw new Error('Could not read the current repository revision');
+    }
+    const command = await window.flowpilot.commands.apply({
+      commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+      expectedRevision: snapshot.value.revision,
+    });
+    return { setting, command };
+  });
+  expect(attempts).toEqual({
+    setting: { ok: false, error: 'ValidationFailed' },
+    command: { ok: false, error: 'ValidationFailed' },
+  });
+  expect(
+    await app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+  ).toBe(nativeThemeBefore);
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.theme),
+  ).toBe(rendererThemeBefore);
+  const unchangedProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+  }));
+  expect(unchangedProfile.settings).toEqual(settingsBefore);
+  expect(unchangedProfile.snapshot).toMatchObject({
+    ok: true,
+    value: { revision: 0 },
+  });
+});
+
+test('removes the titlebar inset in native full screen', async () => {
+  await app?.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setFullScreen(true);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.hasAttribute('data-full-screen'),
+      ),
+    )
+    .toBe(true);
+  await app?.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setFullScreen(false);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document.documentElement.hasAttribute('data-full-screen'),
+      ),
+    )
+    .toBe(false);
+});
+test('keeps the navigation titlebar clear across supported widths', async () => {
+  for (const width of [900, 1280, 1440, 1728]) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(width);
+    const bounds = await page.getByLabel('Хлебные крошки').boundingBox();
+    expect(bounds?.x).toBeGreaterThanOrEqual(104);
+    await expect(
+      page.getByText('Моё пространство', { exact: true }),
+    ).toBeVisible();
+  }
+});
 test('creates and starts a task through persisted Today and Now flows', async () => {
   await page.getByRole('button', { name: 'Задача' }).click();
   await page.getByLabel('Что нужно сделать?').fill('Проверить быстрый ввод');
@@ -387,7 +561,12 @@ test('persists settings and applies reduced motion to control transitions', asyn
   await theme.selectOption('dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('flowpilot-theme')))
+    .poll(() =>
+      page.evaluate(async () => {
+        const result = await window.flowpilot.snapshot.load();
+        return result.ok ? result.value.settings.theme : undefined;
+      }),
+    )
     .toBe('dark');
   const friday = page.getByRole('checkbox', { name: 'Пятница' });
   await friday.click();
