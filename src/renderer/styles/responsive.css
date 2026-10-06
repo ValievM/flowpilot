@@ -96,9 +96,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  html[data-motion-choice='system'] *,
+  html[data-motion-choice='system'] *::before,
+  html[data-motion-choice='system'] *::after {
     scroll-behavior: auto;
     animation-duration: 0s;
     animation-iteration-count: 1;

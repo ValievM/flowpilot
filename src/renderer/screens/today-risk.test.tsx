@@ -2,11 +2,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../App';
-import {
-  fakeApi,
-  mockSystemTheme,
-  taskRecord,
-} from '../test-support/fake-flowpilot';
+import { fakeApi, taskRecord } from '../test-support/fake-flowpilot';
+import { mockSystemTheme } from '../test-support/mock-system-theme';
 
 function showTasks(
   tasks: Parameters<typeof taskRecord>[0][],
