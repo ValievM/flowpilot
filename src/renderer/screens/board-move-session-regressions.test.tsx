@@ -32,14 +32,19 @@ describe('move locks across dialog sessions', () => {
     await chooseDestination('Делаю');
     expect(api.applyMock).toHaveBeenCalledTimes(1);
 
+    openAddDialog();
     await resolveApply(pending, { ok: true, value: movedSnapshot('doing') });
+
+    const addDialog = screen.getByRole('dialog', { name: 'Новая колонка' });
+    expect(addDialog).toBeInTheDocument();
+    expect(screen.queryByText('Изменения сохранены.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
 
     const doing = await screen.findByRole('region', { name: 'Делаю' });
     expect(
       within(doing).getByRole('article', { name: 'Задача: Написать отчёт' }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/это изменение не применено/)).toBeNull();
-    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('releases the ordinary move lock after a failed request', async () => {
@@ -47,12 +52,23 @@ describe('move locks across dialog sessions', () => {
     const pending = deferApplies(api);
     renderBoard(api);
     await chooseDestination('Делаю');
-    openAndCancelAdd();
-    await chooseDestination('Делаю');
+    openAddDialog();
     expect(api.applyMock).toHaveBeenCalledTimes(1);
 
     await resolveApply(pending, { ok: false, error: 'InternalError' });
+    expect(
+      screen.getByRole('dialog', { name: 'Новая колонка' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('Изменения сохранены.')).toBeNull();
     expect(screen.queryByText(/это изменение не применено/)).toBeNull();
+
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Новая колонка' })).getByRole(
+        'button',
+        { name: 'Отмена' },
+      ),
+    );
     await chooseDestination('Делаю');
     expect(api.applyMock).toHaveBeenCalledTimes(2);
     await resolveApply(pending, { ok: true, value: movedSnapshot('doing') });
@@ -91,6 +107,7 @@ describe('move locks across dialog sessions', () => {
     expect(screen.queryByText(/это изменение не применено/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
   it('releases the reopened waiting lock after a failed request', async () => {
     const api = createBoardApi();
     const pending = deferApplies(api);
@@ -139,6 +156,10 @@ async function confirmWaitingMove(): Promise<void> {
     target: { value: 'Жду ответ' },
   });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Переместить' }));
+}
+
+function openAddDialog(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'Добавить колонку' }));
 }
 
 function openAndCancelAdd(): void {
