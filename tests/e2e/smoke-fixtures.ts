@@ -68,6 +68,11 @@ export async function launchSmokeApp(
     width: SNAPSHOT_WINDOW.width,
     height: SNAPSHOT_WINDOW.height,
   });
+  const windowState = await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowState).toEqual({ visible: false, focused: false });
   if (verifyDate) {
     await expect(
       page.getByRole('heading', { name: todayLabelAt(now), exact: true }),
