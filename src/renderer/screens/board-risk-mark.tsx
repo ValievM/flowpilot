@@ -1,50 +1,46 @@
 import React from 'react';
 import { Temporal } from 'temporal-polyfill';
+import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import { deadlineRisk } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
 import type { IpcSnapshot } from '../../shared/contracts';
-import { boardRiskCopy } from './board-copy';
-import type { BoardRiskCopy } from './board-copy';
+import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 
 type BoardTask = IpcSnapshot['tasks'][number];
 
 export function BoardRiskMark({
   task,
   snapshot,
+  today,
 }: {
   task: BoardTask;
   snapshot: IpcSnapshot;
+  today: TemporalTypes.PlainDate;
 }): React.JSX.Element | null {
-  const display = boardRiskDisplay(task, snapshot);
-  if (!display) return null;
-  return (
-    <div className="board-risk">
-      <p className={display.isRisk ? 'risk-label' : 'board-risk-unknown'}>
-        {display.isRisk && (
-          <span className="risk-icon" aria-hidden="true">
-            !
-          </span>
-        )}
-        {display.label}
-      </p>
-      <p className="board-risk-reason">{display.reason}</p>
-    </div>
-  );
-}
-
-function boardRiskDisplay(
-  task: BoardTask,
-  snapshot: IpcSnapshot,
-): BoardRiskCopy | undefined {
-  if (!task.deadline) return undefined;
+  if (!task.deadline) return null;
   const settings = snapshot.settings.workdays;
-  const workdays = new Set(
+  const configuredWorkdays = new Set(
     Array.isArray(settings)
       ? settings.filter((value): value is number => typeof value === 'number')
       : [],
   );
-  return boardRiskCopy(
-    deadlineRisk(toDomainTask(task), Temporal.Now.plainDateISO(), workdays),
+  const risk = deadlineRisk(toDomainTask(task), today, configuredWorkdays);
+  const message = deadlineMessage(risk);
+  if (!message || !risk.ok) return null;
+  const title = deadlineTitle(risk);
+  const isRisk = ['tight', 'short', 'overdue'].includes(risk.risk);
+  return (
+    <p
+      className={`risk-label${risk.risk === 'unknown' ? ' risk-unknown' : ''}${isRisk ? ' is-risk' : ''}`}
+      data-risk-kind={risk.risk}
+      title={title}
+    >
+      <span className="risk-icon" aria-hidden="true">
+        {isRisk ? '!' : 'i'}
+      </span>
+      {title && <strong>{title}: </strong>}
+      {message}
+    </p>
   );
 }
 

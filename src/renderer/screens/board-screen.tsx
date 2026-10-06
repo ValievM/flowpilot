@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardColumns } from './board-columns';
 import { BoardDialogs } from './board-dialogs';
@@ -6,6 +7,7 @@ import { useBoardActions } from './use-board-actions';
 import type { BoardActions } from './use-board-actions';
 import { useBoardSnapshot } from './use-board-snapshot';
 import type { BoardSnapshotState } from './use-board-snapshot';
+import { BoardLoadFailure, BoardLoading } from './board-status';
 
 type Column = IpcSnapshot['columns'][number];
 type WaitingMove = { taskId: string; columnId: string };
@@ -36,15 +38,21 @@ type BoardWorkspaceProps = {
   data: BoardSnapshotState;
   ui: BoardUiState;
   actions: BoardActions;
+  today: TemporalTypes.PlainDate;
 };
 
 type BoardPartProps = {
   snapshot: IpcSnapshot;
   ui: BoardUiState;
   actions: BoardActions;
+  today: TemporalTypes.PlainDate;
 };
 
-export function BoardScreen(): React.JSX.Element {
+export function BoardScreen({
+  today,
+}: {
+  today: TemporalTypes.PlainDate;
+}): React.JSX.Element {
   const data = useBoardSnapshot();
   const ui = useBoardUiState();
   const actions = useBoardActions({
@@ -61,7 +69,7 @@ export function BoardScreen(): React.JSX.Element {
   if (!data.snapshot) {
     return <BoardLoadFailure error={data.error} onRetry={data.retry} />;
   }
-  return <BoardWorkspace data={data} ui={ui} actions={actions} />;
+  return <BoardWorkspace data={data} ui={ui} actions={actions} today={today} />;
 }
 
 function useBoardUiState(): BoardUiState {
@@ -107,6 +115,7 @@ function BoardWorkspace({
   data,
   ui,
   actions,
+  today,
 }: BoardWorkspaceProps): React.JSX.Element {
   const snapshot = data.snapshot;
   if (!snapshot) return <BoardLoading />;
@@ -119,7 +128,12 @@ function BoardWorkspace({
     >
       <BoardHeader ui={ui} notice={data.notice} loading={data.loading} />
       <BoardMessages data={data} />
-      <BoardTaskColumns snapshot={snapshot} ui={ui} actions={actions} />
+      <BoardTaskColumns
+        snapshot={snapshot}
+        ui={ui}
+        actions={actions}
+        today={today}
+      />
       <BoardDialogWorkspace snapshot={snapshot} ui={ui} actions={actions} />
     </section>
   );
@@ -129,10 +143,12 @@ function BoardTaskColumns({
   snapshot,
   ui,
   actions,
+  today,
 }: BoardPartProps): React.JSX.Element {
   return (
     <BoardColumns
       snapshot={snapshot}
+      today={today}
       onMove={actions.move}
       onRename={(column) => {
         ui.advanceDialogSession();
@@ -159,7 +175,7 @@ function BoardDialogWorkspace({
   snapshot,
   ui,
   actions,
-}: BoardPartProps): React.JSX.Element {
+}: Omit<BoardPartProps, 'today'>): React.JSX.Element {
   return (
     <BoardDialogs
       columns={snapshot.columns}
@@ -269,32 +285,5 @@ function BoardMessages({
         </p>
       )}
     </>
-  );
-}
-
-function BoardLoading(): React.JSX.Element {
-  return (
-    <section className="simple-screen" aria-busy="true">
-      <h1>Доска</h1>
-      <p role="status">Загрузка доски…</p>
-    </section>
-  );
-}
-
-function BoardLoadFailure({
-  error,
-  onRetry,
-}: {
-  error: string;
-  onRetry: () => void;
-}): React.JSX.Element {
-  return (
-    <section className="simple-screen">
-      <h1>Доска</h1>
-      <p role="alert">{error}</p>
-      <button className="button" onClick={onRetry}>
-        Повторить
-      </button>
-    </section>
   );
 }

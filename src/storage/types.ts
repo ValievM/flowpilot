@@ -5,7 +5,6 @@ import type {
   TaskStatus,
   Subtask,
   TaskComment,
-  AttachmentMetadata,
   WaitingDetails,
 } from '../domain';
 export type HistoryEntry = {

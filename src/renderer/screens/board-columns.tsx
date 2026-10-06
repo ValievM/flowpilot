@@ -1,3 +1,4 @@
+import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import React from 'react';
 import type { IpcSnapshot } from '../../shared/contracts';
@@ -16,6 +17,7 @@ type BoardColumnProps = {
   tasks: readonly Task[];
   columns: readonly Column[];
   snapshot: IpcSnapshot;
+  today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: () => void;
@@ -23,11 +25,13 @@ type BoardColumnProps = {
 
 export function BoardColumns({
   snapshot,
+  today,
   onMove,
   onRename,
   onDelete,
 }: {
   snapshot: IpcSnapshot;
+  today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: (column: Column, hasTasks: boolean) => void;
@@ -74,6 +78,7 @@ export function BoardColumns({
               tasks={tasks}
               columns={snapshot.columns}
               snapshot={snapshot}
+              today={today}
               onMove={moveTask}
               onRename={onRename}
               onDelete={() => {
@@ -91,6 +96,7 @@ function BoardColumn({
   tasks,
   columns,
   snapshot,
+  today,
   onMove,
   onRename,
   onDelete,
@@ -111,6 +117,7 @@ function BoardColumn({
         tasks={tasks}
         columns={columns}
         snapshot={snapshot}
+        today={today}
         onMove={onMove}
       />
     </BoardDroppableColumn>
@@ -149,12 +156,14 @@ function BoardTaskList({
   tasks,
   columns,
   snapshot,
+  today,
   onMove,
 }: {
   column: Column;
   tasks: readonly Task[];
   columns: readonly Column[];
   snapshot: IpcSnapshot;
+  today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
 }): React.JSX.Element {
   if (!tasks.length) {
@@ -169,6 +178,7 @@ function BoardTaskList({
           column={column}
           columns={columns}
           snapshot={snapshot}
+          today={today}
           onMove={onMove}
         />
       ))}
@@ -180,12 +190,14 @@ function BoardTaskCard({
   column,
   columns,
   snapshot,
+  today,
   onMove,
 }: {
   task: Task;
   column: Column;
   columns: readonly Column[];
   snapshot: IpcSnapshot;
+  today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
 }): React.JSX.Element {
   return (
@@ -194,7 +206,7 @@ function BoardTaskCard({
       className="task-summary board-task"
       label={`Задача: ${task.title}`}
     >
-      <BoardRiskMark task={task} snapshot={snapshot} />
+      <BoardRiskMark task={task} snapshot={snapshot} today={today} />
       <h3>{task.title}</h3>
       {task.deadline && (
         <p className="task-summary-meta">Срок: {task.deadline}</p>

@@ -1,3 +1,4 @@
+import { Temporal } from 'temporal-polyfill';
 import { render } from '@testing-library/react';
 import { vi, type Mock } from 'vitest';
 import type {
@@ -111,6 +112,31 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
     return Promise.resolve({ ok: true as const, value: current });
   });
   return {
+    appearance: {
+      initialize: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: 'system' as const }),
+      ),
+      ready: vi.fn(() => Promise.resolve()),
+      setTheme: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: null }),
+      ),
+    },
+    ai: {
+      run: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: 'ProviderUnavailable' as const,
+        }),
+      ),
+      cancel: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+      prompt: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: 'InternalError' as const,
+        }),
+      ),
+      reply: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+    },
     snapshot: { load: loadMock },
     commands: { apply: applyMock },
     settings: {
@@ -121,7 +147,11 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       info: vi.fn(() =>
         Promise.resolve({
           ok: true as const,
-          value: { name: 'FlowPilot', version: 'test' },
+          value: {
+            name: 'FlowPilot',
+            version: 'test',
+            now: '2026-10-06T12:00:00Z',
+          },
         }),
       ),
     },
@@ -151,6 +181,6 @@ function toIpcStatus(
 
 export function renderBoard(value = createBoardApi()): MockBoardApi {
   window.flowpilot = value;
-  render(<BoardScreen />);
+  render(<BoardScreen today={Temporal.PlainDate.from('2026-10-06')} />);
   return value;
 }

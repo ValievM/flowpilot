@@ -176,10 +176,12 @@ function boardCollisionDetection(
   args: Parameters<CollisionDetection>[0],
   keyboardTargetId: string | undefined,
 ): Collision[] {
-  const pointerCollisions = pointerWithin(args);
-  return keyboardTargetId && !pointerCollisions.length
-    ? closestCenter(args)
-    : pointerCollisions;
+  if (keyboardTargetId) {
+    return closestCenter(args).filter(
+      (collision) => collision.id === keyboardTargetId,
+    );
+  }
+  return pointerWithin(args);
 }
 function finishBoardDrag(
   event: DragEndEvent,

@@ -256,12 +256,11 @@ describe('board task movement', () => {
     vi.setSystemTime(new Date('2026-10-06T12:00:00Z'));
     const card = { ...task(), deadline: '2026-10-09' };
     renderBoard(createBoardApi(snapshot([card])));
-    expect(
-      await screen.findByText('Срок есть, объём неизвестен'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Оценка остатка работы не указана.'),
-    ).toBeInTheDocument();
+    const unknownRisk = await screen.findByText(
+      'Срок есть, объём неизвестен. По приблизительной оценке.',
+    );
+    expect(unknownRisk).toHaveAttribute('data-risk-kind', 'unknown');
+    expect(unknownRisk).not.toHaveClass('is-risk');
   });
 
   it('renders a retryable error if the real snapshot cannot load', async () => {

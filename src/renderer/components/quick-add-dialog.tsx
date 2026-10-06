@@ -21,8 +21,11 @@ export function QuickAddDialog({
     if (open) {
       dialogRef.current?.showModal();
       dialogRef.current?.querySelector('input')?.focus();
-    } else if (dialogRef.current?.open) dialogRef.current.close();
-  }, [open]);
+    } else if (dialogRef.current?.open) {
+      dialogRef.current.close();
+      addButtonRef.current?.focus();
+    }
+  }, [open, addButtonRef]);
 
   const submitTask = async (
     event: React.SyntheticEvent<HTMLFormElement>,

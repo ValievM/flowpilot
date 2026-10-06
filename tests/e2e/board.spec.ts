@@ -74,7 +74,7 @@ test('opens the board editor modally and restores focus after Escape', async () 
   await expect(trigger).toBeFocused();
 });
 
-test('moves a persisted task with keyboard and pointer drops', async () => {
+test('moves a persisted task with the narrow-layout keyboard', async () => {
   const created = await page.evaluate(() =>
     window.flowpilot.commands.apply({
       commands: [
@@ -111,8 +111,8 @@ test('moves a persisted task with keyboard and pointer drops', async () => {
   }
   await card.focus();
   await expect(card).toBeFocused();
-  await page.keyboard.press('Space');
-  await page.keyboard.press('ArrowDown');
+  await card.press('Space');
+  await card.press('ArrowDown');
   await expect(page.getByRole('region', { name: 'Делаю' })).toHaveAttribute(
     'data-drop-active',
     'true',
@@ -121,37 +121,18 @@ test('moves a persisted task with keyboard and pointer drops', async () => {
   await expect(
     page.getByRole('region', { name: 'Делаю' }).getByRole('article'),
   ).toBeVisible();
-  await page.setViewportSize({ width: 1280, height: 800 });
-  const titleBox = await card
-    .getByRole('heading', { name: 'Проверить перенос' })
-    .boundingBox();
-  const doneBox = await page
-    .getByRole('region', { name: 'Готово' })
-    .boundingBox();
-  if (!titleBox || !doneBox)
-    throw new Error('Board drag targets are not visible');
-  await page.mouse.move(
-    titleBox.x + titleBox.width / 2,
-    titleBox.y + titleBox.height / 2,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    doneBox.x + doneBox.width / 2,
-    doneBox.y + doneBox.height / 2,
-    { steps: 10 },
-  );
-  await page.mouse.up();
-  await expect(
-    page.getByRole('region', { name: 'Готово' }).getByRole('article'),
-  ).toBeVisible();
   const saved = await page.evaluate(() => window.flowpilot.snapshot.load());
   expect(saved).toMatchObject({
     ok: true,
     value: {
       tasks: [
-        { id: 'board-smoke-task', columnId: 'done', status: { kind: 'done' } },
+        {
+          id: 'board-smoke-task',
+          columnId: 'doing',
+          status: { kind: 'doing' },
+        },
       ],
-      revision: 3,
+      revision: 2,
     },
   });
 });

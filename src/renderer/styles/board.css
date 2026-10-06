@@ -91,25 +91,6 @@
   color: var(--danger);
 }
 
-.board-risk-unknown {
-  margin: var(--space-8) 0 0;
-  color: var(--muted);
-  font-size: var(--type-secondary);
-  line-height: var(--type-line-body);
-}
-
-.board-risk {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.board-risk-reason {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--type-secondary);
-  line-height: var(--type-line-body);
-}
-
 .board-removal label {
   color: var(--muted);
   font-size: var(--type-secondary);

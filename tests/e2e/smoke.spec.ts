@@ -779,4 +779,3 @@ for (const screen of ['today', 'now'] as const) {
     }
   }
 }
-
