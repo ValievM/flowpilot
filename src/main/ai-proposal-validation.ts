@@ -44,6 +44,8 @@ export function validateCommand(
   command: AiCommand,
   state: CommandValidationState,
 ): string | undefined {
+  if (command.kind === 'task.classify' || command.kind === 'task.setAiRank')
+    return 'not-persisted-yet';
   const taskId = taskIdFor(command);
   return taskId !== undefined && !state.taskIds.has(taskId)
     ? 'task-not-found'
@@ -152,6 +154,8 @@ function validateCreatedTask(
     return 'subtask-id-conflict';
   if (task.comment && state.commentIds.has(task.comment.id))
     return 'comment-id-conflict';
+  if (task.typeId !== undefined || task.disciplineId !== undefined)
+    return 'not-persisted-yet';
   return validateTaskReferences(task, state.snapshot);
 }
 
