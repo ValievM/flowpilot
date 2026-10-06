@@ -11,12 +11,14 @@ type SnapshotSetters = {
   setNotice: React.Dispatch<React.SetStateAction<string>>;
 };
 
+type SnapshotLoadResult = 'loaded' | 'superseded' | 'failed';
+
 export type ApplyResult = { ok: true } | { ok: false; message: string };
 
 type ApplyInput = SnapshotSetters & {
   snapshot: IpcSnapshot | undefined;
   commands: CommandsApplyRequest['commands'];
-  load: () => Promise<boolean>;
+  load: () => Promise<SnapshotLoadResult>;
   isCurrent?: () => boolean;
 };
 
@@ -25,7 +27,7 @@ export type BoardSnapshotState = {
   loading: boolean;
   error: string;
   notice: string;
-  load: () => Promise<boolean>;
+  load: () => Promise<SnapshotLoadResult>;
   retry: () => void;
   apply: (
     commands: CommandsApplyRequest['commands'],
@@ -79,20 +81,21 @@ async function loadBoardSnapshot(
   setters: SnapshotSetters,
   isCurrent?: () => boolean,
   showLoading = true,
-): Promise<boolean> {
+): Promise<SnapshotLoadResult> {
   if (showLoading) setters.setLoading(true);
   try {
     const result = await window.flowpilot.snapshot.load();
     if (!result.ok) {
       setMessageIfCurrent(setters.setError, isCurrent, SNAPSHOT_LOAD_ERROR);
-      return false;
+      return 'failed';
     }
-    if (isCurrent?.() ?? true) setters.setSnapshot(result.value);
+    if (!(isCurrent?.() ?? true)) return 'superseded';
+    setters.setSnapshot(result.value);
     setMessageIfCurrent(setters.setError, isCurrent, '');
-    return true;
+    return 'loaded';
   } catch {
     setMessageIfCurrent(setters.setError, isCurrent, SNAPSHOT_LOAD_ERROR);
-    return false;
+    return 'failed';
   } finally {
     if (showLoading) setters.setLoading(false);
   }
@@ -129,9 +132,17 @@ async function applyBoardCommands(input: ApplyInput): Promise<ApplyResult> {
         'Доска изменилась в другом месте. Актуальные данные загружаются; это изменение не применено.',
       );
       const refreshed = await input.load();
-      const message = refreshed
-        ? 'Доска изменилась в другом месте. Показаны актуальные данные; это изменение не применено.'
-        : 'Доска изменилась в другом месте. Актуальные данные загрузить не удалось; это изменение не применено.';
+      if (refreshed === 'superseded') {
+        return {
+          ok: false,
+          message:
+            'Доска изменилась в другом месте. Актуальные данные ещё загружаются; это изменение не применено.',
+        };
+      }
+      const message =
+        refreshed === 'loaded'
+          ? 'Доска изменилась в другом месте. Показаны актуальные данные; это изменение не применено.'
+          : 'Доска изменилась в другом месте. Актуальные данные загрузить не удалось; это изменение не применено.';
       setMessageIfCurrent(input.setNotice, isCurrent, message);
       return { ok: false, message };
     }
