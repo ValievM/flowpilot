@@ -3,7 +3,7 @@ import type { DeadlineRiskResult } from '../risk/risk';
 import type { Outcome, Series } from '../repeat';
 import type { RulesDocument } from '../rules';
 import type { ScheduleSnapshot } from '../schedule/fixed-events';
-import type { Task, TaskType, Discipline } from '../task';
+import type { Task, TaskColumn, TaskType, Discipline } from '../task';
 
 export interface ContextInput {
   readonly today: Temporal.PlainDate;
@@ -15,6 +15,7 @@ export interface ContextInput {
   readonly taskTypes: readonly TaskType[];
   readonly disciplines: readonly Discipline[];
   readonly workdays: ReadonlySet<number>;
+  readonly columns?: readonly TaskColumn[];
   readonly schedule?: ScheduleSnapshot;
 }
 
@@ -35,6 +36,12 @@ export interface EffectivePriority {
 export interface ContextTask {
   readonly id: string;
   readonly typeId?: string;
+  readonly columnId: string;
+  readonly untrustedColumn?: {
+    readonly trust: 'untrusted';
+    readonly name: string;
+    readonly description: string;
+  };
   readonly disciplineId?: string;
   readonly state: Task['status']['kind'];
   readonly day?: string;
@@ -55,6 +62,11 @@ export interface ContextTask {
     readonly description?: string;
     readonly waitingReason?: string;
     readonly comments: readonly string[];
+    readonly guidance: readonly {
+      readonly trust: 'untrusted';
+      readonly documentId: string;
+      readonly text: string;
+    }[];
     readonly subtasks: readonly {
       readonly id: string;
       readonly title: string;

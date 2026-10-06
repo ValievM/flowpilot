@@ -39,6 +39,7 @@ export function mapContextTask(task: Task, input: ContextInput): ContextTask {
     id: task.id,
     ...(task.typeId ? { typeId: task.typeId } : {}),
     ...(task.disciplineId ? { disciplineId: task.disciplineId } : {}),
+    ...mapColumnReference(task.columnId, input.columns),
     state: task.status.kind,
     ...(task.day ? { day: task.day.toString() } : {}),
     ...(task.time ? { time: task.time.toString() } : {}),
@@ -60,6 +61,7 @@ export function mapContextTask(task: Task, input: ContextInput): ContextTask {
       ...(task.status.kind === 'waiting'
         ? { waitingReason: sanitizeUntrustedText(task.status.reason) }
         : {}),
+      guidance: applicableGuidance(input.activeRules, rules.documentIds),
       comments: task.comments.map(({ text }) => sanitizeUntrustedText(text)),
       subtasks: task.subtasks.map(({ id, title, completed }) => ({
         id,
@@ -74,6 +76,24 @@ export function mapContextTask(task: Task, input: ContextInput): ContextTask {
   };
 }
 
+function mapColumnReference(
+  columnId: string,
+  columns: ContextInput['columns'],
+): Pick<ContextTask, 'columnId' | 'untrustedColumn'> {
+  const column = columns?.find(({ id }) => id === columnId);
+  return {
+    columnId,
+    ...(column
+      ? {
+          untrustedColumn: {
+            trust: 'untrusted',
+            name: sanitizeUntrustedText(column.name),
+            description: sanitizeUntrustedText(column.description),
+          },
+        }
+      : {}),
+  };
+}
 function selectedPriority(
   priorities: readonly Extract<LintedRule, { rule: { kind: 'priority' } }>[],
 ): EffectivePriority | null {
@@ -85,6 +105,23 @@ function selectedPriority(
         reason: sanitizeUntrustedText(winner.rule.reason),
       }
     : null;
+}
+
+function applicableGuidance(
+  documents: ContextInput['activeRules'],
+  documentIds: readonly string[],
+): ContextTask['untrusted']['guidance'] {
+  return documents
+    .filter(
+      (document) =>
+        documentIds.includes(document.id) && document.guidance !== undefined,
+    )
+    .map((document) => ({
+      trust: 'untrusted' as const,
+      documentId: document.id,
+      text: sanitizeUntrustedText(document.guidance ?? ''),
+    }))
+    .sort((left, right) => left.documentId.localeCompare(right.documentId));
 }
 
 function mapRule(entry: LintedRule): ContextReferenceRule {
@@ -139,8 +176,8 @@ function riskOrder(risk: ContextTask['deadlineRisk']): number {
 function availabilityOrder(value: ContextTask['availability']): number {
   const order: Record<ContextTask['availability'], number> = {
     'available-now': 0,
-    today: 1,
-    'rolled-over': 2,
+    'rolled-over': 1,
+    today: 2,
     waiting: 3,
     future: 4,
   };
