@@ -289,10 +289,10 @@ describe('Repository', () => {
           kind: 'task.create',
           task: {
             id: 'task-1',
-            title: 'Task',
+            title: 'Task one',
             status: {
               kind: 'waiting',
-              reason: 'Исходная причина',
+              reason: 'Исходная причина 1',
               until: Temporal.PlainDate.from('2026-10-07'),
             },
             columnId: 'custom',
@@ -302,8 +302,29 @@ describe('Repository', () => {
             addedOrder: 1,
           },
         },
+        {
+          kind: 'task.create',
+          task: {
+            id: 'task-2',
+            title: 'Task two',
+            status: {
+              kind: 'waiting',
+              reason: 'Исходная причина 2',
+              until: Temporal.PlainDate.from('2026-10-09'),
+            },
+            columnId: 'custom',
+            subtasks: [],
+            comments: [],
+            attachments: [],
+            addedOrder: 2,
+          },
+        },
       ],
       1,
+    );
+
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', state: 'waiting' }),
     );
 
     expect(
@@ -322,27 +343,61 @@ describe('Repository', () => {
         2,
       ),
     ).toEqual({ ok: true, value: { revision: 3 } });
-    expect(repository.load().tasks[0]).toMatchObject({
-      columnId: 'waiting',
-      status: {
-        kind: 'waiting',
-        reason: 'Ждёт ответа',
-        until: Temporal.PlainDate.from('2026-10-08'),
-      },
-    });
+    expect(repository.load().tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'task-1',
+          columnId: 'waiting',
+          status: {
+            kind: 'waiting',
+            reason: 'Ждёт ответа',
+            until: Temporal.PlainDate.from('2026-10-08'),
+          },
+        }),
+        expect.objectContaining({
+          id: 'task-2',
+          columnId: 'waiting',
+          status: {
+            kind: 'waiting',
+            reason: 'Ждёт ответа',
+            until: Temporal.PlainDate.from('2026-10-08'),
+          },
+        }),
+      ]),
+    );
+    expect(repository.load().columns).not.toContainEqual(
+      expect.objectContaining({ id: 'custom' }),
+    );
     const deletion = repository
       .history(10)
       .entries.find(({ revision }) => revision === 3);
     expect(deletion).toBeDefined();
     expect(repository.undo(deletion?.id)).toMatchObject({ ok: true });
-    expect(repository.load().tasks[0]).toMatchObject({
-      columnId: 'custom',
-      status: {
-        kind: 'waiting',
-        reason: 'Исходная причина',
-        until: Temporal.PlainDate.from('2026-10-07'),
-      },
-    });
+    expect(repository.load().columns).toContainEqual(
+      expect.objectContaining({ id: 'custom', state: 'waiting' }),
+    );
+    expect(repository.load().tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'task-1',
+          columnId: 'custom',
+          status: {
+            kind: 'waiting',
+            reason: 'Исходная причина 1',
+            until: Temporal.PlainDate.from('2026-10-07'),
+          },
+        }),
+        expect.objectContaining({
+          id: 'task-2',
+          columnId: 'custom',
+          status: {
+            kind: 'waiting',
+            reason: 'Исходная причина 2',
+            until: Temporal.PlainDate.from('2026-10-09'),
+          },
+        }),
+      ]),
+    );
     repository.close();
   });
 
