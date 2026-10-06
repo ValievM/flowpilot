@@ -264,6 +264,37 @@ describe('AI proposal application', () => {
     expect(repository.history(10).entries).toEqual(before);
   });
 
+  it('rejects rule imports through applyProposal before any writes', () => {
+    const { repository, application } = setup();
+    seedTask(repository);
+    const stateBefore = repository.load();
+    const historyBefore = repository.history(10).entries;
+    const mixed = proposal('unsupported-rule-import', 1, [
+      {
+        kind: 'task.update',
+        id: 'task-1',
+        changes: { title: 'Must not apply' },
+      },
+      { kind: 'rule.import', documentJson: '{"rules":[]}' },
+    ]);
+
+    expect(application.applyProposal(mixed, 'auto')).toMatchObject({
+      kind: 'rejected',
+      error: {
+        kind: 'NotPersistedYet',
+        reason: 'not-persisted-yet',
+        commands: [
+          { index: 1, kind: 'rule.import', reason: 'not-persisted-yet' },
+        ],
+      },
+    });
+    expect(repository.load()).toEqual(stateBefore);
+    expect(repository.history(10).entries).toEqual(historyBefore);
+    expect(
+      repository.appliedProposal('unsupported-rule-import'),
+    ).toBeUndefined();
+  });
+
   it('rejects a task creation with an unsupported catalog reference as a whole', () => {
     const { repository, application } = setup();
     const result = application.applyProposal(
