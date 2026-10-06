@@ -62,6 +62,132 @@ describe('AI proposal application', () => {
     expect(repository.history(1).entries[0]?.source).toBe('ai');
   });
 
+  it('binds confirmation to the staged proposal snapshot', () => {
+    const { repository, application } = setup();
+    seedTask(repository);
+    const command = {
+      kind: 'task.update' as const,
+      id: 'task-1',
+      changes: { title: 'Shown' },
+    };
+    const commentCommand = {
+      kind: 'comment.add' as const,
+      taskId: 'task-1',
+      comment: { id: 'comment-1', text: 'Shown comment' },
+    };
+    const staged = application.applyProposal(
+      proposal('confirm-snapshot', 1, [command, commentCommand]),
+      'confirm',
+    );
+
+    expect(staged).toMatchObject({
+      kind: 'confirmation-required',
+      diff: {
+        changes: [
+          {
+            entityId: 'task-1',
+            field: 'title',
+            before: 'Draft',
+            after: 'Shown',
+          },
+          {
+            commandIndex: 1,
+            entityId: 'task-1',
+            field: 'comments',
+            before: [],
+            after: [{ id: 'comment-1', text: 'Shown comment' }],
+          },
+        ],
+      },
+    });
+    command.changes.title = 'Not shown';
+    commentCommand.comment.text = 'Not shown comment';
+    expect(staged).toMatchObject({
+      diff: {
+        changes: [{}, { after: [{ id: 'comment-1', text: 'Shown comment' }] }],
+      },
+    });
+    expect(application.confirmProposal('confirm-snapshot')).toMatchObject({
+      kind: 'applied',
+      revision: 2,
+      replayed: false,
+    });
+    expect(repository.load()).toMatchObject({
+      revision: 2,
+      tasks: [
+        {
+          title: 'Shown',
+          comments: [{ id: 'comment-1', text: 'Shown comment' }],
+        },
+      ],
+    });
+    expect(repository.history(1).entries[0]).toMatchObject({
+      revision: 2,
+      source: 'ai',
+      entities: [
+        {
+          kind: 'task',
+          id: 'task-1',
+          after: {
+            task: { title: 'Shown' },
+            comments: [{ id: 'comment-1', text: 'Shown comment' }],
+          },
+        },
+      ],
+    });
+  });
+
+  it('shows each update against the state produced by earlier commands', () => {
+    const { repository, application } = setup();
+    seedTask(repository);
+    const staged = application.applyProposal(
+      proposal('confirm-sequence', 1, [
+        {
+          kind: 'task.update',
+          id: 'task-1',
+          changes: { title: 'Intermediate' },
+        },
+        {
+          kind: 'task.update',
+          id: 'task-1',
+          changes: { title: 'Final' },
+        },
+      ]),
+      'confirm',
+    );
+
+    expect(staged).toMatchObject({
+      kind: 'confirmation-required',
+      diff: {
+        changes: [
+          {
+            commandIndex: 0,
+            entityId: 'task-1',
+            field: 'title',
+            before: 'Draft',
+            after: 'Intermediate',
+          },
+          {
+            commandIndex: 1,
+            entityId: 'task-1',
+            field: 'title',
+            before: 'Intermediate',
+            after: 'Final',
+          },
+        ],
+      },
+    });
+    expect(application.confirmProposal('confirm-sequence')).toMatchObject({
+      kind: 'applied',
+      revision: 2,
+    });
+    expect(repository.load().tasks[0]?.title).toBe('Final');
+    const history = repository.history(1).entries[0];
+    expect(history?.entities[0]?.after).toMatchObject({
+      task: { title: 'Final' },
+    });
+  });
+
   it('applies auto proposals immediately and reports rejected commands', () => {
     const { repository, application } = setup();
     const result = application.applyProposal(
@@ -155,6 +281,35 @@ describe('AI proposal application', () => {
     });
     expect(repository.load().tasks).toEqual([]);
     expect(repository.load().revision).toBe(0);
+  });
+
+  it('rejects unsupported commands before stale proposals', () => {
+    const { repository, application } = setup();
+    seedTask(repository);
+    const historyBefore = repository.history(10).entries;
+
+    expect(
+      application.applyProposal(
+        proposal('stale-unsupported', 0, [
+          {
+            kind: 'task.update',
+            id: 'task-1',
+            changes: { title: 'Must not apply' },
+          },
+          { kind: 'rule.activate', ruleId: 'rule-1' },
+        ]),
+        'auto',
+      ),
+    ).toMatchObject({
+      kind: 'rejected',
+      error: { kind: 'NotPersistedYet', reason: 'not-persisted-yet' },
+    });
+    expect(repository.load()).toMatchObject({
+      revision: 1,
+      tasks: [{ title: 'Draft' }],
+    });
+    expect(repository.history(10).entries).toEqual(historyBefore);
+    expect(repository.appliedProposal('stale-unsupported')).toBeUndefined();
   });
 
   it('uses changed rule fingerprints to reject a proposal as stale', () => {

@@ -4,7 +4,14 @@ import {
   type AiPlannedCommand,
   type Proposal,
 } from '../shared/ai-commands';
-import { isStale, toStorageCommands, validateProposal } from './ai-proposals';
+import {
+  cloneAiCommands,
+  findUnpersistedCommands,
+  isStale,
+  toStorageCommands,
+  validateProposal,
+  type RejectedAiCommand,
+} from './ai-proposals';
 import { buildProposalDiff, type AiFieldChange } from './ai-proposal-diff';
 import type { AiSnapshot } from './ai-proposal-validation';
 
@@ -25,14 +32,17 @@ type PersistedAiCommand = Extract<
   }
 >;
 
-type RejectedCommand = {
-  readonly index: number;
-  readonly kind: string;
-  readonly reason: string;
-};
+type RejectedCommand = RejectedAiCommand;
 
 type PendingProposal = {
-  readonly proposal: unknown;
+  readonly proposal: Proposal;
+  readonly rejectedCommands: readonly RejectedCommand[];
+};
+
+type ConfirmationData = {
+  readonly proposal: Proposal;
+  readonly changes: readonly AiFieldChange[];
+  readonly rejectedCommands: readonly RejectedCommand[];
 };
 
 export type ProposalOutcome =
@@ -122,7 +132,12 @@ export class AiProposalApplication {
     }
     const pending = this.pending.get(proposalId);
     if (!pending) return rejected({ kind: 'NotPending', proposalId });
-    return this.prepareAndApply(pending.proposal, 'confirm', true);
+    return this.prepareAndApply(
+      pending.proposal,
+      'confirm',
+      true,
+      pending.rejectedCommands,
+    );
   }
 
   rejectProposal(proposalId: string): ProposalOutcome {
@@ -138,6 +153,7 @@ export class AiProposalApplication {
     input: unknown,
     mode: AiMode,
     confirmed = false,
+    stagedRejectedCommands: readonly RejectedCommand[] = [],
   ): ProposalOutcome {
     const parsed = proposalSchema.safeParse(input);
     if (!parsed.success)
@@ -145,43 +161,55 @@ export class AiProposalApplication {
         kind: 'InvalidProposal',
         message: 'Предложение AI имеет неверный формат и не применено.',
       });
+    const unsupportedOutcome = rejectUnpersistedProposal(parsed.data.commands);
+    if (unsupportedOutcome) return unsupportedOutcome;
     const snapshot = this.currentSnapshot();
     if (isStale(parsed.data, snapshot.revision, snapshot.ruleVersions))
       return rejected(staleProposal(parsed.data, snapshot));
-    const unsupported = findUnpersistedCommands(parsed.data.commands);
-    if (unsupported.length > 0)
-      return rejected({
-        kind: 'NotPersistedYet',
-        reason: 'not-persisted-yet',
-        message:
-          'Предложение содержит изменения, которые пока нельзя сохранить.',
-        commands: unsupported,
-      });
     const validation = validateProposal(input, snapshot);
-    const batch = toStorageCommands(validation.validCommands, snapshot);
+    const rejectedCommands = [
+      ...stagedRejectedCommands,
+      ...validation.rejectedCommands,
+    ];
+    const needsConfirmation = mode === 'confirm' && !confirmed;
+    const commandsForDiff = needsConfirmation
+      ? cloneAiCommands(validation.validCommands)
+      : validation.validCommands;
+    const batch = toStorageCommands(commandsForDiff, snapshot);
     const commands = batch.commands.filter(isStorageCommand);
-    if (mode === 'confirm' && !confirmed) {
-      this.pending.set(parsed.data.id, { proposal: parsed.data });
-      return {
-        kind: 'confirmation-required',
-        proposalId: parsed.data.id,
-        diff: {
-          changes: buildProposalDiff(batch.commands, snapshot),
-          rejectedCommands: validation.rejectedCommands,
-        },
-        rejectedCommands: validation.rejectedCommands,
-      };
-    }
+    if (needsConfirmation)
+      return this.requireConfirmation({
+        proposal: { ...parsed.data, commands: validation.validCommands },
+        changes: buildProposalDiff(batch.commands, snapshot),
+        rejectedCommands,
+      });
     const result = this.repository.apply(commands, parsed.data.baseRevision, {
       source: 'ai',
       proposalId: parsed.data.id,
     });
-    const outcome = applyResult(result, validation.rejectedCommands);
+    const outcome = applyResult(result, rejectedCommands);
     if (outcome.kind === 'applied') {
       this.pending.delete(parsed.data.id);
       this.completed.set(parsed.data.id, outcome);
     }
     return outcome;
+  }
+
+  private requireConfirmation({
+    proposal,
+    changes,
+    rejectedCommands,
+  }: ConfirmationData): ProposalOutcome {
+    this.pending.set(proposal.id, {
+      proposal: { ...proposal, commands: cloneAiCommands(proposal.commands) },
+      rejectedCommands: rejectedCommands.map((command) => ({ ...command })),
+    });
+    return {
+      kind: 'confirmation-required',
+      proposalId: proposal.id,
+      diff: { changes, rejectedCommands },
+      rejectedCommands,
+    };
   }
 
   private currentSnapshot(): AiSnapshot {
@@ -190,51 +218,18 @@ export class AiProposalApplication {
   }
 }
 
-const UNSUPPORTED_COMMANDS = new Set([
-  'rule.import',
-  'rule.activate',
-  'task.classify',
-]);
-
-function findUnpersistedCommands(
+function rejectUnpersistedProposal(
   commands: readonly unknown[],
-): RejectedCommand[] {
-  const rejected: RejectedCommand[] = [];
-  for (const [index, input] of commands.entries()) {
-    const rejection = findUnpersistedCommand(input, index);
-    if (rejection) rejected.push(rejection);
-  }
-  return rejected;
+): ProposalOutcome | undefined {
+  const unsupported = findUnpersistedCommands(commands);
+  if (unsupported.length === 0) return undefined;
+  return rejected({
+    kind: 'NotPersistedYet',
+    reason: 'not-persisted-yet',
+    message: 'Предложение содержит изменения, которые пока нельзя сохранить.',
+    commands: unsupported,
+  });
 }
-
-function findUnpersistedCommand(
-  input: unknown,
-  index: number,
-): RejectedCommand | undefined {
-  const candidate = recordValue(input);
-  const kind =
-    candidate && typeof candidate.kind === 'string' ? candidate.kind : '';
-  if (!UNSUPPORTED_COMMANDS.has(kind) && !hasCatalogReference(kind, candidate))
-    return undefined;
-  return { index, kind, reason: 'not-persisted-yet' };
-}
-
-function hasCatalogReference(
-  kind: string,
-  candidate: Record<string, unknown> | undefined,
-): boolean {
-  if (kind !== 'task.create') return false;
-  const task = recordValue(candidate?.task);
-  return task?.typeId !== undefined || task?.disciplineId !== undefined;
-}
-
-function recordValue(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return undefined;
-  // The proposal envelope has only JSON object fields.
-  return value as Record<string, unknown>;
-}
-
 function isStorageCommand(
   command: AiPlannedCommand,
 ): command is PersistedAiCommand {
