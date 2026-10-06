@@ -116,7 +116,10 @@ describe('history review regressions', () => {
       ok: false,
       error: { kind: 'UndoConflict' },
     });
-    expect(repository.load().settings).toEqual({ workdays: [1, 2, 3] });
+    expect(repository.load().settings).toEqual({
+      aiMode: 'auto',
+      workdays: [1, 2, 3],
+    });
     repository.close();
   });
 

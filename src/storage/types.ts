@@ -32,6 +32,7 @@ export interface Snapshot {
   readonly settings: Readonly<Record<string, unknown>>;
   readonly revision: number;
 }
+export type AiMode = 'auto' | 'confirm';
 
 type TaskUpdateChanges = Partial<
   Omit<
@@ -72,10 +73,16 @@ export type StorageCommand =
   | { kind: 'comment.add'; taskId: string; comment: TaskComment }
   | { kind: 'attachment.add'; taskId: string; sourcePath: string }
   | { kind: 'attachment.remove'; attachmentId: string }
+  | { kind: 'task.setAiRank'; taskId: string; rank: number }
   | { kind: 'column.create'; column: TaskColumn }
   | { kind: 'column.rename'; id: string; name: string; description: string }
   | { kind: 'column.delete'; id: string; targetColumnId?: string }
   | { kind: 'setting.set'; key: string; value: unknown };
+
+export interface ApplyOptions {
+  readonly source?: 'user' | 'ai';
+  readonly proposalId?: string;
+}
 
 export type HistoryPage = {
   readonly entries: readonly HistoryEntry[];

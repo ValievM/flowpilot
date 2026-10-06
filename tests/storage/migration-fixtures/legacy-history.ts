@@ -48,7 +48,7 @@ export function seedLegacyHistory(
     entityId: 'retired-column',
     stateBefore: retiredColumn,
     stateAfter: null,
-    versionAfter: null,
+    versionAfter: version >= 6 ? 2 : null,
   });
   if (version >= 5) seedColumnGenerations(database);
 }

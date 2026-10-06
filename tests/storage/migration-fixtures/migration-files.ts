@@ -4,6 +4,7 @@ import historySchema from '../../../src/storage/migrations/0003_change_log.sql?r
 import entityVersions from '../../../src/storage/migrations/0004_entity_versions.sql?raw';
 import columnGenerations from '../../../src/storage/migrations/0005_column_generations.sql?raw';
 import legacyTombstoneGenerations from '../../../src/storage/migrations/0006_legacy_tombstone_generations.sql?raw';
+import aiApplication from '../../../src/storage/migrations/0007_ai_application.sql?raw';
 
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
@@ -23,6 +24,11 @@ export const migrationFiles = [
     version: 6,
     filename: '0006_legacy_tombstone_generations.sql',
     sql: legacyTombstoneGenerations,
+  },
+  {
+    version: 7,
+    filename: '0007_ai_application.sql',
+    sql: aiApplication,
   },
 ] as const;
 

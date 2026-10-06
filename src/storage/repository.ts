@@ -12,6 +12,8 @@ import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
 import type { TaskColumn } from '../domain';
 import type {
+  AiMode,
+  ApplyOptions,
   ApplyResult,
   Clock,
   HistoryPage,
@@ -76,21 +78,28 @@ export class Repository {
       revision,
     };
   }
+  getAiMode(): AiMode {
+    return readSettings(this.database).aiMode === 'confirm'
+      ? 'confirm'
+      : 'auto';
+  }
 
   apply(
     commands: readonly StorageCommand[],
     expectedRevision: number,
-    options: { source?: 'user' | 'ai' } = {},
+    options: ApplyOptions = {},
   ): ApplyResult {
-    if (commands.length === 0) {
-      const actual = readRevision(this.database);
-      if (actual !== expectedRevision)
-        return {
-          ok: false,
-          error: { kind: 'StaleRevision', expected: expectedRevision, actual },
-        };
-      return { ok: true, value: { revision: actual } };
-    }
+    const previous = options.proposalId
+      ? this.appliedProposal(options.proposalId)
+      : undefined;
+    if (previous !== undefined)
+      return { ok: true, value: { revision: previous } };
+    if (commands.length === 0)
+      return applyEmptyCommands(
+        this.database,
+        options.proposalId,
+        expectedRevision,
+      );
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
     );
@@ -102,6 +111,27 @@ export class Repository {
           message: `Invalid ${invalid.kind} command`,
         },
       };
+    const prepared = this.prepareAttachments(commands);
+    if (!prepared.ok) return prepared;
+    return applyCommands(this.database, {
+      commands,
+      expectedRevision,
+      now: this.clock.now().toString(),
+      attachmentFiles: this.attachments,
+      preparedAttachments: prepared.value,
+      source: options.source ?? 'user',
+      ...(options.proposalId !== undefined
+        ? { proposalId: options.proposalId }
+        : {}),
+    });
+  }
+
+  private prepareAttachments(commands: readonly StorageCommand[]):
+    | { ok: true; value: Map<number, AttachmentRecord> }
+    | {
+        ok: false;
+        error: { kind: 'InvalidCommand'; message: string };
+      } {
     const prepared = new Map<number, AttachmentRecord>();
     for (const [index, command] of commands.entries()) {
       if (command.kind !== 'attachment.add') continue;
@@ -118,14 +148,14 @@ export class Repository {
       }
       prepared.set(index, result.value);
     }
-    return applyCommands(this.database, {
-      commands,
-      expectedRevision,
-      now: this.clock.now().toString(),
-      attachmentFiles: this.attachments,
-      preparedAttachments: prepared,
-      source: options.source ?? 'user',
-    });
+    return { ok: true, value: prepared };
+  }
+
+  appliedProposal(proposalId: string): number | undefined {
+    const row = this.database
+      .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
+      .get(proposalId) as { revision: number } | undefined;
+    return row?.revision;
   }
 
   history(limit: number, before?: string): HistoryPage {
@@ -151,9 +181,60 @@ function readSettings(
   const rows = database
     .prepare('SELECT key,value_json FROM settings')
     .all() as { key: string; value_json: string }[];
-  return Object.fromEntries(
-    rows.map(({ key, value_json }) => [key, JSON.parse(value_json) as unknown]),
-  );
+  return {
+    aiMode: 'auto',
+    ...Object.fromEntries(
+      rows.map(({ key, value_json }) => [
+        key,
+        JSON.parse(value_json) as unknown,
+      ]),
+    ),
+  };
+}
+function applyEmptyCommands(
+  database: Database.Database,
+  proposalId: string | undefined,
+  expectedRevision: number,
+): ApplyResult {
+  if (proposalId !== undefined)
+    return applyEmptyProposal(database, proposalId, expectedRevision);
+  const actual = readRevision(database);
+  if (actual !== expectedRevision)
+    return {
+      ok: false,
+      error: { kind: 'StaleRevision', expected: expectedRevision, actual },
+    };
+  return { ok: true, value: { revision: actual } };
+}
+
+function applyEmptyProposal(
+  database: Database.Database,
+  proposalId: string,
+  expectedRevision: number,
+): ApplyResult {
+  return database.transaction(() => {
+    const previous = database
+      .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
+      .get(proposalId) as { revision: number } | undefined;
+    if (previous)
+      return { ok: true as const, value: { revision: previous.revision } };
+    const actual = readRevision(database);
+    if (actual !== expectedRevision)
+      return {
+        ok: false as const,
+        error: {
+          kind: 'StaleRevision' as const,
+          expected: expectedRevision,
+          actual,
+        },
+      };
+    database
+      .prepare(
+        'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
+      )
+      .run(proposalId, proposalId, actual);
+    return { ok: true as const, value: { revision: actual } };
+  })();
 }
 
 function readRevision(database: Database.Database): number {

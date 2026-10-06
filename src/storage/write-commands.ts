@@ -23,6 +23,7 @@ type ApplyOptions = {
   attachmentFiles: AttachmentFiles;
   preparedAttachments: ReadonlyMap<number, AttachmentRecord>;
   source: 'user' | 'ai';
+  proposalId?: string;
 };
 type CommandCapture = { index: number; options: ApplyOptions };
 type ChangeSet = Map<string, { before: EntitySnapshot; after: EntitySnapshot }>;
@@ -39,8 +40,12 @@ export function applyCommands(
         throw new Error('Unable to move attachment to trash');
       trashed.push(command.attachmentId);
     }
-    const revision = applyTransaction(database, options);
-    return { ok: true, value: { revision } };
+    const applied = applyTransaction(database, options);
+    if (applied.replayed) {
+      trashed.forEach((id) => options.attachmentFiles.restoreFromTrash(id));
+      discardPrepared(options);
+    }
+    return { ok: true, value: { revision: applied.revision } };
   } catch (error) {
     trashed.forEach((id) => options.attachmentFiles.restoreFromTrash(id));
     discardPrepared(options);
@@ -51,8 +56,12 @@ export function applyCommands(
 function applyTransaction(
   database: Database.Database,
   options: ApplyOptions,
-): number {
+): { revision: number; replayed: boolean } {
   const transaction = database.transaction(() => {
+    const previous = options.proposalId
+      ? readAppliedProposal(database, options.proposalId)
+      : undefined;
+    if (previous !== undefined) return { revision: previous, replayed: true };
     assertRevision(database, options.expectedRevision);
     const changes: ChangeSet = new Map();
     options.commands.forEach((command, index) => {
@@ -69,9 +78,33 @@ function applyTransaction(
       occurredAt: options.now,
       source: options.source,
     });
-    return revision;
+    if (options.proposalId)
+      recordAppliedProposal(database, options.proposalId, revision);
+    return { revision, replayed: false };
   });
   return transaction();
+}
+
+function readAppliedProposal(
+  database: Database.Database,
+  proposalId: string,
+): number | undefined {
+  const row = database
+    .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
+    .get(proposalId) as { revision?: number } | undefined;
+  return row?.revision;
+}
+
+function recordAppliedProposal(
+  database: Database.Database,
+  proposalId: string,
+  revision: number,
+): void {
+  database
+    .prepare(
+      'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
+    )
+    .run(proposalId, proposalId, revision);
 }
 
 function captureAndExecute(

@@ -84,6 +84,7 @@ const nonEmptyWorkdays = z
 
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
+  aiMode: z.enum(['auto', 'confirm']),
 };
 export const settingFields = {
   key: z.string().min(1),
@@ -198,6 +199,13 @@ const settingCommandSchema = z
   .object({ ...settingFields, kind: z.literal('setting.set') })
   .strict()
   .superRefine(validateSettingValue);
+const aiRankCommandSchema = z
+  .object({
+    kind: z.literal('task.setAiRank'),
+    taskId: z.string().min(1),
+    rank: z.number().int().min(0),
+  })
+  .strict();
 
 export const commandSchema = z.discriminatedUnion('kind', [
   taskCreateSchema,
@@ -212,6 +220,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
   columnRenameSchema,
   columnDeleteSchema,
   settingCommandSchema,
+  aiRankCommandSchema,
 ]);
 
 export const ipcCommandSchema = z.discriminatedUnion('kind', [
