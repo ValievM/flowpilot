@@ -14,9 +14,11 @@ export interface PersistedState {
   readonly workdays: ReadonlySet<number>;
   readonly loadError: string | undefined;
   readonly commandError: string | undefined;
+  readonly settingsError: string | undefined;
   readonly isLoading: boolean;
   readonly isSaved: boolean;
   refresh(): Promise<IpcSnapshot | undefined>;
+  updateWorkdays(workdays: ReadonlySet<number>): Promise<boolean>;
   apply(commands: CommandsApplyRequest['commands']): Promise<boolean>;
 }
 
@@ -28,6 +30,9 @@ interface PersistenceControls {
     React.SetStateAction<string | undefined>
   >;
   readonly setCommandError: React.Dispatch<
+    React.SetStateAction<string | undefined>
+  >;
+  readonly setSettingsError: React.Dispatch<
     React.SetStateAction<string | undefined>
   >;
   readonly setLoading: React.Dispatch<React.SetStateAction<boolean>>;
@@ -89,6 +94,38 @@ function useSnapshotRefresh(api: FlowPilotApi, controls: PersistenceControls) {
       controls.setLoading(false);
     }
   }, [api, controls]);
+}
+
+function useWorkdaysUpdate(
+  api: FlowPilotApi,
+  snapshot: IpcSnapshot | undefined,
+  controls: PersistenceControls,
+): (workdays: ReadonlySet<number>) => Promise<boolean> {
+  return React.useCallback(
+    async (workdays) => {
+      if (!snapshot || workdays.size === 0) return false;
+      controls.setSaved(false);
+      controls.setSettingsError(undefined);
+      try {
+        const result = await api.settings.set({
+          key: 'workdays',
+          value: [...workdays].sort(),
+          expectedRevision: snapshot.revision,
+        });
+        if (!result.ok) throw new Error('settings');
+        controls.setSnapshot(result.value);
+        controls.setSaved(true);
+        return true;
+      } catch {
+        controls.setSettingsError(
+          'Не удалось сохранить рабочие дни. Настройка не изменена; попробуйте снова.',
+        );
+        controls.setSaved(true);
+        return false;
+      }
+    },
+    [api, controls, snapshot],
+  );
 }
 
 async function applyAfterStale(
@@ -177,6 +214,7 @@ export function usePersistedTasks(
   const [snapshot, setSnapshot] = React.useState<IpcSnapshot>();
   const [loadError, setLoadError] = React.useState<string>();
   const [commandError, setCommandError] = React.useState<string>();
+  const [settingsError, setSettingsError] = React.useState<string>();
   const [isLoading, setLoading] = React.useState(true);
   const [isSaved, setSaved] = React.useState(true);
   const controls = React.useMemo(
@@ -184,12 +222,21 @@ export function usePersistedTasks(
       setSnapshot,
       setLoadError,
       setCommandError,
+      setSettingsError,
       setLoading,
       setSaved,
     }),
-    [setCommandError, setLoadError, setLoading, setSaved, setSnapshot],
+    [
+      setCommandError,
+      setLoadError,
+      setLoading,
+      setSaved,
+      setSettingsError,
+      setSnapshot,
+    ],
   );
   const refresh = useSnapshotRefresh(api, controls);
+  const updateWorkdays = useWorkdaysUpdate(api, snapshot, controls);
   const apply = useCommandApply(api, snapshot, refresh, controls);
   React.useEffect(() => {
     void refresh();
@@ -199,9 +246,11 @@ export function usePersistedTasks(
     ...parsed,
     loadError,
     commandError,
+    settingsError,
     isLoading,
     isSaved,
     refresh,
+    updateWorkdays,
     apply,
   };
 }
