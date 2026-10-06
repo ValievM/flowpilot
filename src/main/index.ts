@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { selectRuntimeOptions, selectWindowOptions } from './runtime';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
+import { reportStartupFailure } from './startup-error';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -57,8 +58,18 @@ if (!app.requestSingleInstanceLock()) {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
       });
     })
-    .catch(() => {
-      app.quit();
+    .catch((error: unknown) => {
+      reportStartupFailure(error, {
+        logFailure: (code) => {
+          console.error(`[FlowPilot] Startup failed: ${code}`);
+        },
+        showErrorBox: (title, message) => {
+          dialog.showErrorBox(title, message);
+        },
+        quit: () => {
+          app.quit();
+        },
+      });
     });
 }
 
