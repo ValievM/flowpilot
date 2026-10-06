@@ -42,6 +42,45 @@ describe('AI proposal application', () => {
     expect(repository.load().tasks[0]?.title).toBe('Draft');
     expect(repository.history(10).entries).toEqual(historyBefore);
   });
+  it('activates a saved draft rule through an AI proposal', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'draft-rule',
+      title: 'Правило-черновик',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const { repository, application } = setup();
+    const saved = repository.apply(
+      [
+        { kind: 'taskType.create', taskType: { id: 'type-1', name: 'Тип' } },
+        { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+      ],
+      0,
+    );
+    expect(saved.ok).toBe(true);
+    expect(repository.load().rules[0]?.status).toBe('draft');
+    const draftVersion = repository.load().rules[0]?.version;
+
+    const outcome = application.applyProposal(
+      proposal('activate-saved-draft', 1, [
+        { kind: 'rule.activate', ruleId: rule.id },
+      ]),
+      'auto',
+    );
+
+    expect(outcome).toMatchObject({ kind: 'applied', revision: 2 });
+    expect(outcome).toMatchObject({ rejectedCommands: [] });
+    expect(repository.load().rules[0]).toMatchObject({
+      id: rule.id,
+      status: 'active',
+      version: (draftVersion ?? 0) + 1,
+      activeDocument: rule,
+      versions: [{ version: draftVersion }],
+    });
+  });
   it('shows an existing rule document replacement in the confirmation diff', () => {
     const rule = {
       schema_version: 'v1',

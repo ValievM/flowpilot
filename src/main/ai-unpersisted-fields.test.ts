@@ -5,6 +5,7 @@ import type { AiSnapshot } from './ai-proposals';
 const snapshot: AiSnapshot = {
   revision: 4,
   ruleVersions: {},
+  savedRuleIds: [],
   tasks: [
     {
       id: 'task-1',

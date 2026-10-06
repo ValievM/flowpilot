@@ -11,6 +11,7 @@ import { type AiCommand, type AiTaskCreation } from '../shared/ai-commands';
 export interface AiSnapshot {
   readonly revision: number;
   readonly ruleVersions: Readonly<Record<string, string>>;
+  readonly savedRuleIds: readonly string[];
   readonly tasks: readonly Task[];
   readonly columns: readonly TaskColumn[];
   readonly taskTypes: readonly TaskType[];
@@ -23,6 +24,7 @@ interface CommandValidationState {
   readonly taskIds: Set<string>;
   readonly subtaskIds: Set<string>;
   readonly commentIds: Set<string>;
+  readonly ruleIds: Set<string>;
 }
 
 export function createValidationState(
@@ -37,6 +39,7 @@ export function createValidationState(
     commentIds: new Set(
       snapshot.tasks.flatMap((task) => task.comments.map(({ id }) => id)),
     ),
+    ruleIds: new Set(snapshot.savedRuleIds),
   };
 }
 
@@ -101,7 +104,7 @@ function validateCommandKind(
     case 'rule.import':
       return validateRuleImport(command.documentJson, snapshot);
     case 'rule.activate':
-      return validateRuleActivation(command.ruleId, snapshot.rules);
+      return validateRuleActivation(command.ruleId, state.ruleIds);
   }
 }
 
@@ -114,11 +117,9 @@ function validateNestedId(
 }
 function validateRuleActivation(
   ruleId: string,
-  rules: readonly RulesDocument[],
+  ruleIds: ReadonlySet<string>,
 ): string | undefined {
-  return rules.some((rule) => rule.id === ruleId)
-    ? undefined
-    : 'rule-not-found';
+  return ruleIds.has(ruleId) ? undefined : 'rule-not-found';
 }
 
 function taskIdFor(command: AiCommand): string | undefined {

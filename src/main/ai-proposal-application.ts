@@ -204,6 +204,7 @@ export class AiProposalApplication {
       ...references,
       taskTypes: current.taskTypes,
       disciplines: current.disciplines,
+      savedRuleIds: current.rules.map(({ id }) => id),
       rules: current.rules.flatMap(({ activeDocument }) =>
         activeDocument ? [activeDocument] : [],
       ),
