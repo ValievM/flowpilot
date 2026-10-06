@@ -1,6 +1,7 @@
 import React from 'react';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardModal } from './board-modal';
+import { BoardColumnFields } from './board-column-fields';
 
 type Column = IpcSnapshot['columns'][number];
 type DialogProps = {
@@ -78,7 +79,7 @@ function ColumnDialog({
           {editing ? 'Изменить колонку' : 'Новая колонка'}
         </h2>
         <DialogFeedback error={error} />
-        <ColumnFields editing={editing} />
+        <BoardColumnFields editing={editing} />
         <div className="dialog-actions">
           <button type="button" className="text-button" onClick={onCancel}>
             Отмена
@@ -89,50 +90,6 @@ function ColumnDialog({
         </div>
       </form>
     </BoardModal>
-  );
-}
-
-function ColumnFields({
-  editing,
-}: {
-  editing: Column | undefined;
-}): React.JSX.Element {
-  return (
-    <>
-      <label htmlFor="column-name">Название</label>
-      <input
-        id="column-name"
-        name="name"
-        required
-        maxLength={300}
-        defaultValue={editing?.name}
-        aria-describedby="column-name-help"
-      />
-      <p id="column-name-help" className="helper-text">
-        Короткое название помогает ориентироваться на доске.
-      </p>
-      <label htmlFor="column-description">Описание</label>
-      <textarea
-        id="column-description"
-        name="description"
-        defaultValue={editing?.description}
-      />
-      {!editing && <ColumnStateField />}
-    </>
-  );
-}
-
-function ColumnStateField(): React.JSX.Element {
-  return (
-    <>
-      <label htmlFor="column-state">Смысл состояния</label>
-      <select id="column-state" name="state">
-        <option value="todo">Сделать</option>
-        <option value="doing">Делаю</option>
-        <option value="waiting">Ожидание</option>
-        <option value="done">Готово</option>
-      </select>
-    </>
   );
 }
 

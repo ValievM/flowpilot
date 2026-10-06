@@ -1,4 +1,4 @@
-import { type SyntheticEvent } from 'react';
+import React, { type SyntheticEvent } from 'react';
 import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
 import type { ApplyResult } from './use-board-snapshot';
 
@@ -10,6 +10,7 @@ type Move = { taskId: string; columnId: string };
 type ActionsInput = {
   snapshot: IpcSnapshot | undefined;
   apply: Apply;
+  dialogSubmission: React.RefObject<number | undefined>;
   dialogSession: { current: number };
   editingColumn: Column | undefined;
   setEditingColumn: (column: Column | undefined) => void;
@@ -105,8 +106,13 @@ async function saveBoardColumn(
   const form = new FormData(event.currentTarget);
   const name = stringField(form.get('name')).trim();
   const description = stringField(form.get('description'));
-  if (!name) return;
+  if (!name) {
+    input.setDialogError('Введите название колонки.');
+    return;
+  }
   const session = input.dialogSession.current;
+  if (input.dialogSubmission.current === session) return;
+  input.dialogSubmission.current = session;
   input.setDialogError('');
   const state = stringField(form.get('state'), 'todo') as Column['state'];
   const command: CommandsApplyRequest['commands'][number] = input.editingColumn
@@ -121,14 +127,19 @@ async function saveBoardColumn(
           builtIn: false,
         },
       };
-  const result = await input.apply([command]);
-  if (session !== input.dialogSession.current) return;
-  if (result.ok) {
-    input.dialogSession.current += 1;
-    input.setEditingColumn(undefined);
-    input.setCreatingColumn(false);
-  } else {
-    input.setDialogError(result.message);
+  try {
+    const result = await input.apply([command]);
+    if (session !== input.dialogSession.current) return;
+    if (result.ok) {
+      input.dialogSession.current += 1;
+      input.setEditingColumn(undefined);
+      input.setCreatingColumn(false);
+    } else {
+      input.setDialogError(result.message);
+    }
+  } finally {
+    if (input.dialogSubmission.current === session)
+      input.dialogSubmission.current = undefined;
   }
 }
 
@@ -136,19 +147,41 @@ async function deleteBoardColumn(
   input: ActionsInput,
   columnId = input.deletingId,
 ): Promise<boolean> {
-  if (!input.snapshot || !columnId) return false;
+  if (
+    !input.snapshot ||
+    !columnId ||
+    (input.snapshot.tasks.some((task) => task.columnId === columnId) &&
+      !input.deleteTarget)
+  ) {
+    return false;
+  }
   const hasTasks = input.snapshot.tasks.some(
     (task) => task.columnId === columnId,
   );
-  if (hasTasks && !input.deleteTarget) return false;
   const session = input.dialogSession.current;
+  if (input.dialogSubmission.current === session) return false;
+  input.dialogSubmission.current = session;
   input.setDialogError('');
   const command: CommandsApplyRequest['commands'][number] = {
     kind: 'column.delete',
     id: columnId,
     ...(hasTasks ? { targetColumnId: input.deleteTarget } : {}),
   };
-  const result = await input.apply([command]);
+  let result: ApplyResult;
+  try {
+    result = await input.apply([command]);
+  } finally {
+    if (input.dialogSubmission.current === session)
+      input.dialogSubmission.current = undefined;
+  }
+  return completeColumnDelete(input, session, result);
+}
+
+function completeColumnDelete(
+  input: ActionsInput,
+  session: number,
+  result: ApplyResult,
+): boolean {
   if (session !== input.dialogSession.current) return false;
   if (!result.ok) {
     input.setDialogError(result.message);
