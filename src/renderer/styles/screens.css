@@ -64,15 +64,35 @@
 .settings-card select {
   width: min(100%, var(--inspector-width));
   min-width: 0;
-  min-height: var(--control-height);
-  padding: var(--space-8);
+  height: var(--control-height);
+  padding: var(--space-8) calc(var(--space-24) + var(--space-8)) var(--space-8)
+    var(--space-8);
   border: var(--stroke) solid var(--line);
   border-radius: var(--r2);
-  background: var(--panel);
+  appearance: none;
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - var(--space-12)) center,
+    calc(100% - var(--space-8)) center;
+  background-size: var(--space-4) var(--space-4);
+  background-repeat: no-repeat;
+}
+
+.settings-screen > .settings-card {
+  width: min(100%, var(--inspector-width));
+}
+
+.settings-screen input[type='checkbox'] {
+  accent-color: var(--accent);
 }
 
 .workdays-options {
   display: grid;
+  width: 100%;
+  min-width: 0;
   grid-template-columns: repeat(auto-fit, minmax(var(--panel-min), 1fr));
   gap: var(--space-8);
   padding: var(--space-12);
