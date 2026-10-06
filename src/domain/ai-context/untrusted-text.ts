@@ -1,0 +1,29 @@
+import { MAX_CONTEXT_TEXT_LENGTH } from './context-types';
+
+const SPACED_RELATIVE_WINDOWS_PATH = new RegExp(
+  String.raw`(?<![\w/:.=?&\\])\p{L}[\p{L}\p{N}_.-]*\s+\p{L}[\p{L}\p{N}_.-]*\\(?:[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\\)*[\p{L}\p{N}_.-]+\s+[\p{L}\p{N}_.-]+\.[\p{L}\p{N}]+`,
+  'gu',
+);
+
+const FILE_PATH = new RegExp(
+  [
+    String.raw`\bfile:\/\/(?:[^/\s?#,;]+)?\/(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\/)*(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\.[A-Za-z0-9]+|[^/\s,;!?]+(?:\s+(?!then\b)[^/\s,;!?]+)*)|`,
+    String.raw`(?<![\w:/.?&])\/(?:[^/\s,;]+\/)*(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\/)*[^/\s,;]+(?:\s+[^/\s,;.!?]+)*\.[A-Za-z0-9]+|`,
+    String.raw`(?<![\w:/.?&])\/(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\/)+[^/\s,;.!?]+(?:\s+(?!then\b)[^/\s,;.!?]+)*|`,
+    String.raw`(?<![\w:/.?&])\/(?:[^/\s,;]+\/)*[^/\s,;]+(?:\s+(?!then\b)[^/\s,;]+)*|`,
+    String.raw`(?<![\w/:.=?&])(?:[\p{L}\p{N}_.-]+\\)+[\p{L}\p{N}_.-]+(?:\.[\p{L}\p{N}]+)?|`,
+    String.raw`(?<![\w/:.=?&])(?!(?:and\/or|(?:[\p{L}\p{N}_.-]+\s+)*input\/output)\b)(?:[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\/)+[\p{L}\p{N}_.-]+(?:\s+(?!then\b)[\p{L}\p{N}_.-]+)*(?:\.[\p{L}\p{N}]+)?|`,
+    String.raw`\b[A-Za-z]:[\\/](?:[^\\/:,;]+[\\/])*[^\\/:,;]+(?:\s+[^\\/:,;]+)*\.[A-Za-z0-9]+|`,
+    String.raw`\b[A-Za-z]:[\\/](?:[^\\/:,;]+[\\/])*[^\\/:,\s;!?]+(?:\s+(?!then\b)[^\\/:,\s;!?]+)*|`,
+    String.raw`\\\\[^\\\s,;]+\\(?:[^\\,;]+\\)*[^\\,;]+\.[A-Za-z0-9]+|`,
+    String.raw`\\\\[^\\\s,;]+\\(?:[^\\,;]+\\)*[^\\\s,;!?]+(?:\s+(?!then\b)[^\\\s,;!?]+)*`,
+  ].join(''),
+  'giu',
+);
+
+export function sanitizeUntrustedText(value: string): string {
+  return value
+    .replace(SPACED_RELATIVE_WINDOWS_PATH, '[путь скрыт]')
+    .replace(FILE_PATH, '[путь скрыт]')
+    .slice(0, MAX_CONTEXT_TEXT_LENGTH);
+}

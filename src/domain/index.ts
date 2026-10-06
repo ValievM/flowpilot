@@ -100,3 +100,5 @@ export type {
 } from './disciplines';
 export type { CategoryColor, Discipline, TaskType } from './task';
 export { DEFAULT_REMINDER_SETTINGS, planReminders } from './reminders';
+export { buildContext, contextFingerprint } from './ai-context/build-context';
+export type { AiContext, ContextInput } from './ai-context/context-types';
