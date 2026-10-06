@@ -15,8 +15,6 @@ let page!: Page;
 let profilePath: string;
 
 test.beforeEach(async () => {
-  const isPointerMoveTest =
-    test.info().title === 'moves a persisted task with a pointer drop';
   profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
   app = await electron.launch({
     args: [
@@ -26,7 +24,6 @@ test.beforeEach(async () => {
     ],
     env: {
       ...process.env,
-      ...(isPointerMoveTest ? { FLOWPILOT_E2E: '0' } : {}),
       FLOWPILOT_TEST: '1',
       FLOWPILOT_TEST_NOW: '2026-10-05T12:00:00Z',
       FLOWPILOT_TEST_PROFILE: profilePath,
@@ -164,10 +161,11 @@ test('moves a persisted task with a pointer drop', async () => {
     }),
   );
   expect(created).toMatchObject({ ok: true, value: { revision: 1 } });
-  const windowVisible = await app?.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows()[0]?.isVisible(),
-  );
-  expect(windowVisible).toBe(true);
+  const windowState = await app?.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowState).toEqual({ visible: false, focused: false });
   await page
     .getByRole('navigation', { name: 'Представления' })
     .getByRole('button', { name: 'Доска' })
@@ -192,6 +190,12 @@ test('moves a persisted task with a pointer drop', async () => {
     { steps: 10 },
   );
   await page.mouse.up();
+
+  const windowAfterDrop = await app?.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowAfterDrop).toEqual({ visible: false, focused: false });
   await expect(
     page.getByRole('region', { name: 'Готово' }).getByRole('article'),
   ).toBeVisible();

@@ -486,6 +486,10 @@ test('rejects generic theme writes without changing the live appearance', async 
 });
 
 test('removes the titlebar inset in native full screen', async () => {
+  test.skip(
+    process.env.FLOWPILOT_E2E === '1',
+    'Native fullscreen requires visible startup and is verified separately.',
+  );
   await app?.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setFullScreen(true);
   });
