@@ -831,22 +831,29 @@ test('moves a persisted task with keyboard and pointer drops', async () => {
     }),
   );
   expect(created).toMatchObject({ ok: true, value: { revision: 1 } });
+  await page.setViewportSize({ width: 900, height: 800 });
+  expect(await page.evaluate(() => window.innerWidth)).toBe(900);
   await page
     .getByRole('navigation', { name: 'Представления' })
     .getByRole('button', { name: 'Доска' })
     .click();
   const card = page.getByRole('article', { name: 'Задача: Проверить перенос' });
   await expect(card).toBeVisible();
-  await page.setViewportSize({ width: 900, height: 800 });
-  expect(await page.evaluate(() => window.innerWidth)).toBe(900);
+  for (const columnName of ['Сделать', 'Делаю', 'Ожидание', 'Готово']) {
+    await expect(page.getByRole('region', { name: columnName })).toBeVisible();
+  }
   await card.focus();
-  await card.press('Space');
-  await card.press('ArrowDown');
-  await card.press('Space');
+  await expect(card).toBeFocused();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('region', { name: 'Делаю' })).toHaveAttribute(
+    'data-drop-active',
+    'true',
+  );
+  await page.keyboard.press('Space');
   await expect(
     page.getByRole('region', { name: 'Делаю' }).getByRole('article'),
   ).toBeVisible();
-
   await page.setViewportSize({ width: 1280, height: 800 });
   const titleBox = await card
     .getByRole('heading', { name: 'Проверить перенос' })
