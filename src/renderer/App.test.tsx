@@ -84,6 +84,48 @@ describe('persisted today and now screens', () => {
     });
     expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
   });
+  it('keeps the persisted appearance after a failed theme save and retries', async () => {
+    mockSystemTheme(true);
+    const fake = fakeApi();
+    let persistedTheme = 'system';
+    let nativeTheme = persistedTheme;
+    const setTheme = vi
+      .spyOn(fake.api.appearance, 'setTheme')
+      .mockImplementationOnce(() =>
+        Promise.resolve({ ok: false, error: 'InternalError' }),
+      )
+      .mockImplementation(({ theme }) => {
+        persistedTheme = theme;
+        nativeTheme = theme;
+        return Promise.resolve({ ok: true, value: null });
+      });
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    const themeButton = screen.getByRole('button', {
+      name: 'Тема: как в системе',
+    });
+    fireEvent.click(themeButton);
+    await waitFor(() => {
+      expect(setTheme).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(persistedTheme).toBe('system');
+      expect(nativeTheme).toBe('system');
+      expect(document.documentElement.dataset.theme).toBe('dark');
+      expect(themeButton).toHaveAccessibleName('Тема: как в системе');
+    });
+
+    fireEvent.click(themeButton);
+    await waitFor(() => {
+      expect(persistedTheme).toBe('light');
+      expect(nativeTheme).toBe('light');
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(themeButton).toHaveAccessibleName('Тема: светлая');
+    });
+  });
   it('marks the titlebar action as non-draggable', async () => {
     renderApp();
     await screen.findByRole('heading', { name: 'Сегодня пока пусто' });

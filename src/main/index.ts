@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
@@ -7,6 +7,10 @@ import { selectRuntimeOptions, selectWindowOptions } from './runtime';
 import { initialAppearanceTheme, isTrustedNavigation } from './appearance';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
+import {
+  createWindowStartupGate,
+  type WindowStartupGate,
+} from './window-startup';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -14,8 +18,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 let mainWindow: BrowserWindow | undefined;
 let repository: Repository | undefined;
 const WINDOW_STARTUP_FALLBACK_MS = 10_000;
-let windowStartupReady = false;
-let windowStartupTimer: NodeJS.Timeout | undefined;
+let windowStartupGate: WindowStartupGate | undefined;
 const manualProvider = new ManualExchangeProvider();
 const runtime = selectRuntimeOptions(
   app.isPackaged,
@@ -29,7 +32,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!windowStartupReady) return;
+    if (!windowStartupGate?.isReady()) return;
     mainWindow?.show();
     mainWindow?.focus();
   });
@@ -58,7 +61,7 @@ if (!app.requestSingleInstanceLock()) {
         },
         aiRunner,
         manualProvider,
-        onAppearanceReady: revealMainWindow,
+        onAppearanceReady: () => windowStartupGate?.ready(),
       });
       createWindow();
       app.on('activate', () => {
@@ -71,7 +74,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 app.on('will-quit', () => {
-  clearWindowStartupTimer();
+  windowStartupGate?.stop();
   repository?.close();
 });
 app.on('window-all-closed', () => {
@@ -79,12 +82,11 @@ app.on('window-all-closed', () => {
 });
 
 function createWindow(): void {
-  clearWindowStartupTimer();
-  windowStartupReady = false;
-  const windowOptions = selectWindowOptions(runtime.isE2E);
-  const applicationAddress = MAIN_WINDOW_VITE_DEV_SERVER_URL
+  windowStartupGate?.stop();
+  const address = MAIN_WINDOW_VITE_DEV_SERVER_URL
     ? MAIN_WINDOW_VITE_DEV_SERVER_URL
     : path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`);
+  const windowOptions = selectWindowOptions(runtime.isE2E);
   mainWindow = new BrowserWindow({
     ...windowOptions,
     width: 1280,
@@ -105,44 +107,64 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   });
+  configureWindowNavigation(mainWindow, address);
+  configureWindowInteractions(mainWindow);
+  configureWindowStartup(mainWindow);
+  loadWindow(mainWindow, address);
+}
+
+function configureWindowNavigation(
+  window: BrowserWindow,
+  address: string,
+): void {
   const trustedAddress = MAIN_WINDOW_VITE_DEV_SERVER_URL
     ? MAIN_WINDOW_VITE_DEV_SERVER_URL
-    : `file://${applicationAddress}`;
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  mainWindow.webContents.on('will-navigate', (event, address) => {
-    if (!isTrustedNavigation(address, trustedAddress)) event.preventDefault();
+    : `file://${address}`;
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, target) => {
+    if (!isTrustedNavigation(target, trustedAddress)) event.preventDefault();
   });
-  mainWindow.on('enter-full-screen', () => {
+}
+
+function configureWindowInteractions(window: BrowserWindow): void {
+  window.on('enter-full-screen', () => {
     setFullScreenState(true);
   });
-  mainWindow.on('leave-full-screen', () => {
+  window.on('leave-full-screen', () => {
     setFullScreenState(false);
   });
+}
 
+function configureWindowStartup(window: BrowserWindow): void {
+  windowStartupGate = createWindowStartupGate({
+    reveal: () => {
+      if (!runtime.isE2E) window.show();
+    },
+    showError: () => {
+      dialog.showErrorBox(
+        'FlowPilot не запущен',
+        'Не удалось загрузить окно FlowPilot. Перезапустите приложение. Если проблема повторится, обратитесь в поддержку.',
+      );
+    },
+    quit: () => {
+      app.quit();
+    },
+    schedule: (callback, delayMs) => setTimeout(callback, delayMs),
+    cancel: clearTimeout,
+    timeoutMs: WINDOW_STARTUP_FALLBACK_MS,
+  });
+  window.webContents.on('did-fail-load', (...args) => {
+    if (args[4]) windowStartupGate?.fail();
+  });
+  if (!runtime.isE2E) windowStartupGate.start();
+}
+
+function loadWindow(window: BrowserWindow, address: string): void {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    void window.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    void mainWindow.loadFile(applicationAddress);
+    void window.loadFile(address);
   }
-  startWindowRevealFallback();
-}
-
-function startWindowRevealFallback(): void {
-  if (runtime.isE2E) return;
-  windowStartupTimer = setTimeout(revealMainWindow, WINDOW_STARTUP_FALLBACK_MS);
-  mainWindow?.webContents.once('did-fail-load', revealMainWindow);
-}
-
-function revealMainWindow(): void {
-  windowStartupReady = true;
-  clearWindowStartupTimer();
-  if (!runtime.isE2E) mainWindow?.show();
-}
-
-function clearWindowStartupTimer(): void {
-  if (windowStartupTimer === undefined) return;
-  clearTimeout(windowStartupTimer);
-  windowStartupTimer = undefined;
 }
 
 function setFullScreenState(isFullScreen: boolean): void {
