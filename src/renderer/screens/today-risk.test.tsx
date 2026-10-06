@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Temporal } from 'temporal-polyfill';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../App';
 import {
   fakeApi,
@@ -8,9 +8,12 @@ import {
   taskRecord,
 } from '../test-support/fake-flowpilot';
 
-function showTasks(tasks: Parameters<typeof taskRecord>[0][]): void {
+function showTasks(
+  tasks: Parameters<typeof taskRecord>[0][],
+  now: () => string,
+): void {
   mockSystemTheme(false);
-  const api = fakeApi(tasks.map(taskRecord)).api;
+  const api = fakeApi(tasks.map(taskRecord), now).api;
   Object.defineProperty(window, 'flowpilot', {
     configurable: true,
     value: api,
@@ -18,35 +21,38 @@ function showTasks(tasks: Parameters<typeof taskRecord>[0][]): void {
   render(<App />);
 }
 
-function setLocalDate(date: string): void {
-  vi.setSystemTime(new Date(`${date}T09:00:00`));
-}
-
 afterEach(() => {
   cleanup();
-  vi.useRealTimers();
   document.documentElement.removeAttribute('data-theme');
-  vi.restoreAllMocks();
 });
+
+function localInstant(localDateTime: string): string {
+  return Temporal.PlainDateTime.from(localDateTime)
+    .toZonedDateTime(Temporal.Now.timeZoneId())
+    .toInstant()
+    .toString();
+}
 
 describe('today risk and rollover display', () => {
   it('shows approximate risk and unknown workload with explanatory text', async () => {
-    setLocalDate('2026-10-05');
-    showTasks([
-      {
-        id: 'tight',
-        title: 'Равный запас',
-        day: '2026-10-05',
-        deadline: '2026-10-09',
-        estimate: { unit: 'workdays', value: 5 },
-      },
-      {
-        id: 'unknown',
-        title: 'Без оценки',
-        day: '2026-10-05',
-        deadline: '2026-10-09',
-      },
-    ]);
+    showTasks(
+      [
+        {
+          id: 'tight',
+          title: 'Равный запас',
+          day: '2026-10-05',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 5 },
+        },
+        {
+          id: 'unknown',
+          title: 'Без оценки',
+          day: '2026-10-05',
+          deadline: '2026-10-09',
+        },
+      ],
+      () => localInstant('2026-10-05T12:00'),
+    );
     expect(
       await screen.findAllByText(
         /до срока 5 рабочих дней.*запас исчерпан.*приблизительной оценке/i,
@@ -57,32 +63,36 @@ describe('today risk and rollover display', () => {
   });
 
   it('shows short and overdue risk from the selected local date', async () => {
-    setLocalDate('2026-10-08');
-    showTasks([
-      {
-        id: 'short',
-        title: 'Два дня',
-        day: '2026-10-08',
-        deadline: '2026-10-09',
-        estimate: { unit: 'workdays', value: 4 },
-      },
-    ]);
+    showTasks(
+      [
+        {
+          id: 'short',
+          title: 'Два дня',
+          day: '2026-10-08',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 4 },
+        },
+      ],
+      () => localInstant('2026-10-08T12:00'),
+    );
     expect(
       await screen.findAllByText(
         /осталось 2 рабочих дня.*оценка остатка 4 рабочих дня.*срок не выдержать/i,
       ),
     ).toHaveLength(2);
     cleanup();
-    setLocalDate('2026-10-09');
-    showTasks([
-      {
-        id: 'late',
-        title: 'Срок позади',
-        day: '2026-10-09',
-        deadline: '2026-10-08',
-        estimate: { unit: 'workdays', value: 2 },
-      },
-    ]);
+    showTasks(
+      [
+        {
+          id: 'late',
+          title: 'Срок позади',
+          day: '2026-10-09',
+          deadline: '2026-10-08',
+          estimate: { unit: 'workdays', value: 2 },
+        },
+      ],
+      () => localInstant('2026-10-09T12:00'),
+    );
     await screen.findByRole('heading', { name: 'Срок позади', level: 3 });
     expect(screen.getAllByText(/Срок прошёл/).length).toBeGreaterThan(0);
     expect(
@@ -91,14 +101,15 @@ describe('today risk and rollover display', () => {
   });
 
   it('shows a yesterday task as rolled over after midnight without changing persisted source', async () => {
-    setLocalDate('2026-10-06');
     const yesterdayTask = taskRecord({
       id: 'yesterday',
       title: 'Продолжить вчерашнее',
       day: '2026-10-05',
       status: { kind: 'doing' },
     });
-    const api = fakeApi([yesterdayTask]);
+    const api = fakeApi([yesterdayTask], () =>
+      localInstant('2026-10-06T00:01'),
+    );
     Object.defineProperty(window, 'flowpilot', {
       configurable: true,
       value: api.api,
@@ -115,15 +126,18 @@ describe('today risk and rollover display', () => {
   });
 
   it('refreshes availability when the window regains focus after its scheduled time', async () => {
-    setLocalDate('2026-10-05');
-    showTasks([
-      {
-        id: 'timed',
-        title: 'Задача после полудня',
-        day: '2026-10-05',
-        time: '12:00',
-      },
-    ]);
+    let now = localInstant('2026-10-05T11:00');
+    showTasks(
+      [
+        {
+          id: 'timed',
+          title: 'Задача после полудня',
+          day: '2026-10-05',
+          time: '12:00',
+        },
+      ],
+      () => now,
+    );
     expect(
       await screen.findByRole('heading', { name: 'Сегодня, 5 октября' }),
     ).toBeVisible();
@@ -131,12 +145,10 @@ describe('today risk and rollover display', () => {
     expect(
       screen.getByRole('heading', { name: 'Нет доступных дел' }),
     ).toBeVisible();
-    setLocalDate('2026-10-05');
-    vi.setSystemTime(new Date('2026-10-05T13:00:00'));
+    now = localInstant('2026-10-05T13:00');
     fireEvent.focus(window);
     expect(
       await screen.findByRole('heading', { name: 'Задача после полудня' }),
     ).toBeVisible();
-    expect(Temporal.Now.plainDateISO().toString()).toBe('2026-10-05');
   });
 });

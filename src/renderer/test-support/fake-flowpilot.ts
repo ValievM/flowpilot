@@ -202,7 +202,6 @@ function fakeApiFor(
   clock: () => string | undefined,
 ): FlowPilotApi {
   return {
-    clock: { now: clock },
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
     settings: {
@@ -213,7 +212,11 @@ function fakeApiFor(
       info: () =>
         Promise.resolve({
           ok: true,
-          value: { name: 'FlowPilot', version: 'test' },
+          value: {
+            name: 'FlowPilot',
+            version: 'test',
+            now: clock() ?? '2026-10-05T12:00:00Z',
+          },
         }),
     },
   };

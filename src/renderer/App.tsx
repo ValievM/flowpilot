@@ -33,6 +33,7 @@ interface AppModel {
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
+  readonly clockReady: boolean;
   readonly cycleTheme: () => void;
   readonly startTask: (task: Task) => Promise<void>;
   readonly addTask: (title: string) => Promise<boolean>;
@@ -70,6 +71,7 @@ function useAppModel(): AppModel {
     addButtonRef,
     state,
     views,
+    clockReady: clock.isReady,
     cycleTheme,
     startTask: (task) => startTask(state, task),
     addTask: (title) => addTask(state, title, views.today.toString()),
@@ -168,6 +170,10 @@ function ErrorState({
   );
 }
 
+function shouldShowLoading(model: AppModel): boolean {
+  const { state } = model;
+  return !model.clockReady || (state.isLoading && state.tasks.length === 0);
+}
 function MainContent({
   model,
   screenProps,
@@ -176,7 +182,7 @@ function MainContent({
   readonly screenProps: ScreenProps;
 }): React.JSX.Element {
   const { state, view, views } = model;
-  if (state.isLoading && state.tasks.length === 0) return <LoadingState />;
+  if (shouldShowLoading(model)) return <LoadingState />;
   if (state.loadError && state.tasks.length === 0)
     return (
       <ErrorState

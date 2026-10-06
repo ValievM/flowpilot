@@ -4,6 +4,7 @@ import { deadlineRisk } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 import type { View } from '../types';
+import { taskCountPhrase } from '../today-copy';
 
 interface TodayScreenProps {
   readonly tasks: readonly Task[];
@@ -53,11 +54,9 @@ function TaskRow({
       <div className="task-copy">
         <h3>{task.title}</h3>
         <div className="task-meta">
-          <span>
-            {task.status.kind === 'waiting'
-              ? `Ожидание: ${task.status.reason}`
-              : taskState(task)}
-          </span>
+          {task.status.kind === 'waiting' && (
+            <span>Ожидание: {task.status.reason}</span>
+          )}
           {task.deadline && (
             <>
               <span aria-hidden="true">·</span>
@@ -184,7 +183,9 @@ export function TodayScreen({
         <section className="queue" aria-labelledby="queue-heading">
           <div className="queue-heading">
             <h2 id="queue-heading">Очередь на сегодня</h2>
-            <span className="queue-count">{available.length} ДЕЛА</span>
+            <span className="queue-count">
+              {taskCountPhrase(available.length)}
+            </span>
           </div>
           <ol className="task-list">
             {tasks.map((task, index) => (

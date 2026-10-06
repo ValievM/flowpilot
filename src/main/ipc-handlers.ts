@@ -11,7 +11,11 @@ import {
 
 type RegistrationDependencies = {
   readonly repository: Repository;
-  readonly appInfo: { getName(): string; getVersion(): string };
+  readonly appInfo: {
+    getName(): string;
+    getVersion(): string;
+    getNow(): string;
+  };
 };
 
 export function registerIpcHandlers(

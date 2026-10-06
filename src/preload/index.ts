@@ -3,6 +3,7 @@ import { contextBridge } from 'electron';
 import { ipcRenderer } from 'electron';
 import {
   ipcChannels,
+  type AppInfo,
   type FlowPilotApi,
   type CommandsApplyRequest,
   type SettingsSetRequest,
@@ -10,12 +11,7 @@ import {
 } from '../shared/contracts';
 import type { Result } from '../shared/ipc-result';
 // Electron types invoke as untyped; main validates requests and returns this FlowPilotApi contract.
-const testNow =
-  process.defaultApp && process.env.FLOWPILOT_TEST === '1'
-    ? process.env.FLOWPILOT_TEST_NOW
-    : undefined;
 const api: FlowPilotApi = Object.freeze({
-  clock: { now: () => testNow },
   snapshot: {
     load: () =>
       ipcRenderer.invoke(ipcChannels.snapshotLoad, {}) as Promise<
@@ -40,9 +36,7 @@ const api: FlowPilotApi = Object.freeze({
   },
   app: {
     info: () =>
-      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<
-        Result<{ name: string; version: string }>
-      >,
+      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<Result<AppInfo>>,
   },
 });
 

@@ -187,6 +187,10 @@ h1 {
   line-height: var(--type-line-body);
 }
 
+.risk-label strong {
+  white-space: nowrap;
+}
+
 .risk-icon {
   flex: none;
   font-weight: var(--type-weight-strong);
@@ -242,6 +246,9 @@ h1 {
 }
 
 .risk-label.is-risk {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
   border-left: var(--selection-stroke) solid var(--danger);
   background: var(--danger-bg);
   color: var(--danger);

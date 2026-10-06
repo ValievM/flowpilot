@@ -39,6 +39,7 @@ if (!app.requestSingleInstanceLock()) {
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
+          getNow: () => runtime.clock.now().toString(),
         },
       });
       createWindow();

@@ -4,16 +4,28 @@ import { Temporal } from 'temporal-polyfill';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-const TEST_NOW = '2026-10-05T12:00:00Z';
-const TODAY_DATE = Temporal.Instant.from(TEST_NOW)
-  .toZonedDateTimeISO(Temporal.Now.timeZoneId())
-  .toPlainDate();
+const DEFAULT_TEST_NOW = '2026-10-05T12:00:00Z';
+const SNAPSHOT_NOW = '2026-10-05T12:00:00Z';
+const TEST_NOW = process.env.FLOWPILOT_TEST_NOW ?? DEFAULT_TEST_NOW;
+function localDateAt(instant: string): Temporal.PlainDate {
+  return Temporal.Instant.from(instant)
+    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+    .toPlainDate();
+}
+
+function todayLabelAt(instant: string): string {
+  const date = localDateAt(instant);
+  return `Сегодня, ${date.toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  })}`;
+}
+
+const TODAY_DATE = localDateAt(TEST_NOW);
 const TODAY = TODAY_DATE.toString();
-const DEADLINE = TODAY_DATE.add({ days: 4 }).toString();
-const TODAY_LABEL = `Сегодня, ${new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'long',
-}).format(new Date(TEST_NOW))}`;
+const SNAPSHOT_DATE = localDateAt(SNAPSHOT_NOW);
+const SNAPSHOT_DAY = SNAPSHOT_DATE.toString();
+const SNAPSHOT_DEADLINE = SNAPSHOT_DATE.add({ days: 4 }).toString();
 const SNAPSHOT_WINDOW = {
   width: 1280,
   height: 800,
@@ -24,8 +36,7 @@ let app: ElectronApplication | undefined;
 // Playwright initializes the renderer page in beforeEach before each test body.
 let page!: Page;
 let profilePath: string;
-test.beforeEach(async () => {
-  profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
+async function startApp(now: string, verifyDate = true): Promise<void> {
   app = await electron.launch({
     args: [
       path.resolve(__dirname, '../..'),
@@ -35,7 +46,7 @@ test.beforeEach(async () => {
     env: {
       ...process.env,
       FLOWPILOT_TEST: '1',
-      FLOWPILOT_TEST_NOW: TEST_NOW,
+      FLOWPILOT_TEST_NOW: now,
       FLOWPILOT_TEST_PROFILE: profilePath,
     },
   });
@@ -47,9 +58,21 @@ test.beforeEach(async () => {
     width: SNAPSHOT_WINDOW.width,
     height: SNAPSHOT_WINDOW.height,
   });
-  await expect(
-    page.getByRole('heading', { name: TODAY_LABEL, exact: true }),
-  ).toBeVisible();
+  if (verifyDate) {
+    await expect(
+      page.getByRole('heading', { name: todayLabelAt(now), exact: true }),
+    ).toBeVisible();
+  }
+}
+test.beforeEach(async () => {
+  const { title } = test.info();
+  profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
+  const fixtureNow = title.startsWith('matches ') ? SNAPSHOT_NOW : TEST_NOW;
+  await startApp(
+    fixtureNow,
+    title !==
+      'uses shifted main time for the Today header and Сейчас availability',
+  );
 });
 
 test.afterEach(async () => {
@@ -69,6 +92,53 @@ test('opens the app without exposing Node globals', async () => {
       () => typeof (window as Window & { process?: unknown }).process,
     ),
   ).toBe('undefined');
+});
+test('uses shifted main time for the Today header and Сейчас availability', async () => {
+  const shiftedNow = Temporal.Instant.from(TEST_NOW)
+    .add({ hours: 720 })
+    .toString();
+  const shiftedDate = localDateAt(shiftedNow).toString();
+  await app?.close();
+  app = undefined;
+  rmSync(profilePath, { recursive: true, force: true });
+  profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-shifted-'));
+  await startApp(shiftedNow);
+  const result = await page.evaluate(
+    async (day) =>
+      window.flowpilot.commands.apply({
+        expectedRevision: 0,
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'shifted-today',
+              title: 'Дело в смещённом Сегодня',
+              description: '',
+              status: { kind: 'todo' },
+              columnId: 'todo',
+              day,
+              subtasks: [],
+              comments: [],
+              attachments: [],
+              addedOrder: 0,
+            },
+          },
+        ],
+      }),
+    shiftedDate,
+  );
+  expect(result).toMatchObject({ ok: true });
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Дело в смещённом Сегодня', level: 3 }),
+  ).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Сейчас' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Дело в смещённом Сегодня' }),
+  ).toBeVisible();
 });
 
 test('loads an empty profile and shows the empty state in Сейчас', async () => {
@@ -254,7 +324,7 @@ for (const screen of ['today', 'now'] as const) {
               ],
               expectedRevision: 0,
             }),
-          { today: TODAY, deadline: DEADLINE },
+          { today: SNAPSHOT_DAY, deadline: SNAPSHOT_DEADLINE },
         );
         expect(seeded).toMatchObject({ ok: true, value: { revision: 1 } });
         await page.evaluate(() => {

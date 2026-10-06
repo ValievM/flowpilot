@@ -48,11 +48,19 @@ export const settingsSetRequestSchema = z
   .strict()
   .superRefine(validateSettingValue);
 export const appInfoRequestSchema = z.object({}).strict();
+export const appInfoResponseSchema = z
+  .object({
+    name: z.string(),
+    version: z.string(),
+    now: z.iso.datetime(),
+  })
+  .strict();
+export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
+
 export type FlowPilotApi = {
-  clock: { now(): string | undefined };
   snapshot: { load(): Promise<Result<IpcSnapshot>> };
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
@@ -62,6 +70,6 @@ export type FlowPilotApi = {
     set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
   };
   app: {
-    info(): Promise<Result<{ name: string; version: string }>>;
+    info(): Promise<Result<AppInfo>>;
   };
 };
