@@ -103,7 +103,8 @@ describe('Task persistence invariant', () => {
       addedOrder: 0,
     };
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
-    const revision = repository.load().revision;
+    const snapshotBeforeRejectedCreate = repository.load();
+    const revision = snapshotBeforeRejectedCreate.revision;
     const rejectedCreate = repository.apply(
       [
         {
@@ -117,8 +118,10 @@ describe('Task persistence invariant', () => {
       ok: false,
       error: { kind: 'InvalidCommand' },
     });
+    expect(repository.load()).toEqual(snapshotBeforeRejectedCreate);
     expect(repository.load().revision).toBe(revision);
     for (const field of rejectedFields) {
+      const snapshotBeforeRejectedUpdate = repository.load();
       const rejectedUpdate = repository.apply(
         [
           {
@@ -133,6 +136,7 @@ describe('Task persistence invariant', () => {
         ok: false,
         error: { kind: 'InvalidCommand' },
       });
+      expect(repository.load()).toEqual(snapshotBeforeRejectedUpdate);
       expect(repository.load().revision).toBe(revision);
     }
     repository.close();
