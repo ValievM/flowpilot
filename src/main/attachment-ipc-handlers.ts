@@ -40,10 +40,12 @@ async function openAttachment(
 ): Promise<Result<null>> {
   const parsed = attachmentOpenRequestSchema.safeParse(request);
   if (!parsed.success) return failure('ValidationFailed');
-  const path = deps.repositories
+  const lookup = deps.repositories
     .current()
-    .attachmentPath(parsed.data.attachmentId);
-  if (!path) return failure('NotFound');
+    .attachmentPathResult(parsed.data.attachmentId);
+  if (lookup.kind === 'NotFound') return failure('NotFound');
+  if (lookup.kind !== 'Found') return failure('MissingFile');
+  const path = lookup.path;
   if (!existsSync(path)) return failure('MissingFile');
   try {
     return (await deps.shell.open(path))

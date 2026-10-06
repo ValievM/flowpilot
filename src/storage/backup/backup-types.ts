@@ -9,4 +9,13 @@ export type Verification =
   | { readonly ok: false; readonly problems: readonly BackupProblem[] };
 export type BackupResult =
   | { readonly ok: true; readonly value: string }
-  | { readonly ok: false; readonly error: string };
+  | {
+      readonly ok: false;
+      readonly kind: 'PackageInvalid';
+      readonly error: string;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: 'OperationalFailure';
+      readonly error: string;
+    };

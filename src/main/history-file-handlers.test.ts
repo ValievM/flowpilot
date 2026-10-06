@@ -1,8 +1,10 @@
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   rmSync,
+  truncateSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -10,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Repository } from '../storage';
+import { MAX_ATTACHMENT_SIZE_BYTES, Repository } from '../storage';
 import { createHistoryFileHandlers } from './history-file-handlers';
 
 const directories: string[] = [];
@@ -146,6 +148,43 @@ describe('history and file IPC handlers', () => {
     );
     system.repository().close();
   });
+  it('returns typed file errors when the dialog-selected attachment is missing', async () => {
+    const system = makeSystem();
+    addTask(system.repository(), 'task-1', 0);
+    system.dialogState.file = join(system.directory, 'missing.txt');
+
+    const result = await system.handlers.attachmentsAdd({ taskId: 'task-1' });
+
+    expect(result).toEqual({ ok: false, error: 'FileNotFound' });
+    system.repository().close();
+  });
+  it('returns TooLarge for an attachment beyond the storage limit', async () => {
+    const system = makeSystem();
+    addTask(system.repository(), 'task-1', 0);
+    const source = join(system.directory, 'large.bin');
+    writeFileSync(source, '');
+    truncateSync(source, MAX_ATTACHMENT_SIZE_BYTES + 1);
+    system.dialogState.file = source;
+
+    const result = await system.handlers.attachmentsAdd({ taskId: 'task-1' });
+
+    expect(result).toEqual({ ok: false, error: 'TooLarge' });
+    system.repository().close();
+  });
+  it('returns NotReadable for an unreadable dialog-selected attachment', async () => {
+    const system = makeSystem();
+    addTask(system.repository(), 'task-1', 0);
+    const source = join(system.directory, 'private.txt');
+    writeFileSync(source, 'notes');
+    chmodSync(source, 0);
+    system.dialogState.file = source;
+
+    const result = await system.handlers.attachmentsAdd({ taskId: 'task-1' });
+
+    chmodSync(source, 0o600);
+    expect(result).toEqual({ ok: false, error: 'NotReadable' });
+    system.repository().close();
+  });
 
   it('cancels attachment selection without changing storage', async () => {
     const system = makeSystem();
@@ -216,6 +255,24 @@ describe('history and file IPC handlers', () => {
 
     expect(result).toEqual({ ok: false, error: 'MissingFile' });
     expect(system.opened).toEqual([]);
+    system.repository().close();
+  });
+  it('returns MissingFile when the attachment directory is gone', async () => {
+    const system = makeSystem();
+    addTask(system.repository(), 'task-1', 0);
+    const source = join(system.directory, 'notes.txt');
+    writeFileSync(source, 'notes');
+    system.dialogState.file = source;
+    await system.handlers.attachmentsAdd({ taskId: 'task-1' });
+    const attachment = system.repository().load().tasks[0]?.attachments[0];
+    if (!attachment) throw new Error('The attachment should have been added');
+    rmSync(join(system.directory, 'attachments'), { recursive: true });
+
+    const result = await system.handlers.attachmentsOpen({
+      attachmentId: attachment.id,
+    });
+
+    expect(result).toEqual({ ok: false, error: 'MissingFile' });
     system.repository().close();
   });
 
@@ -316,6 +373,32 @@ describe('history and file IPC handlers', () => {
 
     expect(result).toEqual({ ok: false, error: 'PackageInvalid' });
     expect(system.repository().load()).toEqual(profile);
+    system.repository().close();
+  });
+  it('reports profile replacement failures as operational errors', async () => {
+    const system = makeSystem();
+    addTask(system.repository(), 'task-1', 0);
+    const exportParent = join(system.directory, 'exports');
+    mkdirSync(exportParent);
+    system.dialogState.folder = exportParent;
+    await system.handlers.backupExport({});
+    system.dialogState.folder = join(
+      exportParent,
+      readdirSync(exportParent)[0] ?? '',
+    );
+    const verified = await system.handlers.backupVerify({});
+    if (!verified.ok) throw new Error('The exported package should verify');
+    writeFileSync(
+      `${join(system.directory, 'flowpilot.db')}.before-restore-2026-10-05T12-00-00Z`,
+      'occupied',
+    );
+
+    const result = system.handlers.backupRestore({
+      packageToken: verified.value.packageToken,
+    });
+
+    expect(result).toEqual({ ok: false, error: 'NotReadable' });
+    expect(system.repository().load().tasks).toHaveLength(1);
     system.repository().close();
   });
 });

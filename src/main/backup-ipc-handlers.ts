@@ -71,7 +71,10 @@ function restoreBackup(
   const restored = restore(packagePath, deps.profilePath, deps.clock);
   const next = new Repository(deps.profilePath, deps.clock);
   deps.repositories.replace(next);
-  if (!restored.ok) return failure('PackageInvalid');
+  if (!restored.ok)
+    return failure(
+      restored.kind === 'PackageInvalid' ? 'PackageInvalid' : 'NotReadable',
+    );
   verifiedPackages.delete(parsed.data.packageToken);
   return loadSnapshot({}, { repository: next });
 }

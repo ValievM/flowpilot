@@ -48,7 +48,11 @@ export function exportTo(
     );
     temporary = `${folder}.tmp-${String(process.pid)}`;
     if (existsSync(folder))
-      return { ok: false, error: 'Папка экспорта уже существует' };
+      return {
+        ok: false,
+        kind: 'OperationalFailure',
+        error: 'Папка экспорта уже существует',
+      };
     mkdirSync(temporary, { recursive: false });
     ownsTemporary = true;
     const data = readProfile(profilePath);
@@ -61,7 +65,11 @@ export function exportTo(
     return { ok: true, value: folder };
   } catch (error) {
     if (ownsTemporary) rmSync(temporary, { recursive: true, force: true });
-    return { ok: false, error: errorMessage(error) };
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: errorMessage(error),
+    };
   }
 }
 

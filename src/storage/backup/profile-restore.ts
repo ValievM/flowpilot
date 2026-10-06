@@ -31,6 +31,7 @@ export function restore(
   if (!verification.ok)
     return {
       ok: false,
+      kind: 'PackageInvalid',
       error: verification.problems
         .map((item) => `${item.path}: ${item.message}`)
         .join('; '),
@@ -42,7 +43,11 @@ export function restore(
     restoredAt = instant.toString();
     paths = makePaths(profilePath, instant.toString().replaceAll(':', '-'));
   } catch (error) {
-    return { ok: false, error: errorMessage(error) };
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: errorMessage(error),
+    };
   }
   return buildAndReplace({
     dir,
@@ -84,7 +89,11 @@ function buildAndReplace(input: {
     };
   } catch (error) {
     rollbackProfile(input.paths, state);
-    return { ok: false, error: errorMessage(error) };
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: errorMessage(error),
+    };
   } finally {
     rmSync(input.paths.stageDir, { recursive: true, force: true });
   }

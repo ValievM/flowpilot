@@ -104,6 +104,24 @@ export class Repository {
           message: `Invalid ${invalid.kind} command`,
         },
       };
+    const preparedResult = this.prepareAttachments(commands);
+    if (!preparedResult.ok) return preparedResult;
+    const prepared = preparedResult.value;
+    return applyCommands(this.database, {
+      commands,
+      expectedRevision,
+      now: this.clock.now().toString(),
+      attachmentFiles: this.attachments,
+      preparedAttachments: prepared,
+      source: options.source ?? 'user',
+    });
+  }
+
+  private prepareAttachments(
+    commands: readonly StorageCommand[],
+  ):
+    | { ok: true; value: Map<number, AttachmentRecord> }
+    | Extract<ApplyResult, { ok: false }> {
     const prepared = new Map<number, AttachmentRecord>();
     for (const [index, command] of commands.entries()) {
       if (command.kind !== 'attachment.add') continue;
@@ -115,19 +133,19 @@ export class Repository {
         for (const file of prepared.values()) this.attachments.discard(file.id);
         return {
           ok: false,
-          error: { kind: 'InvalidCommand', message: result.error.kind },
+          error:
+            result.error.kind === 'NotAFile' ||
+            result.error.kind === 'CopyFailed'
+              ? {
+                  kind: 'InvalidCommand',
+                  message: result.error.kind,
+                }
+              : result.error,
         };
       }
       prepared.set(index, result.value);
     }
-    return applyCommands(this.database, {
-      commands,
-      expectedRevision,
-      now: this.clock.now().toString(),
-      attachmentFiles: this.attachments,
-      preparedAttachments: prepared,
-      source: options.source ?? 'user',
-    });
+    return { ok: true, value: prepared };
   }
 
   history(limit: number, before?: string): HistoryPage {
@@ -144,6 +162,9 @@ export class Repository {
   }
   attachmentPath(attachmentId: string): string | undefined {
     return this.attachments.getPath(attachmentId);
+  }
+  attachmentPathResult(attachmentId: string) {
+    return this.attachments.getPathResult(attachmentId);
   }
 
   close(): void {
