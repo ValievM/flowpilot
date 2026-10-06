@@ -485,31 +485,48 @@ test('rejects generic theme writes without changing the live appearance', async 
   });
 });
 
-test('removes the titlebar inset in native full screen', async () => {
-  test.skip(
-    process.env.FLOWPILOT_E2E === '1',
-    'Native fullscreen requires visible startup and is verified separately.',
+test('removes the titlebar inset while fullscreen state is active', async () => {
+  const windowBefore = await app?.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowBefore).toEqual({ visible: false, focused: false });
+  const dragRegion = page.locator('.sidebar-titlebar-drag');
+  const initialHeight = await dragRegion.evaluate((element) =>
+    Number.parseFloat(getComputedStyle(element).height),
   );
-  await app?.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]?.setFullScreen(true);
+  expect(initialHeight).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    document.documentElement.toggleAttribute('data-full-screen', true);
+  });
+  const fullscreenInsets = await dragRegion.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      height: style.height,
+      marginTop: style.marginTop,
+      marginBottom: style.marginBottom,
+    };
+  });
+  expect(fullscreenInsets).toEqual({
+    height: '0px',
+    marginTop: '0px',
+    marginBottom: '0px',
+  });
+  const windowAfter = await app?.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowAfter).toEqual({ visible: false, focused: false });
+  await page.evaluate(() => {
+    document.documentElement.removeAttribute('data-full-screen');
   });
   await expect
     .poll(() =>
-      page.evaluate(() =>
-        document.documentElement.hasAttribute('data-full-screen'),
+      dragRegion.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).height),
       ),
     )
-    .toBe(true);
-  await app?.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]?.setFullScreen(false);
-  });
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        document.documentElement.hasAttribute('data-full-screen'),
-      ),
-    )
-    .toBe(false);
+    .toBe(initialHeight);
 });
 test('keeps the navigation titlebar clear across supported widths', async () => {
   for (const width of [900, 1280, 1440, 1728]) {

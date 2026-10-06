@@ -112,12 +112,13 @@ test('moves a persisted task with the narrow-layout keyboard', async () => {
   await card.focus();
   await expect(card).toBeFocused();
   await card.press('Space');
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
   await card.press('ArrowDown');
   await expect(page.getByRole('region', { name: 'Делаю' })).toHaveAttribute(
     'data-drop-active',
     'true',
   );
-  await page.keyboard.press('Space');
+  await card.press('Space');
   await expect(
     page.getByRole('region', { name: 'Делаю' }).getByRole('article'),
   ).toBeVisible();
