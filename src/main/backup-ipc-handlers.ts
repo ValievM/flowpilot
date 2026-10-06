@@ -11,8 +11,10 @@ import {
   exportTo,
   Repository,
   restore,
+  rollbackRestoredProfile,
   verifyPackage,
   type BackupResult,
+  type RestoredProfileBackup,
 } from '../storage';
 import type { HistoryFileDependencies } from './history-file-dependencies';
 import { loadSnapshot } from './handlers';
@@ -75,14 +77,16 @@ function restoreBackup(
   const current = deps.repositories.current();
   current.close();
   const restored = runRestore(packagePath, deps);
-  const next = new Repository(deps.profilePath, deps.clock);
-  deps.repositories.replace(next);
+  const reopened = reopenRepository(deps, restored);
+  if (!reopened.ok) return failure('NotReadable');
+  deps.repositories.replace(reopened.repository);
+  if (reopened.rolledBack) return failure('NotReadable');
   if (!restored.ok)
     return failure(
       restored.kind === 'PackageInvalid' ? 'PackageInvalid' : 'NotReadable',
     );
   verifiedPackages.delete(parsed.data.packageToken);
-  return loadSnapshot({}, { repository: next });
+  return loadSnapshot({}, { repository: reopened.repository });
 }
 
 function runRestore(
@@ -97,6 +101,50 @@ function runRestore(
       kind: 'OperationalFailure',
       error: error instanceof Error ? error.message : 'Неизвестная ошибка',
     };
+  }
+}
+
+type ReopenOutcome =
+  | {
+      readonly ok: true;
+      readonly repository: Repository;
+      readonly rolledBack: boolean;
+    }
+  | { readonly ok: false };
+
+function reopenRepository(
+  deps: HistoryFileDependencies,
+  restored: BackupResult,
+): ReopenOutcome {
+  try {
+    return {
+      ok: true,
+      repository: new Repository(deps.profilePath, deps.clock),
+      rolledBack: false,
+    };
+  } catch {
+    if (!restored.ok || !restored.backup) return { ok: false };
+    return reopenRolledBackProfile(deps, restored.backup);
+  }
+}
+
+function reopenRolledBackProfile(
+  deps: HistoryFileDependencies,
+  backup: RestoredProfileBackup,
+): ReopenOutcome {
+  try {
+    rollbackRestoredProfile({
+      profilePath: deps.profilePath,
+      backupDb: backup.db,
+      backupAttachments: backup.attachments,
+    });
+    return {
+      ok: true,
+      repository: new Repository(deps.profilePath, deps.clock),
+      rolledBack: true,
+    };
+  } catch {
+    return { ok: false };
   }
 }
 

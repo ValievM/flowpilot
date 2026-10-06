@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Clock } from '../types';
-import type { BackupResult } from './backup-types';
+import type { BackupResult, RestoredProfileBackup } from './backup-types';
 import { verifyPackage } from './package-verify';
 import { buildProfile } from './profile-build';
 
@@ -87,6 +87,7 @@ function buildAndReplace(input: {
       value: input.paths.backupPath
         ? `Профиль восстановлен. Прежние данные сохранены здесь: ${input.paths.backupPath}`
         : 'Профиль восстановлен; прежнего профиля для резервного копирования не было.',
+      backup: restoredBackup(input.paths, state),
     };
   } catch (error) {
     result = rollbackToFailure(input.paths, state, error);
@@ -139,7 +140,7 @@ function makePaths(profilePath: string, timestamp: string): RestorePaths {
     stageDir,
     oldDb,
     oldAttachments: join(parent, `attachments.before-restore-${timestamp}`),
-    attachmentDir: join(parent, 'attachments'),
+    attachmentDir: attachmentDirectory(profilePath),
     backupPath: existsSync(profilePath) ? oldDb : undefined,
   };
 }
@@ -168,6 +169,39 @@ function rollbackProfile(paths: RestorePaths, state: ReplacementState): void {
   if (state.movedDb) renameSync(paths.oldDb, paths.profilePath);
   if (state.movedAttachments)
     renameSync(paths.oldAttachments, paths.attachmentDir);
+}
+
+function restoredBackup(
+  paths: RestorePaths,
+  state: ReplacementState,
+): RestoredProfileBackup | undefined {
+  if (!state.movedDb) return undefined;
+  return {
+    db: paths.oldDb,
+    attachments: state.movedAttachments ? paths.oldAttachments : undefined,
+  };
+}
+
+export function rollbackRestoredProfile(input: {
+  profilePath: string;
+  backupDb: string;
+  backupAttachments?: string | undefined;
+}): void {
+  if (!existsSync(input.backupDb))
+    throw new Error('Резервная копия прежнего профиля не найдена');
+  const attachmentDir = attachmentDirectory(input.profilePath);
+  if (input.backupAttachments && !existsSync(input.backupAttachments))
+    throw new Error('Резервная копия прежних вложений не найдена');
+  rmSync(input.profilePath, { force: true });
+  if (existsSync(attachmentDir))
+    rmSync(attachmentDir, { recursive: true, force: true });
+  renameSync(input.backupDb, input.profilePath);
+  if (input.backupAttachments)
+    renameSync(input.backupAttachments, attachmentDir);
+}
+
+function attachmentDirectory(profilePath: string): string {
+  return join(dirname(profilePath), 'attachments');
 }
 
 function errorMessage(error: unknown): string {
