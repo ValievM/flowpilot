@@ -470,6 +470,35 @@ describe('AI context assembly (F-10)', () => {
     );
   });
 
+  it('redacts lowercase spaced relative Windows paths without leaking fragments', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('lowercase-relative-windows-spaces', {
+            title:
+              'Review shared drive\\project notes\\private file.txt, then continue',
+            description:
+              'input/output; and/or. Keep URL https://example.com/config/secret.txt.',
+            comments: [{ id: 'comment-1', text: 'Keep this prose, please.' }],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe(
+      'Review [путь скрыт], then continue',
+    );
+    expect(result.tasks[0]?.untrusted.description).toBe(
+      'input/output; and/or. Keep URL https://example.com/config/secret.txt.',
+    );
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      'Keep this prose, please.',
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /(?:shared drive|project notes|private file\.txt)/i,
+    );
+  });
+
   it('keeps task category references and sanitized subtask progress in context', () => {
     const result = buildContext(
       input({

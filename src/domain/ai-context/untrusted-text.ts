@@ -1,7 +1,7 @@
 import { MAX_CONTEXT_TEXT_LENGTH } from './context-types';
 
 const SPACED_RELATIVE_WINDOWS_PATH = new RegExp(
-  String.raw`(?<![\w/:.=?&\\])\p{Lu}[\p{L}\p{N}_.-]*\s+\p{Lu}[\p{L}\p{N}_.-]*\\(?:[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\\)*[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\.[\p{L}\p{N}]+`,
+  String.raw`(?<![\w/:.=?&\\])\p{L}[\p{L}\p{N}_.-]*\s+\p{L}[\p{L}\p{N}_.-]*\\(?:[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\\)*[\p{L}\p{N}_.-]+\s+[\p{L}\p{N}_.-]+\.[\p{L}\p{N}]+`,
   'gu',
 );
 
