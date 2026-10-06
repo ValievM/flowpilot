@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
 import { registerIpcHandlers } from './ipc-handlers';
-import { selectRuntimeOptions } from './runtime';
+import { selectRuntimeOptions, selectWindowOptions } from './runtime';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
 
@@ -68,11 +68,14 @@ app.on('window-all-closed', () => {
 });
 
 function createWindow(): void {
+  const windowOptions = selectWindowOptions(runtime.isE2E);
   mainWindow = new BrowserWindow({
+    ...windowOptions,
     width: 1280,
     height: 800,
     minWidth: 900,
     webPreferences: {
+      ...windowOptions.webPreferences,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       sandbox: true,
