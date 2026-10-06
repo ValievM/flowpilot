@@ -433,6 +433,19 @@ test('persists settings and applies reduced motion to control transitions', asyn
   await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
 });
 
+for (const width of [760, 600]) {
+  test(`keeps the workspace visible below the sidebar at ${width.toString()}px`, async () => {
+    await page.setViewportSize({ width, height: 800 });
+    const sidebar = await page.locator('.sidebar').boundingBox();
+    const workspace = await page.locator('.workspace').boundingBox();
+    if (!sidebar || !workspace)
+      throw new Error('Боковая панель или рабочая область не отображается.');
+    await expect(page.locator('.sidebar')).toHaveCSS('flex-direction', 'row');
+    expect(sidebar.height).toBeLessThan(800);
+    expect(workspace.y).toBeLessThan(800);
+  });
+}
+
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {
@@ -451,6 +464,73 @@ for (const width of [900, 1280]) {
         ),
       ).toBe(true);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      const themeChoice = page.getByRole('combobox', { name: 'Тема' });
+      await themeChoice.focus();
+      await page.keyboard.press('Tab');
+      await expect(
+        page.getByRole('combobox', { name: 'Уменьшить движение' }),
+      ).toBeFocused();
+      await expect
+        .poll(() =>
+          page
+            .getByRole('combobox', { name: 'Уменьшить движение' })
+            .evaluate((element) => getComputedStyle(element).outlineStyle),
+        )
+        .toBe('solid');
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      await expect
+        .poll(() =>
+          page.getByRole('combobox', { name: 'Тема' }).evaluate((element) => {
+            const styles = getComputedStyle(element);
+            return {
+              height: styles.height,
+              borderColor: styles.borderColor,
+              appearance: styles.appearance,
+              backgroundImage: styles.backgroundImage,
+            };
+          }),
+        )
+        .toMatchObject({
+          height: '36px',
+          appearance: 'none',
+        });
+      expect(
+        await page
+          .getByRole('checkbox', { name: 'Понедельник' })
+          .evaluate((element) => {
+            const reference = document.createElement('input');
+            reference.type = 'checkbox';
+            reference.style.accentColor = 'var(--accent)';
+            document.body.append(reference);
+            const matchesToken =
+              getComputedStyle(element).accentColor ===
+              getComputedStyle(reference).accentColor;
+            reference.remove();
+            return matchesToken;
+          }),
+      ).toBe(true);
+      const fieldset = page.getByRole('group', {
+        name: 'Дни недели, учитываемые при расчёте срока',
+      });
+      const card = page
+        .getByRole('heading', { name: 'Рабочие дни' })
+        .locator('..');
+      const fieldsetBounds = await fieldset.boundingBox();
+      const cardBounds = await card.boundingBox();
+      if (!fieldsetBounds || !cardBounds)
+        throw new Error('Настройка рабочих дней не отображается.');
+      expect(fieldsetBounds.x).toBeGreaterThan(cardBounds.x);
+      expect(fieldsetBounds.x + fieldsetBounds.width).toBeLessThan(
+        cardBounds.x + cardBounds.width,
+      );
+      const sidebar = await page.locator('.sidebar').boundingBox();
+      const content = await page.locator('.workspace').boundingBox();
+      if (!sidebar || !content)
+        throw new Error('Боковая панель или содержимое не отображается.');
+      expect(sidebar.height).toBeGreaterThanOrEqual(content.height);
       await expect(page).toHaveScreenshot(
         `settings-${theme}-${width.toString()}.png`,
         { fullPage: true, maxDiffPixelRatio: 0.00001 },

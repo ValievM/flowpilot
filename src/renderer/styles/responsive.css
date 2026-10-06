@@ -36,6 +36,7 @@
 
   .sidebar {
     position: static;
+    min-height: 0;
     height: auto;
     flex-direction: row;
     justify-content: space-between;
