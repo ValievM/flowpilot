@@ -42,6 +42,52 @@ describe('AI proposal application', () => {
     expect(repository.load().tasks[0]?.title).toBe('Draft');
     expect(repository.history(10).entries).toEqual(historyBefore);
   });
+  it('shows an existing rule document replacement in the confirmation diff', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'rule-1',
+      title: 'Старая версия',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const taskType = { id: 'type-1', name: 'Тип' };
+    const references = {
+      ...emptyReferences,
+      taskTypes: [taskType],
+      rules: [rule],
+    };
+    const { repository, application } = setup(() => references);
+    seedTask(repository);
+    const seeded = repository.apply(
+      [
+        { kind: 'taskType.create', taskType },
+        { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+        { kind: 'rule.activate', ruleId: rule.id },
+      ],
+      1,
+    );
+    expect(seeded.ok).toBe(true);
+    const updatedRule = { ...rule, title: 'Новая версия' };
+    const staged = application.applyProposal(
+      proposal('rule-diff', 2, [
+        { kind: 'rule.import', documentJson: JSON.stringify(updatedRule) },
+        { kind: 'rule.activate', ruleId: rule.id },
+      ]),
+      'confirm',
+    );
+    if (staged.kind !== 'confirmation-required')
+      throw new Error('Expected rule confirmation diff');
+    const change = staged.diff.changes.find(
+      ({ entityId, field }) => entityId === rule.id && field === 'document',
+    );
+    expect(change?.before).toMatchObject({ title: 'Старая версия' });
+    expect(change?.after).toMatchObject({ title: 'Новая версия' });
+    expect(repository.load().rules[0]?.activeDocument?.title).toBe(
+      'Старая версия',
+    );
+  });
 
   it('applies a confirmed proposal with AI history source', () => {
     const { repository, application } = setup();
@@ -232,115 +278,60 @@ describe('AI proposal application', () => {
     expect(repository.load().revision).toBe(2);
   });
 
-  it('rejects rule commands and catalog references as a whole before writing', () => {
-    const { repository, application } = setup();
+  it('atomically persists catalog classification and rule imports from an AI proposal', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'rule-1',
+      title: 'Исходное правило',
+      scope: { task_type_ids: ['type-1'], discipline_ids: ['discipline-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const taskType = { id: 'type-1', name: 'Тип' };
+    const discipline = { id: 'discipline-1', name: 'Дисциплина' };
+    const references = {
+      ...emptyReferences,
+      taskTypes: [taskType],
+      disciplines: [discipline],
+      rules: [rule],
+    };
+    const { repository, application } = setup(() => references);
     seedTask(repository);
-    const before = repository.history(10).entries;
-    const mixed = proposal('unsupported-rule', 1, [
-      {
-        kind: 'task.update',
-        id: 'task-1',
-        changes: { title: 'Must not apply' },
-      },
-      { kind: 'rule.activate', ruleId: 'rule-1' },
-    ]);
-
-    expect(application.applyProposal(mixed, 'auto')).toMatchObject({
-      kind: 'rejected',
-      error: { kind: 'NotPersistedYet', reason: 'not-persisted-yet' },
-    });
-    expect(repository.load().tasks[0]?.title).toBe('Draft');
-    expect(repository.load().revision).toBe(1);
-    expect(repository.history(10).entries).toEqual(before);
-    expect(repository.appliedProposal('unsupported-rule')).toBeUndefined();
-    const classify = proposal('unsupported-classify', 1, [
-      { kind: 'task.classify', taskId: 'task-1', typeId: 'type-1' },
-    ]);
-    expect(application.applyProposal(classify, 'auto')).toMatchObject({
-      kind: 'rejected',
-      error: { kind: 'NotPersistedYet', reason: 'not-persisted-yet' },
-    });
-    expect(repository.load().revision).toBe(1);
-    expect(repository.history(10).entries).toEqual(before);
-  });
-
-  it('rejects rule imports through applyProposal before any writes', () => {
-    const { repository, application } = setup();
-    seedTask(repository);
-    const stateBefore = repository.load();
-    const historyBefore = repository.history(10).entries;
-    const mixed = proposal('unsupported-rule-import', 1, [
-      {
-        kind: 'task.update',
-        id: 'task-1',
-        changes: { title: 'Must not apply' },
-      },
-      { kind: 'rule.import', documentJson: '{"rules":[]}' },
-    ]);
-
-    expect(application.applyProposal(mixed, 'auto')).toMatchObject({
-      kind: 'rejected',
-      error: {
-        kind: 'NotPersistedYet',
-        reason: 'not-persisted-yet',
-        commands: [
-          { index: 1, kind: 'rule.import', reason: 'not-persisted-yet' },
-        ],
-      },
-    });
-    expect(repository.load()).toEqual(stateBefore);
-    expect(repository.history(10).entries).toEqual(historyBefore);
-    expect(
-      repository.appliedProposal('unsupported-rule-import'),
-    ).toBeUndefined();
-  });
-
-  it('rejects a task creation with an unsupported catalog reference as a whole', () => {
-    const { repository, application } = setup();
-    const result = application.applyProposal(
-      proposal('unsupported-type', 0, [
+    const seeded = repository.apply(
+      [
+        { kind: 'taskType.create', taskType },
+        { kind: 'discipline.create', discipline },
+        { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+        { kind: 'rule.activate', ruleId: 'rule-1' },
+      ],
+      1,
+    );
+    expect(seeded.ok).toBe(true);
+    const updatedRule = { ...rule, title: 'Обновлённое правило' };
+    const applied = application.applyProposal(
+      proposal('persisted-rule', 2, [
+        { kind: 'task.update', id: 'task-1', changes: { title: 'Updated' } },
         {
-          kind: 'task.create',
-          task: { ...aiTask('new', 'New'), typeId: 'type-1' },
+          kind: 'task.classify',
+          taskId: 'task-1',
+          typeId: 'type-1',
+          disciplineId: 'discipline-1',
         },
+        { kind: 'rule.import', documentJson: JSON.stringify(updatedRule) },
+        { kind: 'rule.activate', ruleId: 'rule-1' },
       ]),
       'auto',
     );
-    expect(result).toMatchObject({
-      kind: 'rejected',
-      error: { kind: 'NotPersistedYet' },
-    });
-    expect(repository.load().tasks).toEqual([]);
-    expect(repository.load().revision).toBe(0);
-  });
 
-  it('rejects unsupported commands before stale proposals', () => {
-    const { repository, application } = setup();
-    seedTask(repository);
-    const historyBefore = repository.history(10).entries;
-
-    expect(
-      application.applyProposal(
-        proposal('stale-unsupported', 0, [
-          {
-            kind: 'task.update',
-            id: 'task-1',
-            changes: { title: 'Must not apply' },
-          },
-          { kind: 'rule.activate', ruleId: 'rule-1' },
-        ]),
-        'auto',
-      ),
-    ).toMatchObject({
-      kind: 'rejected',
-      error: { kind: 'NotPersistedYet', reason: 'not-persisted-yet' },
-    });
+    expect(applied).toMatchObject({ kind: 'applied', revision: 3 });
     expect(repository.load()).toMatchObject({
-      revision: 1,
-      tasks: [{ title: 'Draft' }],
+      tasks: [
+        { title: 'Updated', typeId: 'type-1', disciplineId: 'discipline-1' },
+      ],
+      rules: [{ activeDocument: { title: 'Обновлённое правило' } }],
     });
-    expect(repository.history(10).entries).toEqual(historyBefore);
-    expect(repository.appliedProposal('stale-unsupported')).toBeUndefined();
+    expect(repository.history(1).entries[0]?.source).toBe('ai');
   });
 
   it('uses changed rule fingerprints to reject a proposal as stale', () => {

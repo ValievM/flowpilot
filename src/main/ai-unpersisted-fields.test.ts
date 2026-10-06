@@ -90,16 +90,18 @@ const proposalWithOtherUnpersistedCommands = {
   commands: [proposal.commands[0], proposal.commands[2], proposal.commands[3]],
 };
 
-describe('AI commands for fields not persisted yet', () => {
-  it('rejects unpersisted fields individually while preserving other commands', () => {
+describe('AI task classification persistence', () => {
+  it('persists explicit classification while rejecting type fields on task creation', () => {
     const result = validateProposal(
       proposalWithOtherUnpersistedCommands,
       snapshot,
     );
 
-    expect(result.validCommands).toEqual([proposal.commands[3]]);
+    expect(result.validCommands).toEqual([
+      proposal.commands[0],
+      proposal.commands[3],
+    ]);
     expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.classify', reason: 'not-persisted-yet' },
       { index: 1, kind: 'task.create', reason: 'not-persisted-yet' },
     ]);
   });

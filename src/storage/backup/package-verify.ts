@@ -16,7 +16,7 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 10;
 type PackageContents = { manifest: BackupManifest; data: BackupData };
 
 export function verifyPackage(dir: string): Verification {
@@ -187,6 +187,8 @@ function verifyReferences(
 ): void {
   const columns = new Set(data.columns.map((item) => item.id));
   const tasks = new Set(data.tasks.map((item) => item.id));
+  verifyCatalogReferences(data, problems);
+  verifyRuleVersionReferences(data, problems);
   for (const item of data.tasks)
     if (!columns.has(item.column_id))
       problems.push({
@@ -217,6 +219,38 @@ function verifyReferences(
         message: `Метаданные вложения ${item.id} не совпадают с файлом`,
       });
   }
+}
+function verifyCatalogReferences(
+  data: BackupData,
+  problems: BackupProblem[],
+): void {
+  const taskTypes = new Set(data.task_types.map((item) => item.id));
+  const disciplines = new Set(data.disciplines.map((item) => item.id));
+  for (const task of data.tasks) {
+    if (task.type_id && !taskTypes.has(task.type_id))
+      problems.push({
+        path: 'data.json',
+        message: `Задача ${task.id} ссылается на отсутствующий тип`,
+      });
+    if (task.discipline_id && !disciplines.has(task.discipline_id))
+      problems.push({
+        path: 'data.json',
+        message: `Задача ${task.id} ссылается на отсутствующую дисциплину`,
+      });
+  }
+}
+
+function verifyRuleVersionReferences(
+  data: BackupData,
+  problems: BackupProblem[],
+): void {
+  const ruleIds = new Set(data.rules.map((rule) => rule.id));
+  for (const version of data.rule_versions)
+    if (!ruleIds.has(version.rule_id))
+      problems.push({
+        path: 'data.json',
+        message: `Версия правила ${version.rule_id} не связана с документом`,
+      });
 }
 
 function isPackagePath(path: string): boolean {

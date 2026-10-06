@@ -1,49 +1,15 @@
-import type Database from 'better-sqlite3';
-import type { StorageCommand } from './types';
+import Database from 'better-sqlite3';
 import { advanceColumnGeneration } from './column-generations';
-type EntityRef = { kind: 'task' | 'column' | 'setting'; id: string };
+export type EntityRef =
+  | { kind: 'task' | 'column' | 'setting'; id: string }
+  | { kind: 'taskType'; id: string }
+  | { kind: 'discipline'; id: string }
+  | { kind: 'rule'; id: string };
 type Row = Record<string, string | number | null>;
 export type EntitySnapshot = EntityRef & {
   state: string | null;
   version: number | null;
 };
-export function affectedEntities(
-  database: Database.Database,
-  command: StorageCommand,
-): EntityRef[] {
-  if ('task' in command) return [{ kind: 'task', id: command.task.id }];
-  if ('taskId' in command) return [{ kind: 'task', id: command.taskId }];
-  if (command.kind === 'task.update' || command.kind === 'task.move')
-    return [{ kind: 'task', id: command.id }];
-  if (command.kind === 'attachment.remove')
-    return attachmentOwner(database, command.attachmentId);
-  if ('column' in command) return [{ kind: 'column', id: command.column.id }];
-  if (command.kind === 'column.rename')
-    return [{ kind: 'column', id: command.id }];
-  if (command.kind === 'column.delete')
-    return deletedColumnEntities(database, command.id);
-  return [{ kind: 'setting', id: command.key }];
-}
-
-function attachmentOwner(database: Database.Database, id: string): EntityRef[] {
-  const row = database
-    .prepare('SELECT task_id FROM attachments WHERE id = ?')
-    .get(id) as { task_id: string } | undefined;
-  return row ? [{ kind: 'task', id: row.task_id }] : [];
-}
-
-function deletedColumnEntities(
-  database: Database.Database,
-  id: string,
-): EntityRef[] {
-  const rows = database
-    .prepare('SELECT id FROM tasks WHERE column_id = ?')
-    .all(id) as { id: string }[];
-  return [
-    { kind: 'column', id },
-    ...rows.map(({ id: taskId }) => ({ kind: 'task' as const, id: taskId })),
-  ];
-}
 
 export function snapshotEntity(
   database: Database.Database,
@@ -60,6 +26,12 @@ export function snapshotEntity(
     };
   }
   if (ref.kind === 'column') return snapshotColumn(database, ref);
+  if (
+    ref.kind === 'taskType' ||
+    ref.kind === 'discipline' ||
+    ref.kind === 'rule'
+  )
+    return snapshotStorageEntity(database, ref);
   const row = database
     .prepare('SELECT * FROM tasks WHERE id = ?')
     .get(ref.id) as Row | undefined;
@@ -81,6 +53,30 @@ export function snapshotEntity(
     }),
     version,
   };
+}
+function snapshotStorageEntity(
+  database: Database.Database,
+  ref: Extract<EntityRef, { kind: 'taskType' | 'discipline' | 'rule' }>,
+): EntitySnapshot {
+  const table =
+    ref.kind === 'taskType'
+      ? 'task_types'
+      : ref.kind === 'discipline'
+        ? 'disciplines'
+        : 'rule_documents';
+  const row = database
+    .prepare(`SELECT * FROM ${table} WHERE id=?`)
+    .get(ref.id) as Row | undefined;
+  if (!row) return { ...ref, state: null, version: null };
+  if (ref.kind !== 'rule')
+    return { ...ref, state: JSON.stringify(row), version: 1 };
+  const versions = database
+    .prepare(
+      'SELECT rule_id,version,document_json,accepted_at FROM rule_versions WHERE rule_id=? ORDER BY version',
+    )
+    .all(ref.id) as Row[];
+  const documentState = JSON.stringify({ row, versions });
+  return { ...ref, state: documentState, version: Number(row.version) };
 }
 
 function snapshotColumn(
@@ -122,7 +118,43 @@ export function restoreEntity(
     restoreColumn(database, snapshot);
     return;
   }
+  if (
+    snapshot.kind === 'taskType' ||
+    snapshot.kind === 'discipline' ||
+    snapshot.kind === 'rule'
+  ) {
+    restoreStorageEntity(database, snapshot);
+    return;
+  }
   restoreTask(database, snapshot);
+}
+function restoreStorageEntity(
+  database: Database.Database,
+  snapshot: Extract<
+    EntitySnapshot,
+    { kind: 'taskType' | 'discipline' | 'rule' }
+  >,
+): void {
+  const table =
+    snapshot.kind === 'taskType'
+      ? 'task_types'
+      : snapshot.kind === 'discipline'
+        ? 'disciplines'
+        : 'rule_documents';
+  if (snapshot.kind === 'rule')
+    database
+      .prepare('DELETE FROM rule_versions WHERE rule_id=?')
+      .run(snapshot.id);
+  database.prepare(`DELETE FROM ${table} WHERE id=?`).run(snapshot.id);
+  if (!snapshot.state) return;
+  if (snapshot.kind !== 'rule') {
+    insertRow(database, table, JSON.parse(snapshot.state) as Row);
+    return;
+  }
+  const state = JSON.parse(snapshot.state) as { row: Row; versions: Row[] };
+  insertRow(database, table, state.row);
+  for (const version of state.versions)
+    insertRow(database, 'rule_versions', version);
 }
 
 function restoreColumn(

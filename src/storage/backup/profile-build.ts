@@ -48,11 +48,15 @@ function populateDatabase(
     db.transaction(() => {
       clearProfileRows(db);
       insertRows(db, 'columns', data.columns);
+      insertRows(db, 'task_types', data.task_types);
+      insertRows(db, 'disciplines', data.disciplines);
       insertRows(db, 'tasks', data.tasks);
       insertRows(db, 'subtasks', data.subtasks);
       insertRows(db, 'comments', data.comments);
       insertRows(db, 'attachments', data.attachments);
       insertRows(db, 'settings', data.settings);
+      insertRows(db, 'rule_documents', data.rules);
+      insertRows(db, 'rule_versions', data.rule_versions);
       db.prepare('UPDATE metadata SET revision = ? WHERE singleton = 1').run(
         data.revision + 1,
       );
@@ -66,10 +70,14 @@ function populateDatabase(
 
 function clearProfileRows(db: Database.Database): void {
   for (const table of [
+    'rule_versions',
+    'rule_documents',
     'subtasks',
     'comments',
     'attachments',
     'tasks',
+    'task_types',
+    'disciplines',
     'columns',
     'settings',
   ] as const)

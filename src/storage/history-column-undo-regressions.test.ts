@@ -86,6 +86,16 @@ describe('column undo regressions', () => {
     legacyDatabase.exec(
       'ALTER TABLE tasks DROP COLUMN ai_rank; DROP TABLE applied_operations;',
     );
+    legacyDatabase.exec(`
+      DROP INDEX tasks_type_id;
+      DROP INDEX tasks_discipline_id;
+      ALTER TABLE tasks DROP COLUMN type_id;
+      ALTER TABLE tasks DROP COLUMN discipline_id;
+      DROP TABLE rule_versions;
+      DROP TABLE rule_documents;
+      DROP TABLE task_types;
+      DROP TABLE disciplines;
+    `);
     legacyDatabase.pragma('user_version = 5');
     legacyDatabase.close();
 

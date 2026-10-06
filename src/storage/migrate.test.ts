@@ -46,7 +46,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 10 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
@@ -66,6 +66,7 @@ describe('database migrations', () => {
     directories.push(directory);
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
+    database.exec(initialSchema);
     database.exec(`
       CREATE TABLE applied_operations (
         operation_id TEXT PRIMARY KEY,
@@ -82,7 +83,7 @@ describe('database migrations', () => {
 
     migrate(database, path);
 
-    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 10 }]);
     expect(
       database
         .prepare(

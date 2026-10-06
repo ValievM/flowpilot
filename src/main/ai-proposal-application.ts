@@ -1,12 +1,7 @@
 import type { ApplyResult, AiMode, Repository } from '../storage';
-import {
-  proposalSchema,
-  type AiPlannedCommand,
-  type Proposal,
-} from '../shared/ai-commands';
+import { proposalSchema, type Proposal } from '../shared/ai-commands';
 import {
   cloneAiCommands,
-  findUnpersistedCommands,
   isStale,
   toStorageCommands,
   validateProposal,
@@ -18,18 +13,6 @@ import type { AiSnapshot } from './ai-proposal-validation';
 export type AiReferenceData = Pick<
   AiSnapshot,
   'ruleVersions' | 'taskTypes' | 'disciplines' | 'rules'
->;
-type PersistedAiCommand = Extract<
-  AiPlannedCommand,
-  {
-    kind:
-      | 'task.create'
-      | 'task.update'
-      | 'task.move'
-      | 'subtask.add'
-      | 'comment.add'
-      | 'task.setAiRank';
-  }
 >;
 
 type RejectedCommand = RejectedAiCommand;
@@ -70,12 +53,6 @@ export type ProposalError =
       readonly message: string;
       readonly expectedRevision: number;
       readonly actualRevision: number;
-    }
-  | {
-      readonly kind: 'NotPersistedYet';
-      readonly reason: 'not-persisted-yet';
-      readonly message: string;
-      readonly commands: readonly RejectedCommand[];
     }
   | { readonly kind: 'ApplyFailed'; readonly message: string }
   | { readonly kind: 'Declined'; readonly message: string }
@@ -169,8 +146,6 @@ export class AiProposalApplication {
         kind: 'InvalidProposal',
         message: 'Предложение AI имеет неверный формат и не применено.',
       });
-    const unsupportedOutcome = rejectUnpersistedProposal(parsed.data.commands);
-    if (unsupportedOutcome) return unsupportedOutcome;
     const snapshot = this.currentSnapshot();
     if (isStale(parsed.data, snapshot.revision, snapshot.ruleVersions))
       return rejected(staleProposal(parsed.data, snapshot));
@@ -184,7 +159,7 @@ export class AiProposalApplication {
       ? cloneAiCommands(validation.validCommands)
       : validation.validCommands;
     const batch = toStorageCommands(commandsForDiff, snapshot);
-    const commands = batch.commands.filter(isStorageCommand);
+    const commands = batch.commands;
     if (needsConfirmation)
       return this.requireConfirmation({
         proposal: { ...parsed.data, commands: validation.validCommands },
@@ -223,30 +198,17 @@ export class AiProposalApplication {
 
   private currentSnapshot(): AiSnapshot {
     const current = this.repository.load();
-    return { ...current, ...this.getReferences() };
+    const references = this.getReferences();
+    return {
+      ...current,
+      ...references,
+      taskTypes: current.taskTypes,
+      disciplines: current.disciplines,
+      rules: current.rules.flatMap(({ activeDocument }) =>
+        activeDocument ? [activeDocument] : [],
+      ),
+    };
   }
-}
-
-function rejectUnpersistedProposal(
-  commands: readonly unknown[],
-): ProposalOutcome | undefined {
-  const unsupported = findUnpersistedCommands(commands);
-  if (unsupported.length === 0) return undefined;
-  return rejected({
-    kind: 'NotPersistedYet',
-    reason: 'not-persisted-yet',
-    message: 'Предложение содержит изменения, которые пока нельзя сохранить.',
-    commands: unsupported,
-  });
-}
-function isStorageCommand(
-  command: AiPlannedCommand,
-): command is PersistedAiCommand {
-  return (
-    command.kind !== 'task.classify' &&
-    command.kind !== 'rule.import' &&
-    command.kind !== 'rule.activate'
-  );
 }
 
 function applyResult(

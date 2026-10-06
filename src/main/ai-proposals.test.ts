@@ -67,10 +67,8 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(2);
-    expect(result.rejectedCommands).toEqual([
-      { index: 1, kind: 'task.classify', reason: 'not-persisted-yet' },
-    ]);
+    expect(result.validCommands).toHaveLength(3);
+    expect(result.rejectedCommands).toEqual([]);
   });
   it('keeps valid commands and rejects hallucinated task identifiers by name', () => {
     const result = validateProposal(
@@ -87,10 +85,10 @@ describe('AI proposal contract', () => {
     );
     expect(result.validCommands).toEqual([
       { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+      { kind: 'task.classify', taskId: 'task-1', typeId: 'type-1' },
     ]);
     expect(result.rejectedCommands).toEqual([
       { index: 1, kind: 'comment.add', reason: 'task-not-found' },
-      { index: 2, kind: 'task.classify', reason: 'not-persisted-yet' },
     ]);
   });
 
@@ -141,7 +139,7 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.rejectedCommands[0]?.reason).toBe('not-persisted-yet');
+    expect(result.rejectedCommands[0]?.reason).toBe('type-not-found');
   });
 
   it('requires an explicit reason when moving into waiting', () => {
