@@ -8,7 +8,7 @@ import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
 import { taskSummaryData } from './task-summary-data';
 import type { MotionChoice } from './use-reduced-motion';
-import type { ThemeChoice } from './theme/use-theme';
+import type { ThemeChoice } from '../shared/contracts';
 import type { View } from './types';
 
 export interface ScreenProps {
