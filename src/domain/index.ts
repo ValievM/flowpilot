@@ -102,3 +102,27 @@ export type { CategoryColor, Discipline, TaskType } from './task';
 export { DEFAULT_REMINDER_SETTINGS, planReminders } from './reminders';
 export { buildContext, contextFingerprint } from './ai-context/build-context';
 export type { AiContext, ContextInput } from './ai-context/context-types';
+export {
+  parseAnswerCreateCards,
+  parseAnswerNow,
+  parseAnswerReplan,
+  parseAnswerRuleEdit,
+  renderCreateCardsPrompt,
+  renderNowPrompt,
+  renderReplanPrompt,
+  renderRuleEditPrompt,
+} from './ai-prompts';
+export type {
+  AnswerIds,
+  CreateCardsAnswer,
+  CreateCardsPromptInput,
+  NowAnswer,
+  NowAnswerIds,
+  ParseAnswerResult,
+  ReplanAnswer,
+  ReplanPromptInput,
+  RenderedPrompt,
+  RuleEditAnswer,
+  RuleEditIds,
+  RuleEditPromptInput,
+} from './ai-prompts';
