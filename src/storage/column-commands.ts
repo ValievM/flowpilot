@@ -4,6 +4,8 @@ import { advanceColumnGeneration } from './column-generations';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { dateText } from './sql-values';
 import type { StorageCommand } from './types';
+import { loadTask, type TaskRow } from './snapshot-tasks';
+import { dateText } from './sql-values';
 
 export function executeColumnCommand(
   database: Database.Database,

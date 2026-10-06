@@ -5,12 +5,14 @@ import type { ApplyResult } from './use-board-snapshot';
 type Column = IpcSnapshot['columns'][number];
 type Apply = (
   commands: CommandsApplyRequest['commands'],
+  isCurrent?: () => boolean,
 ) => Promise<ApplyResult>;
 type Move = { taskId: string; columnId: string };
 type ActionsInput = {
   snapshot: IpcSnapshot | undefined;
   apply: Apply;
   dialogSubmission: React.RefObject<number | undefined>;
+  moveSubmission: React.RefObject<Map<string, Map<string, number>>>;
   dialogSession: { current: number };
   editingColumn: Column | undefined;
   setEditingColumn: (column: Column | undefined) => void;
@@ -51,7 +53,14 @@ async function moveTask(
 ): Promise<void> {
   const task = input.snapshot?.tasks.find((item) => item.id === taskId);
   if (!task || task.columnId === column.id) return;
-  if (column.state === 'waiting') {
+  if (
+    input.waitingMove?.taskId === taskId &&
+    input.waitingMove.columnId === column.id
+  ) {
+    return;
+  }
+  const targetState = column.state;
+  if (targetState === 'waiting') {
     input.dialogSession.current += 1;
     input.setDialogError('');
     input.setWaitingMove({ taskId, columnId: column.id });
@@ -59,14 +68,37 @@ async function moveTask(
     input.setWaitingUntil('');
     return;
   }
-  await input.apply([
-    {
-      kind: 'task.move',
-      id: task.id,
-      columnId: column.id,
-      status: { kind: column.state },
-    },
-  ]);
+  await applyTaskMove(input, taskId, column, targetState);
+}
+
+async function applyTaskMove(
+  input: ActionsInput,
+  taskId: string,
+  column: Column,
+  state: Exclude<Column['state'], 'waiting'>,
+): Promise<void> {
+  const session = input.dialogSession.current;
+  const taskTargets =
+    input.moveSubmission.current.get(taskId) ?? new Map<string, number>();
+  if (taskTargets.get(column.id) === session) return;
+  taskTargets.set(column.id, session);
+  input.moveSubmission.current.set(taskId, taskTargets);
+  try {
+    await input.apply(
+      [
+        {
+          kind: 'task.move',
+          id: taskId,
+          columnId: column.id,
+          status: { kind: state },
+        },
+      ],
+      () => session === input.dialogSession.current,
+    );
+  } finally {
+    if (taskTargets.get(column.id) === session) taskTargets.delete(column.id);
+    if (taskTargets.size === 0) input.moveSubmission.current.delete(taskId);
+  }
 }
 
 async function confirmWaitingMove(
@@ -78,23 +110,34 @@ async function confirmWaitingMove(
   const waitingMove = input.waitingMove;
   if (!waitingMove || !reason) return;
   const session = input.dialogSession.current;
+  if (input.dialogSubmission.current === session) return;
+  input.dialogSubmission.current = session;
+  input.setDialogError('');
   const status = input.waitingUntil
     ? { kind: 'waiting' as const, reason, until: input.waitingUntil }
     : { kind: 'waiting' as const, reason };
-  const result = await input.apply([
-    {
-      kind: 'task.move',
-      id: waitingMove.taskId,
-      columnId: waitingMove.columnId,
-      status,
-    },
-  ]);
-  if (session !== input.dialogSession.current) return;
-  if (result.ok) {
-    input.dialogSession.current += 1;
-    input.setWaitingMove(undefined);
-  } else {
-    input.setDialogError(result.message);
+  try {
+    const result = await input.apply(
+      [
+        {
+          kind: 'task.move',
+          id: waitingMove.taskId,
+          columnId: waitingMove.columnId,
+          status,
+        },
+      ],
+      () => session === input.dialogSession.current,
+    );
+    if (session !== input.dialogSession.current) return;
+    if (result.ok) {
+      input.dialogSession.current += 1;
+      input.setWaitingMove(undefined);
+    } else {
+      input.setDialogError(result.message);
+    }
+  } finally {
+    if (input.dialogSubmission.current === session)
+      input.dialogSubmission.current = undefined;
   }
 }
 
@@ -128,7 +171,10 @@ async function saveBoardColumn(
         },
       };
   try {
-    const result = await input.apply([command]);
+    const result = await input.apply(
+      [command],
+      () => session === input.dialogSession.current,
+    );
     if (session !== input.dialogSession.current) return;
     if (result.ok) {
       input.dialogSession.current += 1;
@@ -147,17 +193,11 @@ async function deleteBoardColumn(
   input: ActionsInput,
   columnId = input.deletingId,
 ): Promise<boolean> {
-  if (
-    !input.snapshot ||
-    !columnId ||
-    (input.snapshot.tasks.some((task) => task.columnId === columnId) &&
-      !input.deleteTarget)
-  ) {
-    return false;
-  }
-  const hasTasks = input.snapshot.tasks.some(
-    (task) => task.columnId === columnId,
-  );
+  const snapshot = input.snapshot;
+  if (!snapshot || !columnId) return false;
+  const hasTasks = snapshot.tasks.some((task) => task.columnId === columnId);
+  const waiting = waitingDetailsForDelete(input, snapshot, hasTasks);
+  if (!waiting.ok) return false;
   const session = input.dialogSession.current;
   if (input.dialogSubmission.current === session) return false;
   input.dialogSubmission.current = session;
@@ -166,15 +206,53 @@ async function deleteBoardColumn(
     kind: 'column.delete',
     id: columnId,
     ...(hasTasks ? { targetColumnId: input.deleteTarget } : {}),
+    ...(waiting.details ? { waiting: waiting.details } : {}),
   };
   let result: ApplyResult;
   try {
-    result = await input.apply([command]);
+    result = await input.apply(
+      [command],
+      () => session === input.dialogSession.current,
+    );
   } finally {
     if (input.dialogSubmission.current === session)
       input.dialogSubmission.current = undefined;
   }
   return completeColumnDelete(input, session, result);
+}
+
+type WaitingDeleteDetails = {
+  reason: string;
+  until?: string;
+};
+type WaitingDeleteResult =
+  { ok: true; details?: WaitingDeleteDetails } | { ok: false };
+
+function waitingDetailsForDelete(
+  input: ActionsInput,
+  snapshot: IpcSnapshot,
+  hasTasks: boolean,
+): WaitingDeleteResult {
+  if (hasTasks && !input.deleteTarget) return { ok: false };
+  const waitingTarget =
+    hasTasks &&
+    snapshot.columns.some(
+      (column) =>
+        column.id === input.deleteTarget && column.state === 'waiting',
+    );
+  if (!waitingTarget) return { ok: true };
+  const reason = input.waitingReason.trim();
+  if (!reason) {
+    input.setDialogError('Укажите причину ожидания.');
+    return { ok: false };
+  }
+  return {
+    ok: true,
+    details: {
+      reason,
+      ...(input.waitingUntil ? { until: input.waitingUntil } : {}),
+    },
+  };
 }
 
 function completeColumnDelete(
@@ -189,6 +267,8 @@ function completeColumnDelete(
   }
   input.dialogSession.current += 1;
   input.setDeletingId(undefined);
+  input.setWaitingReason('');
+  input.setWaitingUntil('');
   input.setDeleteTarget('');
   return true;
 }

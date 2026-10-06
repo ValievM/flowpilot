@@ -28,6 +28,7 @@ type BoardUiState = {
   setDialogError: (message: string) => void;
   dialogSession: React.RefObject<number>;
   dialogSubmission: React.RefObject<number | undefined>;
+  moveSubmission: React.RefObject<Map<string, Map<string, number>>>;
   advanceDialogSession: () => void;
 };
 
@@ -73,6 +74,7 @@ function useBoardUiState(): BoardUiState {
   const [deleteTarget, setDeleteTarget] = React.useState('');
   const dialogSession = React.useRef(0);
   const dialogSubmission = React.useRef<number | undefined>(undefined);
+  const moveSubmission = React.useRef(new Map<string, Map<string, number>>());
   const advanceDialogSession = (): void => {
     dialogSession.current += 1;
   };
@@ -97,6 +99,7 @@ function useBoardUiState(): BoardUiState {
     advanceDialogSession,
     dialogSession,
     dialogSubmission,
+    moveSubmission,
   };
 }
 
@@ -142,6 +145,8 @@ function BoardTaskColumns({
           ui.advanceDialogSession();
           ui.setDeletingId(column.id);
           ui.setDeleteTarget('');
+          ui.setWaitingReason('');
+          ui.setWaitingUntil('');
           return;
         }
         void deleteEmptyColumn(actions, column.id);
@@ -185,6 +190,8 @@ function BoardDialogWorkspace({
         ui.advanceDialogSession();
         ui.setDeletingId(undefined);
         ui.setDeleteTarget('');
+        ui.setWaitingReason('');
+        ui.setWaitingUntil('');
         ui.setDialogError('');
       }}
       onWaitingReason={ui.setWaitingReason}

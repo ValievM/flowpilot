@@ -24,8 +24,30 @@ type DialogProps = {
   onConfirmWaiting: (event: React.SyntheticEvent<HTMLFormElement>) => void;
   onCancelWaiting: () => void;
 };
+type WaitingFieldsProps = {
+  reason: string;
+  until: string;
+  onReason: (value: string) => void;
+  onUntil: (value: string) => void;
+};
+type DeleteDialogProps = {
+  columns: readonly Column[];
+  deletingId: string | undefined;
+  target: string;
+  error: string;
+  waitingFields: WaitingFieldsProps;
+  onTarget: (value: string) => void;
+  onDelete: () => void;
+  onCancel: () => void;
+};
 
 export function BoardDialogs(props: DialogProps): React.JSX.Element {
+  const waitingFields = {
+    reason: props.waitingReason,
+    until: props.waitingUntil,
+    onReason: props.onWaitingReason,
+    onUntil: props.onWaitingUntil,
+  };
   return (
     <>
       <ColumnDialog
@@ -40,6 +62,7 @@ export function BoardDialogs(props: DialogProps): React.JSX.Element {
         deletingId={props.deletingId}
         target={props.deleteTarget}
         error={props.error}
+        waitingFields={waitingFields}
         onTarget={props.onDeleteTarget}
         onDelete={props.onDelete}
         onCancel={props.onCancelDelete}
@@ -93,51 +116,46 @@ function ColumnDialog({
   );
 }
 
-function DeleteDialog({
-  columns,
-  deletingId,
-  target,
-  error,
-  onTarget,
-  onDelete,
-  onCancel,
-}: {
-  columns: readonly Column[];
-  deletingId: string | undefined;
-  target: string;
-  error: string;
-  onTarget: (value: string) => void;
-  onDelete: () => void;
-  onCancel: () => void;
-}): React.JSX.Element | null {
-  if (!deletingId) return null;
+function DeleteDialog(props: DeleteDialogProps): React.JSX.Element | null {
+  if (!props.deletingId) return null;
+  const waitingTarget = props.columns.some(
+    (column) => column.id === props.target && column.state === 'waiting',
+  );
   return (
-    <BoardModal labelledBy="delete-heading" onCancel={onCancel}>
+    <BoardModal labelledBy="delete-heading" onCancel={props.onCancel}>
       <h2 id="delete-heading">Удалить колонку?</h2>
-      <DialogFeedback error={error} />
+      <DialogFeedback error={props.error} />
       <p>Карточки будут перемещены в выбранную колонку.</p>
       <label htmlFor="delete-target">Переместить карточки в</label>
       <select
         id="delete-target"
-        value={target}
+        value={props.target}
         onChange={(event) => {
-          onTarget(event.target.value);
+          props.onTarget(event.target.value);
         }}
       >
         <option value="">Выберите колонку</option>
-        {columns
-          .filter((item) => item.id !== deletingId)
+        {props.columns
+          .filter((item) => item.id !== props.deletingId)
           .map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
           ))}
       </select>
+      {waitingTarget && <WaitingFields {...props.waitingFields} />}
       <div className="dialog-actions">
-        <button className="text-button" onClick={onCancel}>
+        <button className="text-button" onClick={props.onCancel}>
           Отмена
         </button>
-        <button className="button" disabled={!target} onClick={onDelete}>
+        <button
+          className="button"
+          disabled={
+            !props.target ||
+            (waitingTarget && !props.waitingFields.reason.trim())
+          }
+          onClick={props.onDelete}
+        >
           Удалить колонку
         </button>
       </div>
@@ -194,12 +212,7 @@ function WaitingFields({
   until,
   onReason,
   onUntil,
-}: {
-  reason: string;
-  until: string;
-  onReason: (value: string) => void;
-  onUntil: (value: string) => void;
-}): React.JSX.Element {
+}: WaitingFieldsProps): React.JSX.Element {
   return (
     <>
       <label htmlFor="waiting-reason">
