@@ -1,4 +1,36 @@
+import { z } from 'zod';
+import type { AiContext } from '../ai-context/context-types';
+
 import { PROMPT_DATA } from './template-data';
+
+const contextTextSchema = z.looseObject({});
+const promptContextSchema = z
+  .looseObject({
+    instructions: z.string(),
+    today: z.string(),
+    now: z.string(),
+    tasks: z.array(
+      z.looseObject({
+        id: z.string(),
+        columnId: z.string(),
+        state: z.string(),
+        availability: z.string(),
+        deadlineRisk: contextTextSchema,
+        rules: contextTextSchema,
+        untrusted: contextTextSchema,
+      }),
+    ),
+    completedCount: z.number(),
+    omittedTaskCount: z.number(),
+    missedRepeats: z.array(z.unknown()),
+    taskTypes: z.array(z.unknown()),
+    disciplines: z.array(z.unknown()),
+    workdays: z.array(z.number()),
+  })
+  .transform((context) => {
+    Reflect.deleteProperty(context, 'instructions');
+    return context;
+  });
 
 export interface RenderedPrompt {
   readonly id: string;
@@ -10,8 +42,7 @@ export interface RenderedPrompt {
 }
 
 export interface NowPromptInput {
-  readonly taskIds: readonly string[];
-  readonly availableTaskIds: readonly string[];
+  readonly context: AiContext;
   readonly version?: string;
 }
 
@@ -20,9 +51,8 @@ export interface CreateCardsPromptInput {
   readonly knownTaskIds: readonly string[];
   readonly version?: string;
 }
-
 export interface ReplanPromptInput {
-  readonly taskIds: readonly string[];
+  readonly context: AiContext;
   readonly columnIds: readonly string[];
   readonly version?: string;
 }
@@ -37,8 +67,7 @@ export interface RuleEditPromptInput {
 
 export function renderNowPrompt(input: NowPromptInput): RenderedPrompt {
   return render('now', input.version, {
-    taskIds: input.taskIds,
-    availableTaskIds: input.availableTaskIds,
+    context: promptContext(input.context),
   });
 }
 
@@ -53,7 +82,7 @@ export function renderCreateCardsPrompt(
 
 export function renderReplanPrompt(input: ReplanPromptInput): RenderedPrompt {
   return render('replan', input.version, {
-    taskIds: input.taskIds,
+    context: promptContext(input.context),
     columnIds: input.columnIds,
   });
 }
@@ -67,6 +96,14 @@ export function renderRuleEditPrompt(
     taskTypeIds: input.taskTypeIds,
     disciplineIds: input.disciplineIds,
   });
+}
+
+function promptContext(context: AiContext): unknown {
+  const result = promptContextSchema.safeParse(context);
+  if (!result.success) {
+    throw new TypeError('AI prompt context is missing required context fields');
+  }
+  return result.data;
 }
 
 function render(
