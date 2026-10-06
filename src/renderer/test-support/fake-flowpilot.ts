@@ -223,7 +223,14 @@ function fakeApiFor(
     appearance: {
       initialize: () => Promise.resolve({ ok: true, value: 'system' }),
       ready: () => Promise.resolve(),
-      setTheme: () => Promise.resolve({ ok: true, value: null }),
+      setTheme: ({ theme }) => {
+        state.current = {
+          ...state.current,
+          settings: { ...state.current.settings, theme },
+          revision: state.current.revision + 1,
+        };
+        return Promise.resolve({ ok: true, value: null });
+      },
     },
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },

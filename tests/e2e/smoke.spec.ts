@@ -561,7 +561,12 @@ test('persists settings and applies reduced motion to control transitions', asyn
   await theme.selectOption('dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('flowpilot-theme')))
+    .poll(() =>
+      page.evaluate(async () => {
+        const result = await window.flowpilot.snapshot.load();
+        return result.ok ? result.value.settings.theme : undefined;
+      }),
+    )
     .toBe('dark');
   const friday = page.getByRole('checkbox', { name: 'Пятница' });
   await friday.click();

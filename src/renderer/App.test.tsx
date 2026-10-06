@@ -195,10 +195,11 @@ describe('persisted today and now screens', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
       target: { value: 'dark' },
     });
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBe('dark');
+    await waitFor(() => {
+      expect(app.snapshot().settings.theme).toBe('dark');
+    });
     cleanup();
-    render(<App />);
+    render(<App initialTheme="dark" />);
     await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
     fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
     expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue('dark');
@@ -210,7 +211,9 @@ describe('persisted today and now screens', () => {
       changeSystemTheme(false);
     });
     expect(document.documentElement.dataset.theme).toBe('light');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
+    await waitFor(() => {
+      expect(app.snapshot().settings.theme).toBe('system');
+    });
     expect(isThemeChoice('ultraviolet')).toBe(false);
   });
 
