@@ -433,6 +433,19 @@ test('persists settings and applies reduced motion to control transitions', asyn
   await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
 });
 
+for (const width of [760, 600]) {
+  test(`keeps the workspace visible below the sidebar at ${width.toString()}px`, async () => {
+    await page.setViewportSize({ width, height: 800 });
+    const sidebar = await page.locator('.sidebar').boundingBox();
+    const workspace = await page.locator('.workspace').boundingBox();
+    if (!sidebar || !workspace)
+      throw new Error('Боковая панель или рабочая область не отображается.');
+    await expect(page.locator('.sidebar')).toHaveCSS('flex-direction', 'row');
+    expect(sidebar.height).toBeLessThan(800);
+    expect(workspace.y).toBeLessThan(800);
+  });
+}
+
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {
