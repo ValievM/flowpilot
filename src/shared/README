@@ -29,6 +29,8 @@ AI `task.update` accepts only user-editable fields. AI `task.create` uses a
 separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without
 accepting system fields from the proposal.
+Task fields may enter the model only with a migration, storage write, read path,
+command schema, and invariant test in the same change.
 
 Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
 `FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with
