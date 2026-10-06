@@ -378,6 +378,57 @@ describe('rule and catalog storage', () => {
     expect(repository.load().tasks[0]?.typeId).toBeUndefined();
     repository.close();
   });
+
+  it('preserves an unspecified classification field when only one field is supplied', () => {
+    const repository = openRepository();
+    classifyTaskFully(repository);
+    applyCommands(repository, [
+      { kind: 'task.classify', taskId: 'task-1', typeId: 'other' },
+    ]);
+    expect(repository.load().tasks[0]).toMatchObject({
+      typeId: 'other',
+      disciplineId: 'math',
+    });
+    applyCommands(repository, [
+      {
+        kind: 'discipline.create',
+        discipline: { id: 'physics', name: 'Физика' },
+      },
+      { kind: 'task.classify', taskId: 'task-1', disciplineId: 'physics' },
+    ]);
+    expect(repository.load().tasks[0]).toMatchObject({
+      typeId: 'other',
+      disciplineId: 'physics',
+    });
+    repository.close();
+  });
+
+  it('clears a classification field only on explicit null and keeps the other', () => {
+    const repository = openRepository();
+    classifyTaskFully(repository);
+    applyCommands(repository, [
+      { kind: 'task.classify', taskId: 'task-1', typeId: null },
+    ]);
+    const stored = repository.load().tasks[0];
+    expect(stored?.typeId).toBeUndefined();
+    expect(stored?.disciplineId).toBe('math');
+    repository.close();
+  });
+
+  it('rejects a partial classification with an unknown identifier and keeps saved fields', () => {
+    const repository = openRepository();
+    classifyTaskFully(repository);
+    const result = repository.apply(
+      [{ kind: 'task.classify', taskId: 'task-1', typeId: 'missing' }],
+      repository.load().revision,
+    );
+    expect(result.ok).toBe(false);
+    expect(repository.load().tasks[0]).toMatchObject({
+      typeId: 'study',
+      disciplineId: 'math',
+    });
+    repository.close();
+  });
 });
 
 function openRepository(): Repository {
@@ -440,4 +491,30 @@ function ruleJson(id: string, title: string): string {
       },
     ],
   });
+}
+
+function applyCommands(
+  repository: Repository,
+  commands: readonly StorageCommand[],
+): void {
+  const result = repository.apply(commands, repository.load().revision);
+  if (!result.ok) throw new Error(JSON.stringify(result.error));
+}
+
+function classifyTaskFully(repository: Repository): void {
+  applyCommands(repository, [
+    { kind: 'taskType.create', taskType: { id: 'study', name: 'Учёба' } },
+    { kind: 'taskType.create', taskType: { id: 'other', name: 'Другое' } },
+    {
+      kind: 'discipline.create',
+      discipline: { id: 'math', name: 'Математика' },
+    },
+    { kind: 'task.create', task: task() },
+    {
+      kind: 'task.classify',
+      taskId: 'task-1',
+      typeId: 'study',
+      disciplineId: 'math',
+    },
+  ]);
 }

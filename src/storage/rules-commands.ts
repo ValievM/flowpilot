@@ -91,16 +91,29 @@ function classifyTask(
 ): void {
   if (!database.prepare('SELECT 1 FROM tasks WHERE id = ?').get(command.taskId))
     throw new Error('Task not found');
+  const assignments = classificationAssignments(command);
+  const classified = assignments.sql ? `${assignments.sql}, ` : '';
   database
     .prepare(
-      'UPDATE tasks SET type_id = ?, discipline_id = ?, version = version + 1, updated_at = ? WHERE id = ?',
+      `UPDATE tasks SET ${classified}version = version + 1, updated_at = ? WHERE id = ?`,
     )
-    .run(
-      command.typeId ?? null,
-      command.disciplineId ?? null,
-      now,
-      command.taskId,
-    );
+    .run(...assignments.values, now, command.taskId);
+}
+
+function classificationAssignments(
+  command: Extract<StorageCommand, { kind: 'task.classify' }>,
+): { sql: string; values: (string | null)[] } {
+  const columns: string[] = [];
+  const values: (string | null)[] = [];
+  if (command.typeId !== undefined) {
+    columns.push('type_id = ?');
+    values.push(command.typeId);
+  }
+  if (command.disciplineId !== undefined) {
+    columns.push('discipline_id = ?');
+    values.push(command.disciplineId);
+  }
+  return { sql: columns.join(', '), values };
 }
 
 function importRule(
