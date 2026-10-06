@@ -1,5 +1,10 @@
 import { MAX_CONTEXT_TEXT_LENGTH } from './context-types';
 
+const SPACED_RELATIVE_WINDOWS_PATH = new RegExp(
+  String.raw`(?<![\w/:.=?&\\])\p{Lu}[\p{L}\p{N}_.-]*\s+\p{Lu}[\p{L}\p{N}_.-]*\\(?:[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\\)*[\p{L}\p{N}_.-]+(?:\s+[\p{L}\p{N}_.-]+)*\.[\p{L}\p{N}]+`,
+  'gu',
+);
+
 const FILE_PATH = new RegExp(
   [
     String.raw`\bfile:\/\/(?:[^/\s?#,;]+)?\/(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\/)*(?:[^/\s,;]+(?:\s+[^/\s,;]+)*\.[A-Za-z0-9]+|[^/\s,;!?]+(?:\s+(?!then\b)[^/\s,;!?]+)*)|`,
@@ -18,6 +23,7 @@ const FILE_PATH = new RegExp(
 
 export function sanitizeUntrustedText(value: string): string {
   return value
+    .replace(SPACED_RELATIVE_WINDOWS_PATH, '[путь скрыт]')
     .replace(FILE_PATH, '[путь скрыт]')
     .slice(0, MAX_CONTEXT_TEXT_LENGTH);
 }

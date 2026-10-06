@@ -442,6 +442,34 @@ describe('AI context assembly (F-10)', () => {
     );
   });
 
+  it('redacts spaced relative Windows paths in context without changing prose or URLs', () => {
+    const result = buildContext(
+      input({
+        tasks: [
+          task('relative-windows-spaces', {
+            title: 'Open Shared Drive\\Project Notes\\private file.txt, please',
+            description: 'input/output',
+            comments: [
+              {
+                id: 'comment-1',
+                text: 'and/or; see https://example.com/config/secret.txt.',
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    expect(result.tasks[0]?.untrusted.title).toBe('Open [путь скрыт], please');
+    expect(result.tasks[0]?.untrusted.description).toBe('input/output');
+    expect(result.tasks[0]?.untrusted.comments[0]).toBe(
+      'and/or; see https://example.com/config/secret.txt.',
+    );
+    expect(JSON.stringify(result)).not.toMatch(
+      /(?:Shared Drive|Project Notes|private file\.txt)/,
+    );
+  });
+
   it('keeps task category references and sanitized subtask progress in context', () => {
     const result = buildContext(
       input({
