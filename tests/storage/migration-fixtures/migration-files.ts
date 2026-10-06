@@ -6,7 +6,6 @@ import columnGenerations from '../../../src/storage/migrations/0005_column_gener
 import legacyTombstoneGenerations from '../../../src/storage/migrations/0006_legacy_tombstone_generations.sql?raw';
 import restoreHistory from '../../../src/storage/migrations/0007_restore_history.sql?raw';
 
-
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
   {
@@ -26,7 +25,11 @@ export const migrationFiles = [
     filename: '0006_legacy_tombstone_generations.sql',
     sql: legacyTombstoneGenerations,
   },
-  { version: 7, filename: '0007_restore_history.sql', sql: restoreHistory },
+  {
+    version: 7,
+    filename: '0007_restore_history.sql',
+    sql: restoreHistory,
+  },
 ] as const;
 
 export const latestMigrationVersion = migrationFiles.at(-1)?.version ?? 0;
