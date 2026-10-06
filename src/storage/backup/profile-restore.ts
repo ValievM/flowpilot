@@ -70,6 +70,7 @@ function buildAndReplace(input: {
     installedDb: false,
     installedAttachments: false,
   };
+  let result: BackupResult;
   try {
     buildProfile({
       dir: input.dir,
@@ -81,22 +82,50 @@ function buildAndReplace(input: {
       backupPath: input.paths.backupPath,
     });
     replaceProfile(input.paths, state);
-    return {
+    result = {
       ok: true,
       value: input.paths.backupPath
         ? `Профиль восстановлен. Прежние данные сохранены здесь: ${input.paths.backupPath}`
         : 'Профиль восстановлен; прежнего профиля для резервного копирования не было.',
     };
   } catch (error) {
-    rollbackProfile(input.paths, state);
+    result = rollbackToFailure(input.paths, state, error);
+  }
+  return cleanupStageDir(input.paths.stageDir, result);
+}
+
+function rollbackToFailure(
+  paths: RestorePaths,
+  state: ReplacementState,
+  error: unknown,
+): BackupResult {
+  const primary = errorMessage(error);
+  try {
+    rollbackProfile(paths, state);
+  } catch (rollbackError) {
     return {
       ok: false,
       kind: 'OperationalFailure',
-      error: errorMessage(error),
+      error: `${primary}; откат прерван: ${errorMessage(rollbackError)}`,
     };
-  } finally {
-    rmSync(input.paths.stageDir, { recursive: true, force: true });
   }
+  return { ok: false, kind: 'OperationalFailure', error: primary };
+}
+
+function cleanupStageDir(stageDir: string, result: BackupResult): BackupResult {
+  try {
+    rmSync(stageDir, { recursive: true, force: true });
+  } catch (error) {
+    const note = `не удалось удалить временные файлы восстановления: ${errorMessage(error)}`;
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: result.ok
+        ? `Профиль восстановлен, но ${note}`
+        : `${result.error}; ${note}`,
+    };
+  }
+  return result;
 }
 
 function makePaths(profilePath: string, timestamp: string): RestorePaths {

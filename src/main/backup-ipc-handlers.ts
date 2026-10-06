@@ -7,7 +7,13 @@ import {
   type IpcSnapshot,
 } from '../shared/contracts';
 import type { ErrorCode, Result } from '../shared/ipc-result';
-import { exportTo, Repository, restore, verifyPackage } from '../storage';
+import {
+  exportTo,
+  Repository,
+  restore,
+  verifyPackage,
+  type BackupResult,
+} from '../storage';
 import type { HistoryFileDependencies } from './history-file-dependencies';
 import { loadSnapshot } from './handlers';
 
@@ -68,7 +74,7 @@ function restoreBackup(
   if (!packagePath) return failure('PackageInvalid');
   const current = deps.repositories.current();
   current.close();
-  const restored = restore(packagePath, deps.profilePath, deps.clock);
+  const restored = runRestore(packagePath, deps);
   const next = new Repository(deps.profilePath, deps.clock);
   deps.repositories.replace(next);
   if (!restored.ok)
@@ -77,6 +83,21 @@ function restoreBackup(
     );
   verifiedPackages.delete(parsed.data.packageToken);
   return loadSnapshot({}, { repository: next });
+}
+
+function runRestore(
+  packagePath: string,
+  deps: HistoryFileDependencies,
+): BackupResult {
+  try {
+    return restore(packagePath, deps.profilePath, deps.clock);
+  } catch (error) {
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: error instanceof Error ? error.message : 'Неизвестная ошибка',
+    };
+  }
 }
 
 function failure<T>(error: ErrorCode): Result<T> {
