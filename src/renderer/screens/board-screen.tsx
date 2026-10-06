@@ -133,7 +133,7 @@ function BoardTaskColumns({
   return (
     <BoardColumns
       snapshot={snapshot}
-      onMove={(id, column) => void actions.move(id, column)}
+      onMove={actions.move}
       onRename={(column) => {
         ui.advanceDialogSession();
         ui.setDialogError('');

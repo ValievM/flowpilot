@@ -234,10 +234,16 @@ export function BoardDraggableTask({
   label: string;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `task:${id}`,
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({
+    id: `task:${id}`,
+  });
   const style = transform
     ? {
         transform: `translate3d(${transform.x.toString()}px, ${transform.y.toString()}px, 0)`,
@@ -245,7 +251,11 @@ export function BoardDraggableTask({
     : undefined;
   return (
     <article
-      ref={setNodeRef}
+      id={`board-task-${id}`}
+      ref={(node) => {
+        setNodeRef(node);
+        setActivatorNodeRef(node);
+      }}
       className={className}
       style={style}
       {...attributes}

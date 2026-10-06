@@ -16,7 +16,7 @@ type BoardColumnProps = {
   tasks: readonly Task[];
   columns: readonly Column[];
   snapshot: IpcSnapshot;
-  onMove: (taskId: string, column: Column) => void;
+  onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: () => void;
 };
@@ -28,15 +28,39 @@ export function BoardColumns({
   onDelete,
 }: {
   snapshot: IpcSnapshot;
-  onMove: (taskId: string, column: Column) => void;
+  onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: (column: Column, hasTasks: boolean) => void;
 }): React.JSX.Element {
+  const pendingFocus = React.useRef<
+    { taskId: string; columnId: string } | undefined
+  >(undefined);
+  React.useEffect(() => {
+    const request = pendingFocus.current;
+    if (!request) return;
+    const task = snapshot.tasks.find((item) => item.id === request.taskId);
+    if (task?.columnId !== request.columnId) return;
+    document.getElementById(`board-task-${request.taskId}`)?.focus();
+    pendingFocus.current = undefined;
+  }, [snapshot]);
+  const moveTask = async (taskId: string, column: Column): Promise<boolean> => {
+    const current = pendingFocus.current;
+    if (current?.taskId === taskId && current.columnId === column.id)
+      return false;
+    const request = { taskId, columnId: column.id };
+    pendingFocus.current = request;
+    const saved = await onMove(taskId, column);
+    if (!saved && pendingFocus.current === request)
+      pendingFocus.current = undefined;
+    return saved;
+  };
   return (
     <BoardDragContext
       columns={snapshot.columns}
       tasks={snapshot.tasks}
-      onMove={onMove}
+      onMove={(taskId, column) => {
+        void moveTask(taskId, column);
+      }}
     >
       <div className="board-columns">
         {snapshot.columns.map((column) => {
@@ -50,7 +74,7 @@ export function BoardColumns({
               tasks={tasks}
               columns={snapshot.columns}
               snapshot={snapshot}
-              onMove={onMove}
+              onMove={moveTask}
               onRename={onRename}
               onDelete={() => {
                 onDelete(column, tasks.length > 0);
@@ -131,7 +155,7 @@ function BoardTaskList({
   tasks: readonly Task[];
   columns: readonly Column[];
   snapshot: IpcSnapshot;
-  onMove: (taskId: string, column: Column) => void;
+  onMove: (taskId: string, column: Column) => Promise<boolean>;
 }): React.JSX.Element {
   if (!tasks.length) {
     return <p className="board-column-empty">В этой колонке пока нет задач.</p>;
@@ -162,7 +186,7 @@ function BoardTaskCard({
   column: Column;
   columns: readonly Column[];
   snapshot: IpcSnapshot;
-  onMove: (taskId: string, column: Column) => void;
+  onMove: (taskId: string, column: Column) => Promise<boolean>;
 }): React.JSX.Element {
   return (
     <BoardDraggableTask
@@ -199,7 +223,7 @@ function BoardMoveMenu({
   task: Task;
   column: Column;
   columns: readonly Column[];
-  onMove: (taskId: string, column: Column) => void;
+  onMove: (taskId: string, column: Column) => Promise<boolean>;
 }): React.JSX.Element {
   return (
     <DropdownMenu.Root>
@@ -219,7 +243,7 @@ function BoardMoveMenu({
                 key={item.id}
                 className="board-move-item"
                 onSelect={() => {
-                  onMove(task.id, item);
+                  void onMove(task.id, item);
                 }}
               >
                 {item.name}

@@ -31,7 +31,7 @@ type ActionsInput = {
 };
 
 export type BoardActions = {
-  move: (taskId: string, column: Column) => Promise<void>;
+  move: (taskId: string, column: Column) => Promise<boolean>;
   confirmWaiting: (event: SyntheticEvent<HTMLFormElement>) => Promise<void>;
   saveColumn: (event: SyntheticEvent<HTMLFormElement>) => Promise<void>;
   deleteColumn: (columnId?: string) => Promise<boolean>;
@@ -50,14 +50,14 @@ async function moveTask(
   input: ActionsInput,
   taskId: string,
   column: Column,
-): Promise<void> {
+): Promise<boolean> {
   const task = input.snapshot?.tasks.find((item) => item.id === taskId);
-  if (!task || task.columnId === column.id) return;
+  if (!task || task.columnId === column.id) return false;
   if (
     input.waitingMove?.taskId === taskId &&
     input.waitingMove.columnId === column.id
   ) {
-    return;
+    return false;
   }
   const targetState = column.state;
   if (targetState === 'waiting') {
@@ -66,9 +66,9 @@ async function moveTask(
     input.setWaitingMove({ taskId, columnId: column.id });
     input.setWaitingReason('');
     input.setWaitingUntil('');
-    return;
+    return false;
   }
-  await applyTaskMove(input, taskId, column, targetState);
+  return applyTaskMove(input, taskId, column, targetState);
 }
 
 async function applyTaskMove(
@@ -76,15 +76,15 @@ async function applyTaskMove(
   taskId: string,
   column: Column,
   state: Exclude<Column['state'], 'waiting'>,
-): Promise<void> {
+): Promise<boolean> {
   const session = input.dialogSession.current;
   const taskTargets =
     input.inFlightMoves.current.get(taskId) ?? new Set<string>();
-  if (taskTargets.has(column.id)) return;
+  if (taskTargets.has(column.id)) return false;
   taskTargets.add(column.id);
   input.inFlightMoves.current.set(taskId, taskTargets);
   try {
-    await input.apply(
+    const result = await input.apply(
       [
         {
           kind: 'task.move',
@@ -95,6 +95,7 @@ async function applyTaskMove(
       ],
       () => session === input.dialogSession.current,
     );
+    return result.ok;
   } finally {
     releaseInFlightMove(input, taskId, column.id);
   }
