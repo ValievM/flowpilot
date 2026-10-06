@@ -15,6 +15,12 @@ const MIGRATIONS = [
   { version: 5, sql: columnGenerations },
   { version: 6, sql: legacyTombstoneGenerations },
 ] as const;
+export class ForeignDatabaseError extends Error {
+  constructor() {
+    super('Foreign database schema is not supported');
+    this.name = 'ForeignDatabaseError';
+  }
+}
 
 export function migrate(database: Database.Database, path: string): void {
   const current = readUserVersion(database);
@@ -24,7 +30,9 @@ export function migrate(database: Database.Database, path: string): void {
       `Database version ${String(current)} is newer than supported version ${String(latest)}`,
     );
   if (current === latest) return;
-  if (hasUserTables(database)) {
+  const hasTables = hasUserTables(database);
+  if (current === 0 && hasTables) throw new ForeignDatabaseError();
+  if (hasTables) {
     database.pragma('wal_checkpoint(FULL)');
     copyFileSync(path, `${path}.bak-v${String(current)}`);
   }
