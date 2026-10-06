@@ -107,10 +107,12 @@ function useWorkdaysUpdate(
       controls.setSaved(false);
       controls.setSettingsError(undefined);
       try {
+        const latest = await api.snapshot.load();
+        if (!latest.ok) throw new Error('snapshot');
         const result = await api.settings.set({
           key: 'workdays',
           value: [...workdays].sort(),
-          expectedRevision: snapshot.revision,
+          expectedRevision: latest.value.revision,
         });
         if (!result.ok) throw new Error('settings');
         controls.setSnapshot(result.value);
