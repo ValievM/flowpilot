@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
+import initialSchema from './migrations/0001_init.sql?raw';
 import { Repository } from './index';
 import { removeColumn } from '../domain';
 import { ipcCommandSchema } from '../shared/command-schema';
@@ -530,16 +531,17 @@ describe('Repository', () => {
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
     database.pragma('journal_mode = WAL');
-    database.exec(
-      "CREATE TABLE legacy_data (value TEXT); INSERT INTO legacy_data VALUES ('preserved')",
-    );
-    const backup = `${path}.bak-v0`;
+    database.exec(initialSchema);
+    database.pragma('user_version = 1');
+    const backup = `${path}.bak-v1`;
     const migrated = new Repository(path, clock);
     database.close();
     const backupDatabase = new Database(backup);
     expect(
-      backupDatabase.prepare('SELECT value FROM legacy_data').get(),
-    ).toEqual({ value: 'preserved' });
+      backupDatabase
+        .prepare('SELECT name FROM columns WHERE id = ?')
+        .get('todo'),
+    ).toEqual({ name: 'Сделать' });
     expect(readFileSync(backup).byteLength).toBeGreaterThan(0);
     backupDatabase.close();
     migrated.close();
