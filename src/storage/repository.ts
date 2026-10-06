@@ -140,7 +140,6 @@ export class Repository {
       attachmentFiles: this.attachments,
       entryId,
       now: this.clock.now().toString(),
-      profilePath: this.profilePath,
     });
   }
   close(): void {

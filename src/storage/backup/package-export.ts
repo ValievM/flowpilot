@@ -1,11 +1,16 @@
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 import {
+  closeSync,
+  constants,
   existsSync,
   mkdirSync,
+  openSync,
+  readSync,
   renameSync,
   rmSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Clock } from '../types';
@@ -21,6 +26,7 @@ import {
   MAX_DATA_SIZE_BYTES,
   MAX_MANIFEST_SIZE_BYTES,
   MAX_PACKAGE_SIZE_BYTES,
+  regularFileSize,
 } from './package-files';
 
 const FORMAT_VERSION = 1;
@@ -64,49 +70,128 @@ function writeDataFiles(
   profilePath: string,
   data: BackupData,
 ): BackupManifest['files'] {
-  const dataBytes = Buffer.from(JSON.stringify(data, null, 2));
-  if (dataBytes.length > MAX_DATA_SIZE_BYTES)
-    throw new Error('Размер data.json превышает лимит');
-  writeFileSync(join(temporary, 'data.json'), dataBytes, { flag: 'wx' });
-  const attachments = writeAttachments(temporary, profilePath, data);
-  if (
-    attachments.reduce(
-      (total, file) => total + file.sizeBytes,
-      dataBytes.length,
-    ) > MAX_PACKAGE_SIZE_BYTES
-  )
-    throw new Error('Размер пакета превышает лимит');
+  const dataSize = writeBoundedData(temporary, data);
+  const attachments = writeAttachments(
+    temporary,
+    profilePath,
+    data,
+    MAX_PACKAGE_SIZE_BYTES - dataSize,
+  );
   return [
     {
       path: 'data.json',
-      sha256: hash(dataBytes),
-      sizeBytes: dataBytes.length,
+      sha256: hashFile(join(temporary, 'data.json')),
+      sizeBytes: dataSize,
     },
     ...attachments,
   ];
+}
+
+function writeBoundedData(temporary: string, data: BackupData): number {
+  const descriptor = openSync(
+    join(temporary, 'data.json'),
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+    0o600,
+  );
+  let written = 0;
+  try {
+    const writePart = (value: string): void => {
+      const bytes = Buffer.from(value);
+      if (written + bytes.length > MAX_DATA_SIZE_BYTES)
+        throw new Error('Размер data.json превышает лимит');
+      let offset = 0;
+      while (offset < bytes.length)
+        offset += writeSync(descriptor, bytes, offset, bytes.length - offset);
+      written += bytes.length;
+    };
+    writeJsonValue(data, writePart);
+  } finally {
+    closeSync(descriptor);
+  }
+  return written;
+}
+function writeJsonValue(
+  value: unknown,
+  writePart: (text: string) => void,
+): void {
+  if (typeof value === 'string') {
+    writeJsonString(value, writePart);
+  } else if (
+    value === null ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    writePart(JSON.stringify(value));
+  } else if (Array.isArray(value)) {
+    writePart('[');
+    value.forEach((item, index) => {
+      if (index) writePart(',');
+      writeJsonValue(item, writePart);
+    });
+    writePart(']');
+  } else if (typeof value === 'object') {
+    writePart('{');
+    Object.entries(value).forEach(([key, item], index) => {
+      if (index) writePart(',');
+      writeJsonString(key, writePart);
+      writePart(':');
+      writeJsonValue(item, writePart);
+    });
+    writePart('}');
+  } else {
+    throw new Error('Невозможно сериализовать данные профиля');
+  }
+}
+
+function writeJsonString(
+  value: string,
+  writePart: (text: string) => void,
+): void {
+  writePart('"');
+  for (let offset = 0; offset < value.length; offset += 4096) {
+    const escaped = JSON.stringify(value.slice(offset, offset + 4096));
+    writePart(escaped.slice(1, -1));
+  }
+  writePart('"');
 }
 
 function writeAttachments(
   temporary: string,
   profilePath: string,
   data: BackupData,
+  remaining: number,
 ): BackupManifest['files'] {
   const files: BackupManifest['files'][number][] = [];
+  assertAttachmentsFit(profilePath, data.attachments, remaining);
   for (const record of data.attachments) {
     const source = join(dirname(profilePath), 'attachments', record.id);
     const target = join(temporary, 'attachments', record.id);
     mkdirSync(dirname(target), { recursive: true });
-    copyRegularFile(source, target, MAX_ATTACHMENT_SIZE_BYTES, {
-      sizeBytes: record.size_bytes,
-      sha256: record.sha256,
+    const sizeBytes = copyRegularFile(source, target, {
+      maxSizeBytes: MAX_ATTACHMENT_SIZE_BYTES,
+      expected: { sizeBytes: record.size_bytes, sha256: record.sha256 },
+      aggregateRemaining: remaining,
     });
+    remaining -= sizeBytes;
     files.push({
       path: `attachments/${record.id}`,
       sha256: record.sha256,
-      sizeBytes: record.size_bytes,
+      sizeBytes,
     });
   }
   return files;
+}
+function assertAttachmentsFit(
+  profilePath: string,
+  attachments: BackupData['attachments'],
+  remaining: number,
+): void {
+  for (const item of attachments) {
+    const path = join(dirname(profilePath), 'attachments', item.id);
+    const size = regularFileSize(path, MAX_ATTACHMENT_SIZE_BYTES);
+    if (size > remaining) throw new Error('Размер пакета превышает лимит');
+    remaining -= size;
+  }
 }
 
 function createManifest(
@@ -164,8 +249,21 @@ function readProfile(path: string): BackupData {
   }
 }
 
-function hash(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
+function hashFile(path: string): string {
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const hash = createHash('sha256');
+    const chunk = Buffer.alloc(64 * 1024);
+    let offset = 0;
+    for (;;) {
+      const count = readSync(descriptor, chunk, 0, chunk.length, offset);
+      if (!count) return hash.digest('hex');
+      hash.update(chunk.subarray(0, count));
+      offset += count;
+    }
+  } finally {
+    closeSync(descriptor);
+  }
 }
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка';

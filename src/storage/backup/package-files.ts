@@ -6,37 +6,48 @@ import {
   lstatSync,
   openSync,
   readSync,
-  realpathSync,
   writeSync,
 } from 'node:fs';
-import { join, resolve, sep } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
 
 export const MAX_MANIFEST_SIZE_BYTES = 1024 * 1024;
 export const MAX_DATA_SIZE_BYTES = 64 * 1024 * 1024;
 export const MAX_PACKAGE_SIZE_BYTES = 512 * 1024 * 1024;
 const CHUNK_SIZE = 64 * 1024;
-
+const DIRECTORY_FLAGS =
+  constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
 type PackageFile = { sizeBytes: number; sha256: string };
+type CopyRegularFileOptions = {
+  maxSizeBytes: number;
+  expected: PackageFile;
+  aggregateRemaining?: number;
+};
 
 export function copyRegularFile(
   sourcePath: string,
   destination: string,
-  maxSizeBytes: number,
-  expected: PackageFile,
-): void {
-  const source = openRegularFile(sourcePath, maxSizeBytes);
+  options: CopyRegularFileOptions,
+): number {
+  const remaining = options.aggregateRemaining ?? MAX_PACKAGE_SIZE_BYTES;
+  const source = openRegularAt(
+    dirname(sourcePath),
+    basename(sourcePath),
+    Math.min(options.maxSizeBytes, remaining),
+    dirname(dirname(sourcePath)),
+  );
   let target: number | undefined;
   try {
-    const info = fstatSync(source);
-    if (info.size !== expected.sizeBytes)
+    const size = fstatSync(source).size;
+    if (size !== options.expected.sizeBytes)
       throw new Error('Размер вложения изменился после проверки');
     target = openSync(
       destination,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
       0o600,
     );
-    copyBytes(source, target, info.size, expected.sha256);
+    copyBytes(source, target, size, options.expected.sha256);
+    return size;
   } finally {
     closeSync(source);
     if (target !== undefined) closeSync(target);
@@ -55,7 +66,7 @@ export function readPackageJson(
     let offset = 0;
     while (offset < size) {
       const count = readSync(descriptor, bytes, offset, size - offset, offset);
-      if (count === 0) throw new Error('Файл изменился во время чтения');
+      if (!count) throw new Error('Файл изменился во время чтения');
       offset += count;
     }
     return bytes.toString('utf8');
@@ -71,23 +82,36 @@ export function hashPackageFile(
 ): PackageFile {
   const descriptor = openPackageFile(dir, relativePath, maxSizeBytes);
   try {
-    const info = fstatSync(descriptor);
+    const size = fstatSync(descriptor).size;
     const hash = createHash('sha256');
     const chunk = Buffer.alloc(CHUNK_SIZE);
-    let bytesRead = 0;
-    while (bytesRead < info.size) {
+    let offset = 0;
+    while (offset < size) {
       const count = readSync(
         descriptor,
         chunk,
         0,
-        Math.min(chunk.length, info.size - bytesRead),
-        bytesRead,
+        Math.min(chunk.length, size - offset),
+        offset,
       );
-      if (count === 0) throw new Error('Файл изменился во время проверки');
+      if (!count) throw new Error('Файл изменился во время проверки');
       hash.update(chunk.subarray(0, count));
-      bytesRead += count;
+      offset += count;
     }
-    return { sizeBytes: bytesRead, sha256: hash.digest('hex') };
+    return { sizeBytes: offset, sha256: hash.digest('hex') };
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+export function packageFileSize(
+  dir: string,
+  relativePath: string,
+  maxSizeBytes: number,
+): number {
+  const descriptor = openPackageFile(dir, relativePath, maxSizeBytes);
+  try {
+    return fstatSync(descriptor).size;
   } finally {
     closeSync(descriptor);
   }
@@ -102,66 +126,33 @@ export function copyPackageFile(
   const source = openPackageFile(dir, relativePath, MAX_ATTACHMENT_SIZE_BYTES);
   let target: number | undefined;
   try {
-    const info = fstatSync(source);
-    if (info.size !== expected.sizeBytes)
+    const size = fstatSync(source).size;
+    if (size !== expected.sizeBytes)
       throw new Error('Размер вложения изменился после проверки');
     target = openSync(
       destination,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
       0o600,
     );
-    copyBytes(source, target, info.size, expected.sha256);
+    copyBytes(source, target, size, expected.sha256);
   } finally {
     closeSync(source);
     if (target !== undefined) closeSync(target);
   }
 }
 
-function openRegularFile(path: string, maxSizeBytes: number): number {
-  const fileInfo = lstatSync(path);
-  if (!fileInfo.isFile() || fileInfo.isSymbolicLink())
-    throw new Error('Путь должен быть обычным файлом');
-  if (fileInfo.size > maxSizeBytes)
-    throw new Error('Размер файла превышает лимит');
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  const opened = fstatSync(descriptor);
-  if (!opened.isFile() || opened.size > maxSizeBytes) {
+export function regularFileSize(path: string, maxSizeBytes: number): number {
+  const descriptor = openRegularAt(
+    dirname(path),
+    basename(path),
+    maxSizeBytes,
+    dirname(dirname(path)),
+  );
+  try {
+    return fstatSync(descriptor).size;
+  } finally {
     closeSync(descriptor);
-    throw new Error('Размер файла превышает лимит');
   }
-  return descriptor;
-}
-
-function copyBytes(
-  source: number,
-  target: number,
-  sizeBytes: number,
-  expectedSha256: string,
-): void {
-  const hash = createHash('sha256');
-  const chunk = Buffer.alloc(CHUNK_SIZE);
-  let bytesRead = 0;
-  while (bytesRead < sizeBytes) {
-    const count = readSync(
-      source,
-      chunk,
-      0,
-      Math.min(chunk.length, sizeBytes - bytesRead),
-      bytesRead,
-    );
-    if (count === 0) throw new Error('Файл изменился во время копирования');
-    hash.update(chunk.subarray(0, count));
-    let written = 0;
-    while (written < count) {
-      const countWritten = writeSync(target, chunk, written, count - written);
-      if (countWritten === 0)
-        throw new Error('Не удалось записать файл вложения полностью');
-      written += countWritten;
-    }
-    bytesRead += count;
-  }
-  if (hash.digest('hex') !== expectedSha256)
-    throw new Error('Sha256 вложения не совпадает с метаданными');
 }
 
 function openPackageFile(
@@ -169,27 +160,127 @@ function openPackageFile(
   relativePath: string,
   maxSizeBytes: number,
 ): number {
-  const { root, path } = resolvePackagePath(dir, relativePath);
-  if (relativePath.startsWith('attachments/'))
-    assertRegularDirectory(join(root, 'attachments'), 'Папка вложений');
-  return openRegularFile(path, maxSizeBytes);
+  const root = resolve(dir);
+  const relative = relativePath.startsWith('attachments/')
+    ? relativePath.slice('attachments/'.length)
+    : relativePath;
+  const directory = relativePath.startsWith('attachments/')
+    ? join(root, 'attachments')
+    : root;
+  return openRegularAt(directory, relative, maxSizeBytes, root);
 }
 
-function resolvePackagePath(
-  dir: string,
-  relativePath: string,
-): { root: string; path: string } {
-  const requestedRoot = resolve(dir);
-  assertRegularDirectory(requestedRoot, 'Папка пакета');
-  const root = realpathSync(requestedRoot);
-  const path = resolve(root, relativePath);
-  if (!path.startsWith(`${root}${sep}`))
-    throw new Error('Путь выходит за пределы пакета');
-  return { root, path };
+function openRegularAt(
+  directory: string,
+  name: string,
+  maxSizeBytes: number,
+  root?: string,
+): number {
+  const rootFd = root === undefined ? undefined : openDirectory(root);
+  let directoryFd: number | undefined;
+  let descriptor: number | undefined;
+  try {
+    directoryFd = openDirectory(directory);
+    assertRootUnchanged(rootFd, root);
+    descriptor = openValidatedFile(join(directory, name), maxSizeBytes);
+    assertDirectoryUnchanged(directoryFd, directory);
+    assertRootUnchanged(rootFd, root);
+    const result = descriptor;
+    descriptor = undefined;
+    return result;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    if (directoryFd !== undefined) closeSync(directoryFd);
+    if (rootFd !== undefined) closeSync(rootFd);
+  }
 }
 
-function assertRegularDirectory(path: string, label: string): void {
-  const info = lstatSync(path);
-  if (!info.isDirectory() || info.isSymbolicLink())
-    throw new Error(`${label} должна быть обычной директорией`);
+function openValidatedFile(path: string, maxSizeBytes: number): number {
+  const listed = lstatSync(path);
+  if (!listed.isFile() || listed.isSymbolicLink())
+    throw new Error('Путь должен быть обычным файлом');
+  if (listed.size > maxSizeBytes)
+    throw new Error('Размер файла превышает лимит');
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const opened = fstatSync(descriptor);
+  if (!sameFile(listed, opened) || !opened.isFile()) {
+    closeSync(descriptor);
+    throw new Error('Файл изменился во время открытия');
+  }
+  if (opened.size > maxSizeBytes) {
+    closeSync(descriptor);
+    throw new Error('Размер файла превышает лимит');
+  }
+  return descriptor;
+}
+
+function assertRootUnchanged(
+  rootFd: number | undefined,
+  root: string | undefined,
+): void {
+  if (
+    rootFd !== undefined &&
+    root !== undefined &&
+    !sameFile(fstatSync(rootFd), lstatSync(root))
+  )
+    throw new Error('Папка пакета изменилась во время открытия');
+}
+
+function assertDirectoryUnchanged(
+  directoryFd: number,
+  directory: string,
+): void {
+  if (!sameFile(fstatSync(directoryFd), lstatSync(directory)))
+    throw new Error('Каталог изменился во время открытия');
+}
+function sameFile(
+  first: { dev: number; ino: number },
+  second: { dev: number; ino: number },
+): boolean {
+  return first.dev === second.dev && first.ino === second.ino;
+}
+
+function openDirectory(path: string): number {
+  const before = lstatSync(path);
+  if (!before.isDirectory() || before.isSymbolicLink())
+    throw new Error('Путь должен быть обычной директорией');
+  const descriptor = openSync(path, DIRECTORY_FLAGS);
+  const opened = fstatSync(descriptor);
+  if (before.dev !== opened.dev || before.ino !== opened.ino) {
+    closeSync(descriptor);
+    throw new Error('Каталог изменился во время открытия');
+  }
+  return descriptor;
+}
+
+function copyBytes(
+  source: number,
+  target: number,
+  size: number,
+  expectedSha256: string,
+): void {
+  const hash = createHash('sha256');
+  const chunk = Buffer.alloc(CHUNK_SIZE);
+  let offset = 0;
+  while (offset < size) {
+    const count = readSync(
+      source,
+      chunk,
+      0,
+      Math.min(chunk.length, size - offset),
+      offset,
+    );
+    if (!count) throw new Error('Файл изменился во время копирования');
+    hash.update(chunk.subarray(0, count));
+    let written = 0;
+    while (written < count) {
+      const amount = writeSync(target, chunk, written, count - written);
+      if (!amount)
+        throw new Error('Не удалось записать файл вложения полностью');
+      written += amount;
+    }
+    offset += count;
+  }
+  if (hash.digest('hex') !== expectedSha256)
+    throw new Error('Sha256 вложения не совпадает с метаданными');
 }

@@ -16,6 +16,7 @@ type LogRow = {
   revision: number;
   occurred_at: string;
   source: string;
+  batch_id: string | null;
   undone_entry_id: string | null;
 };
 type EntityRow = {
@@ -42,10 +43,9 @@ export function undoEntry(input: {
   attachmentFiles: AttachmentFiles;
   entryId: string | undefined;
   now: string;
-  profilePath: string;
 }): UndoResult {
-  const { database, attachmentFiles, entryId, now, profilePath } = input;
-  const attempt = createUndoPlan(database, entryId, profilePath);
+  const { database, attachmentFiles, entryId, now } = input;
+  const attempt = createUndoPlan(database, entryId);
   if ('result' in attempt) return attempt.result;
   const restored: string[] = [];
   const trashed: string[] = [];
@@ -75,7 +75,6 @@ export function undoEntry(input: {
 function createUndoPlan(
   database: Database.Database,
   entryId: string | undefined,
-  profilePath: string,
 ): { plan: UndoPlan } | { result: UndoResult } {
   const entry = findEntry(database, entryId);
   if (!entry) return { result: { ok: false, error: { kind: 'NotFound' } } };
@@ -85,7 +84,9 @@ function createUndoPlan(
         ok: false,
         error: {
           kind: 'NotUndoable',
-          reason: `восстановление нельзя отменить; прежние данные сохранены в ${profilePath}.before-restore-${entry.occurred_at.replaceAll(':', '-')}`,
+          reason: entry.batch_id
+            ? `восстановление нельзя отменить; прежние данные сохранены в ${entry.batch_id}`
+            : 'восстановление нельзя отменить; прежнего профиля для резервного копирования не было',
         },
       },
     };
@@ -197,12 +198,12 @@ function findEntry(
     entryId !== undefined
       ? database
           .prepare(
-            'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log WHERE id = ?',
+            'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log WHERE id = ?',
           )
           .get(entryId)
       : database
           .prepare(
-            'SELECT id,revision,occurred_at,source,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT 1',
+            'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT 1',
           )
           .get();
   return row as LogRow | undefined;

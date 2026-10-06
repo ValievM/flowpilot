@@ -11,6 +11,7 @@ import {
   MAX_DATA_SIZE_BYTES,
   MAX_MANIFEST_SIZE_BYTES,
   MAX_PACKAGE_SIZE_BYTES,
+  packageFileSize,
   readPackageJson,
 } from './package-files';
 
@@ -93,9 +94,32 @@ function verifyFiles(
   manifest: BackupManifest,
   problems: BackupProblem[],
 ): Map<string, BackupManifest['files'][number]> {
+  const scan = scanPackageFiles(dir, manifest.files, problems);
+  if (!scan.listed.has('data.json'))
+    problems.push({
+      path: 'manifest.json',
+      message: 'manifest не содержит data.json',
+    });
+  if (scan.exceeded) return scan.listed;
+  for (const { file, size } of scan.files)
+    verifyFileContents(dir, file, size, problems);
+  return scan.listed;
+}
+
+function scanPackageFiles(
+  dir: string,
+  files: BackupManifest['files'],
+  problems: BackupProblem[],
+): {
+  listed: Map<string, BackupManifest['files'][number]>;
+  files: { file: BackupManifest['files'][number]; size: number }[];
+  exceeded: boolean;
+} {
   const listed = new Map<string, BackupManifest['files'][number]>();
-  let packageSize = 0;
-  for (const file of manifest.files) {
+  const actualFiles: { file: BackupManifest['files'][number]; size: number }[] =
+    [];
+  let total = 0;
+  for (const file of files) {
     if (!isPackagePath(file.path)) {
       problems.push({ path: file.path, message: 'Недопустимый путь файла' });
       continue;
@@ -103,29 +127,33 @@ function verifyFiles(
     if (listed.has(file.path))
       problems.push({ path: file.path, message: 'Повтор файла в manifest' });
     listed.set(file.path, file);
-    const fileLimit =
+    const limit =
       file.path === 'data.json'
         ? MAX_DATA_SIZE_BYTES
         : MAX_ATTACHMENT_SIZE_BYTES;
-    if (file.sizeBytes > fileLimit)
+    if (file.sizeBytes > limit) {
       problems.push({
         path: file.path,
         message: 'Размер файла превышает лимит',
       });
-    packageSize += file.sizeBytes;
-    verifyFileContents(dir, file, fileLimit, problems);
+      continue;
+    }
+    try {
+      const size = packageFileSize(dir, file.path, limit);
+      if (size > MAX_PACKAGE_SIZE_BYTES - total) {
+        problems.push({
+          path: 'manifest.json',
+          message: 'Размер пакета превышает лимит',
+        });
+        return { listed, files: actualFiles, exceeded: true };
+      }
+      total += size;
+      actualFiles.push({ file, size });
+    } catch (error) {
+      problems.push({ path: file.path, message: errorMessage(error) });
+    }
   }
-  if (packageSize > MAX_PACKAGE_SIZE_BYTES)
-    problems.push({
-      path: 'manifest.json',
-      message: 'Размер пакета превышает лимит',
-    });
-  if (!listed.has('data.json'))
-    problems.push({
-      path: 'manifest.json',
-      message: 'manifest не содержит data.json',
-    });
-  return listed;
+  return { listed, files: actualFiles, exceeded: false };
 }
 
 function verifyFileContents(
@@ -133,22 +161,22 @@ function verifyFileContents(
   file: BackupManifest['files'][number],
   maxSizeBytes: number,
   problems: BackupProblem[],
-): void {
+): number | undefined {
   try {
     const contents = hashPackageFile(dir, file.path, maxSizeBytes);
     if (
       contents.sizeBytes !== file.sizeBytes ||
       contents.sha256 !== file.sha256
-    )
+    ) {
       problems.push({
         path: file.path,
         message: 'Размер или sha256 не совпадает',
       });
+    }
+    return contents.sizeBytes;
   } catch (error) {
-    problems.push({
-      path: file.path,
-      message: errorMessage(error),
-    });
+    problems.push({ path: file.path, message: errorMessage(error) });
+    return undefined;
   }
 }
 

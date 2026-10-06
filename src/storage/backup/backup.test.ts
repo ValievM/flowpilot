@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   truncateSync,
@@ -12,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Temporal } from 'temporal-polyfill';
+import Database from 'better-sqlite3';
 import { z } from 'zod';
 import { Repository } from '../repository';
 import type { Clock } from '../types';
@@ -617,26 +619,22 @@ describe('backup package', () => {
     expect(readdirSync(destination)).toEqual([]);
   });
 
-  it('keeps the current profile and removes staging files when database assembly fails', () => {
+  it('keeps the current profile and removes staging files when backup replacement fails', () => {
     const { root, profile, repository } = setup();
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
     const before = repository.load();
     repository.close();
     const packageDir = exportPackage(root, profile);
-    let calls = 0;
-    const failingClock: Clock = {
-      now: () => {
-        calls += 1;
-        if (calls === 2) throw new Error('injected build failure');
-        return clock.now();
-      },
-    };
-    expect(restore(packageDir, profile, failingClock).ok).toBe(false);
+    const collision = `${profile}.before-restore-${clock.now().toString().replaceAll(':', '-')}`;
+    writeFileSync(collision, 'preserve this backup');
+
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
     const current = new Repository(profile, clock);
     expect(current.load()).toEqual(before);
     current.close();
+    expect(readFileSync(collision, 'utf8')).toBe('preserve this backup');
     expect(
-      readdirSync(root).filter((name) => name.includes('restore-')),
+      readdirSync(root).filter((name) => name.includes('.restore-stage-')),
     ).toEqual([]);
   });
 
@@ -765,5 +763,165 @@ describe('backup package', () => {
     const clean = exportPackage(parent, profile);
     const exported = readFileSync(join(clean, 'data.json'), 'utf8');
     expect(exported).not.toMatch(/password|token|secret/i);
+  });
+  it('rejects export from a symlinked profile attachment directory', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'safe.txt', 'safe bytes'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const original = join(root, 'attachments');
+    const external = join(root, 'external-attachments');
+    renameSync(original, external);
+    symlinkSync(external, original);
+
+    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    expect(
+      readFileSync(join(external, readdirSync(external)[0] ?? ''), 'utf8'),
+    ).toBe('safe bytes');
+  });
+
+  it('does not hash underdeclared files after their actual package size exceeds the budget', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const attachmentDir = join(packageDir, 'attachments');
+    mkdirSync(attachmentDir);
+    const manifest = z
+      .object({
+        files: z.array(
+          z.object({
+            path: z.string(),
+            sha256: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    for (let index = 0; index < 6; index += 1) {
+      const name = `sparse-${String(index)}`;
+      writeFileSync(join(attachmentDir, name), Buffer.alloc(0));
+      truncateSync(join(attachmentDir, name), MAX_ATTACHMENT_SIZE_BYTES);
+      manifest.files.push({
+        path: `attachments/${name}`,
+        sha256: '0'.repeat(64),
+        sizeBytes: 0,
+      });
+    }
+    save(join(packageDir, 'manifest.json'), manifest);
+
+    expect(verifyPackage(packageDir)).toMatchObject({
+      ok: false,
+      problems: [
+        { path: 'manifest.json', message: 'Размер пакета превышает лимит' },
+      ],
+    });
+  });
+
+  it('uses the exact retained backup path in restore output and undo reason', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    let calls = 0;
+    const changingClock: Clock = {
+      now: () => {
+        calls += 1;
+        return Temporal.Instant.from(
+          calls === 1 ? '2026-10-06T12:00:00Z' : '2026-10-06T12:00:01Z',
+        );
+      },
+    };
+
+    const restored = restore(packageDir, profile, changingClock);
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) throw new Error('Restore should succeed');
+    const backupPath = `${profile}.before-restore-2026-10-06T12-00-00Z`;
+    expect(restored.value).toContain(backupPath);
+    expect(readdirSync(root)).toContain(backupPath.split('/').at(-1));
+    const current = new Repository(profile, clock);
+    const undo = current.undo();
+    expect(undo).toMatchObject({ ok: false, error: { kind: 'NotUndoable' } });
+    if (undo.ok || undo.error.kind !== 'NotUndoable')
+      throw new Error('Restore must not be undoable');
+    expect(undo.error.reason).toContain(backupPath);
+    current.close();
+  });
+
+  it('does not report an old-profile backup when restoring into an absent profile', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const target = join(root, 'new-profile.sqlite');
+
+    const restored = restore(packageDir, target, clock);
+    expect(restored).toMatchObject({ ok: true });
+    if (!restored.ok) throw new Error('Restore should succeed');
+    expect(restored.value).not.toContain('.before-restore-');
+    const current = new Repository(target, clock);
+    const undo = current.undo();
+    expect(undo).toMatchObject({ ok: false, error: { kind: 'NotUndoable' } });
+    if (undo.ok || undo.error.kind !== 'NotUndoable')
+      throw new Error('Restore must not be undoable');
+    expect(undo.error.reason).not.toContain('.before-restore-');
+    current.close();
+  });
+  it('stops exporting data when serialized content exceeds the data limit', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const database = new Database(profile);
+    database
+      .prepare('INSERT INTO settings(key,value_json) VALUES(?,?)')
+      .run(
+        'large-fixture',
+        JSON.stringify('x'.repeat(MAX_DATA_SIZE_BYTES + 1)),
+      );
+    database.close();
+
+    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('FlowPilot-export-')),
+    ).toEqual([]);
+  });
+  it('rejects aggregate attachment bytes before copying an over-budget export', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    repository.close();
+    mkdirSync(join(root, 'attachments'));
+    const database = new Database(profile);
+    const insert = database.prepare(
+      'INSERT INTO attachments(id,task_id,name,media_type,size_bytes,position,sha256,created_at) VALUES(?,?,?,?,?,?,?,?)',
+    );
+    for (let index = 0; index < 6; index += 1) {
+      const id = `sparse-${String(index)}`;
+      insert.run(
+        id,
+        task.id,
+        `${id}.txt`,
+        'text/plain',
+        MAX_ATTACHMENT_SIZE_BYTES,
+        index,
+        '0'.repeat(64),
+        clock.now().toString(),
+      );
+      writeFileSync(join(root, 'attachments', id), Buffer.alloc(0));
+      truncateSync(join(root, 'attachments', id), MAX_ATTACHMENT_SIZE_BYTES);
+    }
+    database.close();
+
+    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('FlowPilot-export-')),
+    ).toEqual([]);
   });
 });

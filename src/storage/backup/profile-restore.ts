@@ -1,14 +1,10 @@
 import { existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { Temporal } from 'temporal-polyfill';
 import type { Clock } from '../types';
 import type { BackupResult } from './backup-types';
 import { verifyPackage } from './package-verify';
 import { buildProfile } from './profile-build';
 
-const BUILD_CLOCK: Clock = {
-  now: () => Temporal.Instant.from('2000-01-01T00:00:00Z'),
-};
 type RestorePaths = {
   profilePath: string;
   stagedDb: string;
@@ -17,6 +13,7 @@ type RestorePaths = {
   oldDb: string;
   oldAttachments: string;
   attachmentDir: string;
+  backupPath: string | undefined;
 };
 type ReplacementState = {
   movedDb: boolean;
@@ -39,11 +36,29 @@ export function restore(
         .join('; '),
     };
   let paths: RestorePaths;
+  let restoredAt: string;
   try {
-    paths = makePaths(profilePath, clock);
+    const instant = clock.now();
+    restoredAt = instant.toString();
+    paths = makePaths(profilePath, instant.toString().replaceAll(':', '-'));
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
+  return buildAndReplace({
+    dir,
+    paths,
+    data: verification.value.data,
+    clock,
+    restoredAt,
+  });
+}
+function buildAndReplace(input: {
+  dir: string;
+  paths: RestorePaths;
+  data: Parameters<typeof buildProfile>[0]['data'];
+  clock: Clock;
+  restoredAt: string;
+}): BackupResult {
   const state: ReplacementState = {
     movedDb: false,
     movedAttachments: false,
@@ -52,38 +67,42 @@ export function restore(
   };
   try {
     buildProfile({
-      dir,
-      stagedDb: paths.stagedDb,
-      stagedAttachments: paths.stagedAttachments,
-      data: verification.value.data,
-      clock,
-      buildClock: BUILD_CLOCK,
+      dir: input.dir,
+      stagedDb: input.paths.stagedDb,
+      stagedAttachments: input.paths.stagedAttachments,
+      data: input.data,
+      buildClock: input.clock,
+      restoredAt: input.restoredAt,
+      backupPath: input.paths.backupPath,
     });
-    replaceProfile(paths, state);
+    replaceProfile(input.paths, state);
     return {
       ok: true,
-      value: `Профиль восстановлен. Прежние данные сохранены здесь: ${paths.oldDb}`,
+      value: input.paths.backupPath
+        ? `Профиль восстановлен. Прежние данные сохранены здесь: ${input.paths.backupPath}`
+        : 'Профиль восстановлен; прежнего профиля для резервного копирования не было.',
     };
   } catch (error) {
-    rollbackProfile(paths, state);
+    rollbackProfile(input.paths, state);
     return { ok: false, error: errorMessage(error) };
   } finally {
-    rmSync(paths.stageDir, { recursive: true, force: true });
+    rmSync(input.paths.stageDir, { recursive: true, force: true });
   }
 }
 
-function makePaths(profilePath: string, clock: Clock): RestorePaths {
-  const timestamp = clock.now().toString().replaceAll(':', '-');
+function makePaths(profilePath: string, timestamp: string): RestorePaths {
   const parent = dirname(profilePath);
   const stageDir = mkdtempSync(join(parent, '.restore-stage-'));
+  const oldDb = `${profilePath}.before-restore-${timestamp}`;
   return {
     profilePath,
     stagedDb: join(stageDir, 'profile.sqlite'),
     stagedAttachments: join(stageDir, 'attachments'),
     stageDir,
-    oldDb: `${profilePath}.before-restore-${timestamp}`,
+    oldDb,
     oldAttachments: join(parent, `attachments.before-restore-${timestamp}`),
     attachmentDir: join(parent, 'attachments'),
+    backupPath: existsSync(profilePath) ? oldDb : undefined,
   };
 }
 

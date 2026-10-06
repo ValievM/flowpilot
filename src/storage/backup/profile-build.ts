@@ -11,12 +11,18 @@ export function buildProfile(input: {
   stagedDb: string;
   stagedAttachments: string;
   data: BackupData;
-  clock: Clock;
   buildClock: Clock;
+  restoredAt: string;
+  backupPath: string | undefined;
 }): void {
   const repository = new Repository(input.stagedDb, input.buildClock);
   repository.close();
-  populateDatabase(input.stagedDb, input.data, input.clock);
+  populateDatabase(
+    input.stagedDb,
+    input.data,
+    input.restoredAt,
+    input.backupPath,
+  );
   mkdirSync(input.stagedAttachments, { recursive: true });
   for (const item of input.data.attachments)
     copyPackageFile(
@@ -30,7 +36,12 @@ export function buildProfile(input: {
     );
 }
 
-function populateDatabase(path: string, data: BackupData, clock: Clock): void {
+function populateDatabase(
+  path: string,
+  data: BackupData,
+  restoredAt: string,
+  backupPath: string | undefined,
+): void {
   const db = new Database(path);
   try {
     db.pragma('foreign_keys = ON');
@@ -45,7 +56,7 @@ function populateDatabase(path: string, data: BackupData, clock: Clock): void {
       db.prepare('UPDATE metadata SET revision = ? WHERE singleton = 1').run(
         data.revision + 1,
       );
-      addRestoreHistory(db, data.revision + 1, clock);
+      addRestoreHistory(db, data.revision + 1, restoredAt, backupPath);
     })();
     db.pragma('wal_checkpoint(TRUNCATE)');
   } finally {
@@ -68,13 +79,13 @@ function clearProfileRows(db: Database.Database): void {
 function addRestoreHistory(
   db: Database.Database,
   revision: number,
-  clock: Clock,
+  restoredAt: string,
+  backupPath: string | undefined,
 ): void {
-  const restoredAt = clock.now();
-  const id = `restore-${String(restoredAt.epochMilliseconds)}`;
+  const id = `restore-${String(Date.parse(restoredAt))}`;
   db.prepare(
     'INSERT INTO change_log(id,revision,occurred_at,source,batch_id,undone_entry_id) VALUES (?,?,?,?,?,NULL)',
-  ).run(id, revision, restoredAt.toString(), 'restore', id);
+  ).run(id, revision, restoredAt, 'restore', backupPath ?? '');
 }
 
 function insertRows(
