@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Repository } from '../repository';
 import type { Clock } from '../types';
+import { copyPackageFile } from './package-files';
 import type { BackupData } from './schemas';
 
 export function buildProfile(input: {
@@ -18,9 +19,14 @@ export function buildProfile(input: {
   populateDatabase(input.stagedDb, input.data, input.clock);
   mkdirSync(input.stagedAttachments, { recursive: true });
   for (const item of input.data.attachments)
-    copyFileSync(
-      join(input.dir, 'attachments', item.id),
+    copyPackageFile(
+      input.dir,
+      `attachments/${item.id}`,
       join(input.stagedAttachments, item.id),
+      {
+        sizeBytes: item.size_bytes,
+        sha256: item.sha256,
+      },
     );
 }
 

@@ -146,15 +146,17 @@ export const manifestSchema = z
     revision: z.number().int().nonnegative(),
     historyIncluded: z.literal(false),
     historyNote: z.string(),
-    files: z.array(
-      z
-        .object({
-          path: z.string(),
-          sha256: z.string().regex(/^[a-f0-9]{64}$/),
-          sizeBytes: z.number().int().nonnegative(),
-        })
-        .strict(),
-    ),
+    files: z
+      .array(
+        z
+          .object({
+            path: z.string(),
+            sha256: z.string().regex(/^[a-f0-9]{64}$/),
+            sizeBytes: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .max(10_000),
   })
   .strict();
 

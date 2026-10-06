@@ -1,10 +1,8 @@
-import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import Database from 'better-sqlite3';
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -17,6 +15,13 @@ import {
   type BackupManifest,
 } from './schemas';
 import type { BackupResult } from './backup-types';
+import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
+import {
+  copyRegularFile,
+  MAX_DATA_SIZE_BYTES,
+  MAX_MANIFEST_SIZE_BYTES,
+  MAX_PACKAGE_SIZE_BYTES,
+} from './package-files';
 
 const FORMAT_VERSION = 1;
 const SCHEMA_VERSION = 7;
@@ -28,6 +33,7 @@ export function exportTo(
   clock: Clock,
 ): BackupResult {
   let temporary = '';
+  let ownsTemporary = false;
   try {
     const exportedAt = clock.now();
     const folder = join(
@@ -38,6 +44,7 @@ export function exportTo(
     if (existsSync(folder))
       return { ok: false, error: 'Папка экспорта уже существует' };
     mkdirSync(temporary, { recursive: false });
+    ownsTemporary = true;
     const data = readProfile(profilePath);
     const files = writeDataFiles(temporary, profilePath, data);
     writeManifest(
@@ -47,7 +54,7 @@ export function exportTo(
     renameSync(temporary, folder);
     return { ok: true, value: folder };
   } catch (error) {
-    if (temporary) rmSync(temporary, { recursive: true, force: true });
+    if (ownsTemporary) rmSync(temporary, { recursive: true, force: true });
     return { ok: false, error: errorMessage(error) };
   }
 }
@@ -58,10 +65,24 @@ function writeDataFiles(
   data: BackupData,
 ): BackupManifest['files'] {
   const dataBytes = Buffer.from(JSON.stringify(data, null, 2));
+  if (dataBytes.length > MAX_DATA_SIZE_BYTES)
+    throw new Error('Размер data.json превышает лимит');
   writeFileSync(join(temporary, 'data.json'), dataBytes, { flag: 'wx' });
+  const attachments = writeAttachments(temporary, profilePath, data);
+  if (
+    attachments.reduce(
+      (total, file) => total + file.sizeBytes,
+      dataBytes.length,
+    ) > MAX_PACKAGE_SIZE_BYTES
+  )
+    throw new Error('Размер пакета превышает лимит');
   return [
-    { path: 'data.json', sha256: hash(dataBytes), sizeBytes: dataBytes.length },
-    ...writeAttachments(temporary, profilePath, data),
+    {
+      path: 'data.json',
+      sha256: hash(dataBytes),
+      sizeBytes: dataBytes.length,
+    },
+    ...attachments,
   ];
 }
 
@@ -75,12 +96,14 @@ function writeAttachments(
     const source = join(dirname(profilePath), 'attachments', record.id);
     const target = join(temporary, 'attachments', record.id);
     mkdirSync(dirname(target), { recursive: true });
-    copyFileSync(source, target);
-    const bytes = readFileSync(target);
+    copyRegularFile(source, target, MAX_ATTACHMENT_SIZE_BYTES, {
+      sizeBytes: record.size_bytes,
+      sha256: record.sha256,
+    });
     files.push({
       path: `attachments/${record.id}`,
-      sha256: hash(bytes),
-      sizeBytes: bytes.length,
+      sha256: record.sha256,
+      sizeBytes: record.size_bytes,
     });
   }
   return files;
@@ -105,11 +128,13 @@ function createManifest(
 }
 
 function writeManifest(temporary: string, manifest: BackupManifest): void {
-  writeFileSync(
-    join(temporary, 'manifest.json'),
-    JSON.stringify(manifest, null, 2),
-    { flag: 'wx' },
-  );
+  const serialized = JSON.stringify(manifest, null, 2);
+  if (
+    manifest.files.length > 10_000 ||
+    Buffer.byteLength(serialized) > MAX_MANIFEST_SIZE_BYTES
+  )
+    throw new Error('Размер manifest.json превышает лимит');
+  writeFileSync(join(temporary, 'manifest.json'), serialized, { flag: 'wx' });
 }
 
 function readProfile(path: string): BackupData {

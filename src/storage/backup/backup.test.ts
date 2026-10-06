@@ -4,6 +4,8 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
+  truncateSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,6 +17,8 @@ import { Repository } from '../repository';
 import type { Clock } from '../types';
 import { exportTo, restore, verifyPackage } from './backup';
 import { afterEach, describe, expect, it } from 'vitest';
+import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
+import { MAX_DATA_SIZE_BYTES, MAX_PACKAGE_SIZE_BYTES } from './package-files';
 
 const directories: string[] = [];
 const clock: Clock = {
@@ -46,6 +50,14 @@ function source(root: string, name: string, value: string): string {
 }
 function digest(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function zeroHash(sizeBytes: number): string {
+  const bytes = Buffer.alloc(64 * 1024);
+  const hash = createHash('sha256');
+  for (let offset = 0; offset < sizeBytes; offset += bytes.length)
+    hash.update(bytes.subarray(0, Math.min(bytes.length, sizeBytes - offset)));
+  return hash.digest('hex');
 }
 function parsed(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
@@ -112,7 +124,8 @@ describe('backup package', () => {
     repository.close();
     const packageDir = exportPackage(root, profile);
     const restoredPath = join(root, 'new-profile.sqlite');
-    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restoreResult = restore(packageDir, restoredPath, clock);
+    expect(restoreResult.ok).toBe(true);
     const restored = new Repository(restoredPath, clock);
     expect(restored.load()).toEqual({
       ...expected,
@@ -172,6 +185,326 @@ describe('backup package', () => {
       problems: [{ message: 'Размер или sha256 не совпадает' }],
     });
   });
+
+  it('preserves a pre-existing export staging directory after a collision', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const staging = join(
+      root,
+      `FlowPilot-export-2026-10-06.tmp-${String(process.pid)}`,
+    );
+    mkdirSync(staging);
+    writeFileSync(join(staging, 'keep.txt'), 'do not delete');
+
+    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    expect(readFileSync(join(staging, 'keep.txt'), 'utf8')).toBe(
+      'do not delete',
+    );
+  });
+
+  it('rejects symlinked attachment parents without touching external files', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'file.txt', 'content'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const externalPath = join(root, 'external');
+    const attachmentId = z
+      .object({ attachments: z.array(z.object({ id: z.string() })) })
+      .parse(parsed(join(packageDir, 'data.json'))).attachments[0]?.id;
+    if (!attachmentId) throw new Error('Missing attachment fixture');
+    const attachmentBytes = readFileSync(
+      join(packageDir, 'attachments', attachmentId),
+    );
+    mkdirSync(externalPath);
+    writeFileSync(join(externalPath, attachmentId), attachmentBytes);
+    writeFileSync(join(externalPath, 'sentinel'), 'external data');
+    rmSync(join(packageDir, 'attachments'), { recursive: true });
+    symlinkSync(externalPath, join(packageDir, 'attachments'));
+
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, join(root, 'restored.sqlite'), clock).ok).toBe(
+      false,
+    );
+    expect(readFileSync(join(externalPath, 'sentinel'), 'utf8')).toBe(
+      'external data',
+    );
+    expect(readdirSync(externalPath)).toEqual([attachmentId, 'sentinel']);
+  });
+  it('rejects a symlinked attachment file before restore copies it', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'file.txt', 'external attachment'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const attachmentId = z
+      .object({ attachments: z.array(z.object({ id: z.string() })) })
+      .parse(parsed(join(packageDir, 'data.json'))).attachments[0]?.id;
+    if (!attachmentId) throw new Error('Missing attachment fixture');
+    const externalPath = join(root, 'external-attachment');
+    const attachmentPath = join(packageDir, 'attachments', attachmentId);
+    const bytes = readFileSync(attachmentPath);
+    writeFileSync(externalPath, bytes);
+    rmSync(attachmentPath);
+    symlinkSync(externalPath, attachmentPath);
+
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, join(root, 'restored.sqlite'), clock).ok).toBe(
+      false,
+    );
+    expect(readFileSync(externalPath)).toEqual(bytes);
+  });
+
+  it('rejects symlinked manifest and data JSON files', () => {
+    for (const filename of ['manifest.json', 'data.json']) {
+      const { root, profile, repository } = setup();
+      repository.close();
+      const packageDir = exportPackage(root, profile);
+      const packageFile = join(packageDir, filename);
+      const externalPath = join(root, `external-${filename}`);
+      const bytes = readFileSync(packageFile);
+      writeFileSync(externalPath, bytes);
+      rmSync(packageFile);
+      symlinkSync(externalPath, packageFile);
+
+      expect(verifyPackage(packageDir).ok).toBe(false);
+    }
+  });
+
+  it('refuses export when stored attachment bytes no longer match metadata', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'file.txt', 'original'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    const attachmentId = repository.load().tasks[0]?.attachments[0]?.id;
+    repository.close();
+    if (!attachmentId) throw new Error('Missing attachment fixture');
+    writeFileSync(join(root, 'attachments', attachmentId), 'tampered');
+
+    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    expect(
+      readdirSync(root).filter((name) => name.startsWith('FlowPilot-export-')),
+    ).toEqual([]);
+  });
+
+  it('accepts an attachment exactly at the storage size limit', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'file.txt', 'small'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const data = z
+      .object({ attachments: z.array(z.record(z.string(), z.unknown())) })
+      .loose()
+      .parse(parsed(join(packageDir, 'data.json')));
+    const record = data.attachments[0];
+    if (!record) throw new Error('Missing attachment fixture');
+    const id = String(record.id);
+    const sha256 = zeroHash(MAX_ATTACHMENT_SIZE_BYTES);
+    record.size_bytes = MAX_ATTACHMENT_SIZE_BYTES;
+    record.sha256 = sha256;
+    save(join(packageDir, 'data.json'), data);
+    writeFileSync(join(packageDir, 'attachments', id), Buffer.alloc(0));
+    truncateSync(
+      join(packageDir, 'attachments', id),
+      MAX_ATTACHMENT_SIZE_BYTES,
+    );
+    updateDataHash(packageDir);
+    const manifest = z
+      .object({
+        files: z.array(
+          z.object({
+            path: z.string(),
+            sha256: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    const file = manifest.files.find(
+      (item) => item.path === `attachments/${id}`,
+    );
+    if (!file) throw new Error('Missing attachment manifest fixture');
+    file.sizeBytes = MAX_ATTACHMENT_SIZE_BYTES;
+    file.sha256 = sha256;
+    save(join(packageDir, 'manifest.json'), manifest);
+
+    expect(verifyPackage(packageDir).ok).toBe(true);
+  });
+
+  it('rejects a valid sparse attachment one byte above the storage limit', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'attachment.add',
+            taskId: task.id,
+            sourcePath: source(root, 'file.txt', 'small'),
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    const original = repository.load();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const data = z
+      .object({ attachments: z.array(z.record(z.string(), z.unknown())) })
+      .loose()
+      .parse(parsed(join(packageDir, 'data.json')));
+    const record = data.attachments[0];
+    if (!record) throw new Error('Missing attachment fixture');
+    const id = String(record.id);
+    const sizeBytes = MAX_ATTACHMENT_SIZE_BYTES + 1;
+    const sha256 = zeroHash(sizeBytes);
+    record.size_bytes = sizeBytes;
+    record.sha256 = sha256;
+    save(join(packageDir, 'data.json'), data);
+    writeFileSync(join(packageDir, `attachments/${id}`), Buffer.alloc(0));
+    truncateSync(join(packageDir, `attachments/${id}`), sizeBytes);
+    updateDataHash(packageDir);
+    const manifest = z
+      .object({
+        files: z.array(
+          z.object({
+            path: z.string(),
+            sha256: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    const attachment = manifest.files.find(
+      (file) => file.path === `attachments/${id}`,
+    );
+    if (!attachment) throw new Error('Missing attachment manifest fixture');
+    attachment.sizeBytes = sizeBytes;
+    attachment.sha256 = sha256;
+    save(join(packageDir, 'manifest.json'), manifest);
+
+    expect(verifyPackage(packageDir)).toMatchObject({
+      ok: false,
+      problems: [{ message: 'Размер файла превышает лимит' }],
+    });
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
+    const current = new Repository(profile, clock);
+    expect(current.load()).toEqual(original);
+    current.close();
+  });
+
+  it('rejects a manifest whose declared files exceed the package size limit', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const manifest = z
+      .object({
+        files: z.array(
+          z.object({
+            path: z.string(),
+            sha256: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    for (let index = 0; index < 6; index += 1)
+      manifest.files.push({
+        path: `attachments/oversize-${String(index)}`,
+        sha256: '0'.repeat(64),
+        sizeBytes: MAX_ATTACHMENT_SIZE_BYTES,
+      });
+    expect(
+      manifest.files.reduce((total, file) => total + file.sizeBytes, 0),
+    ).toBeGreaterThan(MAX_PACKAGE_SIZE_BYTES);
+    save(join(packageDir, 'manifest.json'), manifest);
+
+    expect(verifyPackage(packageDir)).toMatchObject({
+      ok: false,
+      problems: [
+        { path: 'manifest.json', message: 'Размер пакета превышает лимит' },
+      ],
+    });
+  });
+
+  it('rejects oversized data JSON by its stat size before parsing it', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const dataPath = join(packageDir, 'data.json');
+    truncateSync(dataPath, MAX_DATA_SIZE_BYTES + 1);
+    const manifest = z
+      .object({
+        files: z.array(
+          z.object({
+            path: z.string(),
+            sha256: z.string(),
+            sizeBytes: z.number(),
+          }),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    const dataFile = manifest.files.find((file) => file.path === 'data.json');
+    if (!dataFile) throw new Error('Missing data manifest fixture');
+    dataFile.sizeBytes = MAX_DATA_SIZE_BYTES + 1;
+    save(join(packageDir, 'manifest.json'), manifest);
+
+    expect(verifyPackage(packageDir)).toMatchObject({
+      ok: false,
+      problems: [
+        { path: 'manifest.json', message: 'Размер файла превышает лимит' },
+      ],
+    });
+  });
+
   it('rejects attachment metadata that differs from the manifest record', () => {
     const { root, profile, repository } = setup();
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
@@ -342,6 +675,63 @@ describe('backup package', () => {
     );
     expect(saved.load().tasks[0]?.title).toBe('Старый профиль');
     saved.close();
+  });
+  it('does not undo a restore or skip it, then undoes the next user edit', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    const attachment = source(root, 'restored.txt', 'restored attachment');
+    expect(
+      repository.apply(
+        [{ kind: 'attachment.add', taskId: task.id, sourcePath: attachment }],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const restoreResult = restore(packageDir, profile, clock);
+    expect(restoreResult.ok).toBe(true);
+    if (!restoreResult.ok) throw new Error('Restore should succeed');
+    expect(restoreResult.value).toContain('.before-restore-');
+
+    const current = new Repository(profile, clock);
+    const beforeUndo = current.load();
+    const attachmentPath = join(
+      root,
+      'attachments',
+      beforeUndo.tasks[0]?.attachments[0]?.id ?? '',
+    );
+    const attachmentBytes = readFileSync(attachmentPath);
+    const historyBeforeUndo = current.history(10);
+
+    const undoResult = current.undo();
+    expect(undoResult).toMatchObject({
+      ok: false,
+      error: { kind: 'NotUndoable' },
+    });
+    if (undoResult.ok || undoResult.error.kind !== 'NotUndoable')
+      throw new Error('Restore undo should be rejected as not undoable');
+    expect(undoResult.error.reason).toContain(
+      `восстановление нельзя отменить; прежние данные сохранены в ${profile}.before-restore-`,
+    );
+    expect(current.load()).toEqual(beforeUndo);
+    expect(readFileSync(attachmentPath)).toEqual(attachmentBytes);
+    expect(current.history(10)).toEqual(historyBeforeUndo);
+
+    expect(
+      current.apply(
+        [{ kind: 'task.update', id: task.id, changes: { title: 'Правка' } }],
+        beforeUndo.revision,
+      ).ok,
+    ).toBe(true);
+    expect(current.undo()).toMatchObject({ ok: true });
+    expect(current.load().tasks[0]?.title).toBe(task.title);
+    expect(current.load().revision).toBe(beforeUndo.revision + 2);
+    expect(current.history(10).entries.map(({ source }) => source)).toEqual([
+      'undo',
+      'user',
+      'restore',
+    ]);
+    current.close();
   });
 
   it('exports and restores an empty storage profile', () => {

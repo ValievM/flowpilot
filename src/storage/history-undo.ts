@@ -37,13 +37,15 @@ type UndoPlan = {
   attachmentChanges: { restore: string[]; trash: string[] };
 };
 
-export function undoEntry(
-  database: Database.Database,
-  attachmentFiles: AttachmentFiles,
-  entryId: string | undefined,
-  now: string,
-): UndoResult {
-  const attempt = createUndoPlan(database, entryId);
+export function undoEntry(input: {
+  database: Database.Database;
+  attachmentFiles: AttachmentFiles;
+  entryId: string | undefined;
+  now: string;
+  profilePath: string;
+}): UndoResult {
+  const { database, attachmentFiles, entryId, now, profilePath } = input;
+  const attempt = createUndoPlan(database, entryId, profilePath);
   if ('result' in attempt) return attempt.result;
   const restored: string[] = [];
   const trashed: string[] = [];
@@ -72,10 +74,21 @@ export function undoEntry(
 
 function createUndoPlan(
   database: Database.Database,
-  entryId?: string,
+  entryId: string | undefined,
+  profilePath: string,
 ): { plan: UndoPlan } | { result: UndoResult } {
   const entry = findEntry(database, entryId);
   if (!entry) return { result: { ok: false, error: { kind: 'NotFound' } } };
+  if (entry.source === 'restore')
+    return {
+      result: {
+        ok: false,
+        error: {
+          kind: 'NotUndoable',
+          reason: `восстановление нельзя отменить; прежние данные сохранены в ${profilePath}.before-restore-${entry.occurred_at.replaceAll(':', '-')}`,
+        },
+      },
+    };
   if (entry.source === 'undo')
     return { result: { ok: false, error: { kind: 'NotUndoable' } } };
   if (isUndone(database, entry.id))

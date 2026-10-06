@@ -1,13 +1,18 @@
-import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import type { BackupProblem, Verification } from './backup-types';
 import {
   backupDataSchema,
   manifestSchema,
   type BackupData,
   type BackupManifest,
 } from './schemas';
-import type { BackupProblem, Verification } from './backup-types';
+import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
+import {
+  hashPackageFile,
+  MAX_DATA_SIZE_BYTES,
+  MAX_MANIFEST_SIZE_BYTES,
+  MAX_PACKAGE_SIZE_BYTES,
+  readPackageJson,
+} from './package-files';
 
 const FORMAT_VERSION = 1;
 const SCHEMA_VERSION = 7;
@@ -37,28 +42,19 @@ function readPackage(
   | { ok: false; problems: readonly BackupProblem[] } {
   try {
     const manifestResult = manifestSchema.safeParse(
-      JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')) as unknown,
+      JSON.parse(
+        readPackageJson(dir, 'manifest.json', MAX_MANIFEST_SIZE_BYTES),
+      ) as unknown,
     );
     if (!manifestResult.success)
       return failure('manifest.json', manifestResult.error.message);
     const manifest = manifestResult.data;
-    if (manifest.formatVersion > FORMAT_VERSION)
-      return failure(
-        'manifest.json',
-        `Версия формата ${String(manifest.formatVersion)} новее поддерживаемой ${String(FORMAT_VERSION)}`,
-      );
-    if (manifest.formatVersion !== FORMAT_VERSION)
-      return failure(
-        'manifest.json',
-        `Неподдерживаемая версия формата ${String(manifest.formatVersion)}`,
-      );
-    if (manifest.schemaVersion > SCHEMA_VERSION)
-      return failure(
-        'manifest.json',
-        `Версия схемы ${String(manifest.schemaVersion)} новее поддерживаемой ${String(SCHEMA_VERSION)}`,
-      );
+    const validationError = validateManifest(manifest);
+    if (validationError) return failure('manifest.json', validationError);
     const dataResult = backupDataSchema.safeParse(
-      JSON.parse(readFileSync(join(dir, 'data.json'), 'utf8')) as unknown,
+      JSON.parse(
+        readPackageJson(dir, 'data.json', MAX_DATA_SIZE_BYTES),
+      ) as unknown,
     );
     if (!dataResult.success)
       return failure('data.json', dataResult.error.message);
@@ -67,6 +63,30 @@ function readPackage(
     return failure('package', errorMessage(error));
   }
 }
+function validateManifest(manifest: BackupManifest): string | undefined {
+  if (manifest.formatVersion > FORMAT_VERSION)
+    return `Версия формата ${String(manifest.formatVersion)} новее поддерживаемой ${String(FORMAT_VERSION)}`;
+  if (manifest.formatVersion !== FORMAT_VERSION)
+    return `Неподдерживаемая версия формата ${String(manifest.formatVersion)}`;
+  if (manifest.schemaVersion > SCHEMA_VERSION)
+    return `Версия схемы ${String(manifest.schemaVersion)} новее поддерживаемой ${String(SCHEMA_VERSION)}`;
+  const declaredSize = manifest.files.reduce(
+    (total, file) => total + file.sizeBytes,
+    0,
+  );
+  if (declaredSize > MAX_PACKAGE_SIZE_BYTES)
+    return 'Размер пакета превышает лимит';
+  if (
+    manifest.files.some(
+      (file) =>
+        file.sizeBytes >
+        (file.path === 'data.json'
+          ? MAX_DATA_SIZE_BYTES
+          : MAX_ATTACHMENT_SIZE_BYTES),
+    )
+  )
+    return 'Размер файла превышает лимит';
+}
 
 function verifyFiles(
   dir: string,
@@ -74,6 +94,7 @@ function verifyFiles(
   problems: BackupProblem[],
 ): Map<string, BackupManifest['files'][number]> {
   const listed = new Map<string, BackupManifest['files'][number]>();
+  let packageSize = 0;
   for (const file of manifest.files) {
     if (!isPackagePath(file.path)) {
       problems.push({ path: file.path, message: 'Недопустимый путь файла' });
@@ -82,8 +103,23 @@ function verifyFiles(
     if (listed.has(file.path))
       problems.push({ path: file.path, message: 'Повтор файла в manifest' });
     listed.set(file.path, file);
-    verifyFileContents(dir, file, problems);
+    const fileLimit =
+      file.path === 'data.json'
+        ? MAX_DATA_SIZE_BYTES
+        : MAX_ATTACHMENT_SIZE_BYTES;
+    if (file.sizeBytes > fileLimit)
+      problems.push({
+        path: file.path,
+        message: 'Размер файла превышает лимит',
+      });
+    packageSize += file.sizeBytes;
+    verifyFileContents(dir, file, fileLimit, problems);
   }
+  if (packageSize > MAX_PACKAGE_SIZE_BYTES)
+    problems.push({
+      path: 'manifest.json',
+      message: 'Размер пакета превышает лимит',
+    });
   if (!listed.has('data.json'))
     problems.push({
       path: 'manifest.json',
@@ -95,23 +131,23 @@ function verifyFiles(
 function verifyFileContents(
   dir: string,
   file: BackupManifest['files'][number],
+  maxSizeBytes: number,
   problems: BackupProblem[],
 ): void {
   try {
-    const path = join(dir, file.path);
-    const info = lstatSync(path);
-    if (!info.isFile() || info.isSymbolicLink())
-      throw new Error('not a regular file');
-    const bytes = readFileSync(path);
-    if (bytes.length !== file.sizeBytes || hash(bytes) !== file.sha256)
+    const contents = hashPackageFile(dir, file.path, maxSizeBytes);
+    if (
+      contents.sizeBytes !== file.sizeBytes ||
+      contents.sha256 !== file.sha256
+    )
       problems.push({
         path: file.path,
         message: 'Размер или sha256 не совпадает',
       });
-  } catch {
+  } catch (error) {
     problems.push({
       path: file.path,
-      message: 'Файл отсутствует или недоступен',
+      message: errorMessage(error),
     });
   }
 }
@@ -160,9 +196,6 @@ function isPackagePath(path: string): boolean {
 }
 function failure(path: string, message: string): Verification {
   return { ok: false, problems: [{ path, message }] };
-}
-function hash(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
 }
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка';

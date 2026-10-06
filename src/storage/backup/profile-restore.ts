@@ -1,4 +1,4 @@
-import { existsSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import type { Clock } from '../types';
@@ -13,6 +13,7 @@ type RestorePaths = {
   profilePath: string;
   stagedDb: string;
   stagedAttachments: string;
+  stageDir: string;
   oldDb: string;
   oldAttachments: string;
   attachmentDir: string;
@@ -50,7 +51,6 @@ export function restore(
     installedAttachments: false,
   };
   try {
-    cleanStage(paths);
     buildProfile({
       dir,
       stagedDb: paths.stagedDb,
@@ -60,25 +60,27 @@ export function restore(
       buildClock: BUILD_CLOCK,
     });
     replaceProfile(paths, state);
-    return { ok: true, value: paths.oldDb };
+    return {
+      ok: true,
+      value: `Профиль восстановлен. Прежние данные сохранены здесь: ${paths.oldDb}`,
+    };
   } catch (error) {
     rollbackProfile(paths, state);
     return { ok: false, error: errorMessage(error) };
   } finally {
-    cleanStage(paths);
+    rmSync(paths.stageDir, { recursive: true, force: true });
   }
 }
 
 function makePaths(profilePath: string, clock: Clock): RestorePaths {
   const timestamp = clock.now().toString().replaceAll(':', '-');
   const parent = dirname(profilePath);
+  const stageDir = mkdtempSync(join(parent, '.restore-stage-'));
   return {
     profilePath,
-    stagedDb: `${profilePath}.restore-${String(process.pid)}`,
-    stagedAttachments: join(
-      parent,
-      `.attachments.restore-${String(process.pid)}`,
-    ),
+    stagedDb: join(stageDir, 'profile.sqlite'),
+    stagedAttachments: join(stageDir, 'attachments'),
+    stageDir,
     oldDb: `${profilePath}.before-restore-${timestamp}`,
     oldAttachments: join(parent, `attachments.before-restore-${timestamp}`),
     attachmentDir: join(parent, 'attachments'),
@@ -111,12 +113,6 @@ function rollbackProfile(paths: RestorePaths, state: ReplacementState): void {
     renameSync(paths.oldAttachments, paths.attachmentDir);
 }
 
-function cleanStage(paths: RestorePaths): void {
-  rmSync(paths.stagedDb, { force: true });
-  rmSync(`${paths.stagedDb}-wal`, { force: true });
-  rmSync(`${paths.stagedDb}-shm`, { force: true });
-  rmSync(paths.stagedAttachments, { recursive: true, force: true });
-}
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Неизвестная ошибка';
 }
