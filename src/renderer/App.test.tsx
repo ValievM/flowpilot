@@ -160,6 +160,44 @@ describe('persisted today and now screens', () => {
     expect(isThemeChoice('ultraviolet')).toBe(false);
   });
 
+  it.each([
+    ['Доска', 'Доска'],
+    ['Все задачи', 'Все задачи'],
+  ])(
+    'updates the deadline risk marker in the %s view when workdays change',
+    async (viewLabel, heading) => {
+      const app = renderApp([
+        {
+          id: 'view-risk',
+          title: 'Risk view task',
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 4 },
+        },
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+      expect(
+        await screen.findByRole('heading', { name: 'Risk view task' }),
+      ).toBeVisible();
+      expect(screen.getByRole('heading', { name: heading })).toBeVisible();
+      expect(
+        screen.queryByText(/До срока .*запас исчерпан/),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Пятница' }));
+      await waitFor(() => {
+        expect(app.snapshot().settings.workdays).toEqual([1, 2, 3, 4]);
+      });
+      fireEvent.click(screen.getByRole('button', { name: viewLabel }));
+
+      expect(
+        await screen.findByText(
+          /До срока 4 рабочих дня, оценка остатка 4 рабочих дня: запас исчерпан/,
+        ),
+      ).toBeVisible();
+    },
+  );
+
   it('persists workdays, reloads them, and recalculates visible deadline risk', async () => {
     const app = fakeApi(
       [
@@ -231,7 +269,7 @@ describe('persisted today and now screens', () => {
   });
 
   it('defaults reduced motion to the system and persists manual overrides', async () => {
-    const changeSystemMotion = mockSystemTheme(true);
+    const changeSystemMotion = mockSystemTheme(true, false);
     const fake = fakeApi();
     Object.defineProperty(window, 'flowpilot', {
       configurable: true,
@@ -241,6 +279,7 @@ describe('persisted today and now screens', () => {
     await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
     expect(window.localStorage.getItem('flowpilot-reduce-motion')).toBeNull();
     expect(document.documentElement).toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement.dataset.theme).toBe('light');
     act(() => {
       changeSystemMotion(false);
     });

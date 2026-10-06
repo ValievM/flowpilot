@@ -62,7 +62,13 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
       />
     );
   if (props.view === 'board')
-    return <BoardScreen tasks={props.tasks.map(taskSummaryData)} />;
+    return (
+      <BoardScreen
+        tasks={props.tasks.map((task) =>
+          taskSummaryData(task, props.today, props.workdays),
+        )}
+      />
+    );
   if (props.view === 'all')
     return (
       <section className="simple-screen">
@@ -70,7 +76,10 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         <h1>Все задачи</h1>
         <div className="all-task-list">
           {props.tasks.map((task) => (
-            <TaskSummary key={task.id} task={taskSummaryData(task)} />
+            <TaskSummary
+              key={task.id}
+              task={taskSummaryData(task, props.today, props.workdays)}
+            />
           ))}
         </div>
       </section>
