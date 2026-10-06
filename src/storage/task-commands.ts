@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
+import { insertTask, setTaskAiRank, updateTask } from './task-records';
 import type { StorageCommand } from './types';
-import { insertTask, updateTask } from './task-records';
 import {
   addComment,
   addSubtask,
@@ -31,6 +31,9 @@ export function executeTaskCommand(
       return;
     case 'comment.add':
       addComment(database, command.taskId, command.comment, now);
+      return;
+    case 'task.setAiRank':
+      setTaskAiRank(database, command.taskId, command.rank, now);
       return;
     default:
       throw new Error('Unsupported task command');

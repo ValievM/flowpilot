@@ -14,8 +14,8 @@ export function insertTask(
   const status = task.status;
   database
     .prepare(
-      `INSERT INTO tasks(id,title,description,column_id,day,time,deadline,estimate_unit,estimate_value,status_kind,waiting_reason,waiting_until,rolled_over_from,position,created_at,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO tasks(id,title,description,column_id,day,time,deadline,estimate_unit,estimate_value,status_kind,waiting_reason,waiting_until,rolled_over_from,position,ai_rank,created_at,updated_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       task.id,
@@ -32,6 +32,7 @@ export function insertTask(
       status.kind === 'waiting' ? dateText(status.until) : null,
       dateText(task.rolledOverFrom),
       task.addedOrder,
+      task.aiRank ?? null,
       now,
       now,
     );
@@ -61,6 +62,19 @@ export function updateTask(
       `UPDATE tasks SET ${entries.join(', ')}, version = version + 1, updated_at = @now WHERE id = @id`,
     )
     .run({ ...values, now, id });
+}
+export function setTaskAiRank(
+  database: Database.Database,
+  taskId: string,
+  rank: number,
+  now: string,
+): void {
+  const result = database
+    .prepare(
+      'UPDATE tasks SET ai_rank = ?, version = version + 1, updated_at = ? WHERE id = ?',
+    )
+    .run(rank, now, taskId);
+  if (result.changes === 0) throw new Error('task not found');
 }
 
 function insertTaskSubtasks(database: Database.Database, task: Task): void {

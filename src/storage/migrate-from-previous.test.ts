@@ -179,6 +179,18 @@ function expectNewColumnDefaults(database: Database.Database): void {
       .prepare('SELECT generation FROM column_generations WHERE id = ?')
       .get('legacy-column'),
   ).toEqual({ generation: 1 });
+  expect(
+    database
+      .prepare('SELECT ai_rank FROM tasks WHERE id = ?')
+      .get('legacy-task'),
+  ).toEqual({ ai_rank: null });
+  expect(
+    database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      )
+      .get('applied_operations'),
+  ).toEqual({ name: 'applied_operations' });
 }
 
 function expectMigrationHistory(

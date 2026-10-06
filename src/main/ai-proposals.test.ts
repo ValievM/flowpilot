@@ -67,9 +67,8 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(1);
+    expect(result.validCommands).toHaveLength(2);
     expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
       { index: 1, kind: 'task.classify', reason: 'not-persisted-yet' },
     ]);
   });
@@ -86,9 +85,10 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+    ]);
     expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
       { index: 1, kind: 'comment.add', reason: 'task-not-found' },
       { index: 2, kind: 'task.classify', reason: 'not-persisted-yet' },
     ]);
@@ -115,10 +115,11 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.classify', reason: 'invalid-command' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
     ]);
     expect(
       aiCommandSchema.safeParse({ kind: 'task.delete', taskId: 'task-1' })
@@ -183,10 +184,11 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.create', reason: 'not-persisted-yet' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
     ]);
   });
 

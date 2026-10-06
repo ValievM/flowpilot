@@ -5,6 +5,8 @@ import entityVersions from '../../../src/storage/migrations/0004_entity_versions
 import columnGenerations from '../../../src/storage/migrations/0005_column_generations.sql?raw';
 import legacyTombstoneGenerations from '../../../src/storage/migrations/0006_legacy_tombstone_generations.sql?raw';
 import restoreHistory from '../../../src/storage/migrations/0007_restore_history.sql?raw';
+import aiApplication from '../../../src/storage/migrations/0008_ai_application.sql?raw';
+import rejectedAiCommands from '../../../src/storage/migrations/0009_rejected_ai_commands.sql?raw';
 
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
@@ -29,6 +31,16 @@ export const migrationFiles = [
     version: 7,
     filename: '0007_restore_history.sql',
     sql: restoreHistory,
+  },
+  {
+    version: 8,
+    filename: '0008_ai_application.sql',
+    sql: aiApplication,
+  },
+  {
+    version: 9,
+    filename: '0009_rejected_ai_commands.sql',
+    sql: rejectedAiCommands,
   },
 ] as const;
 

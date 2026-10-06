@@ -83,6 +83,9 @@ describe('column undo regressions', () => {
         "UPDATE change_log_entities SET version_after = NULL WHERE entry_id = ? AND entity_kind = 'column'",
       )
       .run(deletion.id);
+    legacyDatabase.exec(
+      'ALTER TABLE tasks DROP COLUMN ai_rank; DROP TABLE applied_operations;',
+    );
     legacyDatabase.pragma('user_version = 5');
     legacyDatabase.close();
 

@@ -22,6 +22,7 @@ export type TaskRow = {
   waiting_reason: string | null;
   waiting_until: string | null;
   rolled_over_from: string | null;
+  ai_rank: number | null;
   position: number;
 };
 
@@ -51,6 +52,7 @@ export function loadTask(database: Database.Database, row: TaskRow): Task {
     ...(row.rolled_over_from
       ? { rolledOverFrom: Temporal.PlainDate.from(row.rolled_over_from) }
       : {}),
+    ...(row.ai_rank !== null ? { aiRank: row.ai_rank } : {}),
     subtasks: relations.subtasks,
     comments: relations.comments,
     attachments: relations.attachments,

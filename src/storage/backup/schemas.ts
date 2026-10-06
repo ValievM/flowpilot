@@ -46,6 +46,7 @@ const task = z
     waiting_until: plainDate.nullable(),
     rolled_over_from: plainDate.nullable(),
     position: z.number().int(),
+    ai_rank: z.number().int().min(0).nullable().default(null),
     version: z.number().int().min(1),
     created_at: z.string(),
     updated_at: z.string(),

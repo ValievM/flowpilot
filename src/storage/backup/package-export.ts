@@ -30,7 +30,7 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 const APP_VERSION = '0.1.0';
 
 export function exportTo(

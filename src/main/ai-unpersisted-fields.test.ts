@@ -87,7 +87,7 @@ const disciplineIdOnlyProposal = {
 
 const proposalWithOtherUnpersistedCommands = {
   ...proposal,
-  commands: [proposal.commands[0], proposal.commands[1], proposal.commands[3]],
+  commands: [proposal.commands[0], proposal.commands[2], proposal.commands[3]],
 };
 
 describe('AI commands for fields not persisted yet', () => {
@@ -100,7 +100,7 @@ describe('AI commands for fields not persisted yet', () => {
     expect(result.validCommands).toEqual([proposal.commands[3]]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.classify', reason: 'not-persisted-yet' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
+      { index: 1, kind: 'task.create', reason: 'not-persisted-yet' },
     ]);
   });
 

@@ -101,9 +101,15 @@ afterEach(() => {
 });
 
 describe('backup package', () => {
-  it('restores tasks, details, settings and both attachment bytes into an empty profile', () => {
+  it('restores tasks, AI order, settings and attachment bytes into an empty profile', () => {
     const { root, profile, repository } = setup();
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [{ kind: 'task.setAiRank', taskId: task.id, rank: 4 }],
+        1,
+      ).ok,
+    ).toBe(true);
     const attachment1 = source(root, 'first.txt', 'first attachment');
     const attachment2 = source(root, 'second.txt', 'second attachment');
     expect(
@@ -112,13 +118,13 @@ describe('backup package', () => {
           { kind: 'attachment.add', taskId: task.id, sourcePath: attachment1 },
           { kind: 'attachment.add', taskId: task.id, sourcePath: attachment2 },
         ],
-        1,
+        2,
       ).ok,
     ).toBe(true);
     expect(
       repository.apply(
         [{ kind: 'setting.set', key: 'workdays', value: [1, 2, 3] }],
-        2,
+        3,
       ).ok,
     ).toBe(true);
     const expected = repository.load();
