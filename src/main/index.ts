@@ -1,15 +1,19 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
 import { registerIpcHandlers } from './ipc-handlers';
-import { selectRuntimeOptions } from './runtime';
+import { selectRuntimeOptions, selectWindowOptions } from './runtime';
+import { ManualExchangeProvider } from './ai/manual-exchange-provider';
+import { createStartupAiRunner } from './ai/startup-ai-runner';
+import { reportStartupFailure } from './startup-error';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | undefined;
 let repository: Repository | undefined;
+const manualProvider = new ManualExchangeProvider();
 const runtime = selectRuntimeOptions(
   app.isPackaged,
   process.env,
@@ -34,20 +38,38 @@ if (!app.requestSingleInstanceLock()) {
         path.join(runtime.profilePath, 'flowpilot.db'),
         runtime.clock,
       );
+      const aiRunner = createStartupAiRunner(
+        app.isPackaged,
+        process.env,
+        manualProvider,
+      );
       registerIpcHandlers(ipcMain, {
         repository,
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
+          getNow: () => runtime.clock.now().toString(),
         },
+        aiRunner,
+        manualProvider,
       });
       createWindow();
       app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
       });
     })
-    .catch(() => {
-      app.quit();
+    .catch((error: unknown) => {
+      reportStartupFailure(error, {
+        logFailure: (code) => {
+          console.error(`[FlowPilot] Startup failed: ${code}`);
+        },
+        showErrorBox: (title, message) => {
+          dialog.showErrorBox(title, message);
+        },
+        quit: () => {
+          app.quit();
+        },
+      });
     });
 }
 
@@ -57,11 +79,14 @@ app.on('window-all-closed', () => {
 });
 
 function createWindow(): void {
+  const windowOptions = selectWindowOptions(runtime.isE2E);
   mainWindow = new BrowserWindow({
+    ...windowOptions,
     width: 1280,
     height: 800,
     minWidth: 900,
     webPreferences: {
+      ...windowOptions.webPreferences,
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       sandbox: true,

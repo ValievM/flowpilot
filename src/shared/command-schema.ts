@@ -32,8 +32,7 @@ const taskSchema = z
     description: z.string().optional(),
     status: statusSchema,
     columnId: z.string().min(1),
-    typeId: z.string().min(1).optional(),
-    disciplineId: z.string().min(1).optional(),
+    // typeId, disciplineId, and aiRank remain rejected until #40/#46 persist them.
     day: dateSchema,
     time: timeSchema,
     deadline: dateSchema,
@@ -192,6 +191,13 @@ const columnDeleteSchema = z
     kind: z.literal('column.delete'),
     id: z.string().min(1),
     targetColumnId: z.string().min(1).optional(),
+    waiting: z
+      .object({
+        reason: z.string().trim().min(1),
+        until: dateValueSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const settingCommandSchema = z

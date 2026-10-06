@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run typecheck && npm run format:check && npm run lint && npm run stylelint && npm run depcruise && npm run test",
-    "e2e": "electron-forge package && playwright test",
+    "e2e": "FLOWPILOT_E2E=1 electron-forge package && FLOWPILOT_E2E=1 TZ=UTC playwright test",
     "package": "electron-forge package --arch=arm64 --platform=darwin",
     "make": "electron-forge make --arch=arm64 --platform=darwin"
   },

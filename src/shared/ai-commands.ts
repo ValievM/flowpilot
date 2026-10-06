@@ -3,9 +3,7 @@ import type { Task, TaskComment, TaskStatus, Subtask } from '../domain';
 import { z } from 'zod';
 import { commandSchema } from './command-schema';
 
-export type AiTaskChanges = Partial<
-  Pick<Task, 'title' | 'description' | 'day' | 'time' | 'deadline' | 'estimate'>
-> & {
+export type AiTaskChanges = Partial<Pick<Task, 'title'>> & {
   readonly description?: string | null;
   readonly day?: Task['day'] | null;
   readonly time?: Task['time'] | null;
@@ -122,17 +120,47 @@ const aiTaskUpdateCommandSchema = z
     changes: aiTaskChangesSchema,
   })
   .strict();
-const baseCommandSchema = z.custom<AiBaseCommand>((value) => {
-  if (typeof value !== 'object' || value === null || !('kind' in value))
-    return false;
-  if (value.kind === 'task.create')
-    return aiTaskCreateCommandSchema.safeParse(value).success;
-  if (value.kind === 'task.update')
-    return aiTaskUpdateCommandSchema.safeParse(value).success;
-  if (typeof value.kind !== 'string' || !allowedStorageKinds.has(value.kind))
-    return false;
-  return commandSchema.safeParse(value).success;
-}, 'Invalid AI storage command');
+const baseCommandSchema = z
+  .custom<AiBaseCommand>((value) => {
+    if (typeof value !== 'object' || value === null || !('kind' in value))
+      return false;
+    if (value.kind === 'task.create')
+      return aiTaskCreateCommandSchema.safeParse(value).success;
+    if (value.kind === 'task.update')
+      return aiTaskUpdateCommandSchema.safeParse(value).success;
+    if (typeof value.kind !== 'string' || !allowedStorageKinds.has(value.kind))
+      return false;
+    return commandSchema.safeParse(value).success;
+  }, 'Invalid AI storage command')
+  .transform((command): AiBaseCommand => {
+    if (command.kind === 'task.create') {
+      return { ...command, task: normalizeTaskDates(command.task) };
+    }
+    if (command.kind === 'task.update') {
+      return { ...command, changes: normalizeTaskChanges(command.changes) };
+    }
+    return command;
+  });
+function normalizeTaskDates(task: AiTaskCreation): AiTaskCreation {
+  return {
+    ...task,
+    ...(task.day ? { day: Temporal.PlainDate.from(task.day) } : {}),
+    ...(task.time ? { time: Temporal.PlainTime.from(task.time) } : {}),
+    ...(task.deadline
+      ? { deadline: Temporal.PlainDate.from(task.deadline) }
+      : {}),
+  };
+}
+function normalizeTaskChanges(changes: AiTaskChanges): AiTaskChanges {
+  return {
+    ...changes,
+    ...(changes.day ? { day: Temporal.PlainDate.from(changes.day) } : {}),
+    ...(changes.time ? { time: Temporal.PlainTime.from(changes.time) } : {}),
+    ...(changes.deadline
+      ? { deadline: Temporal.PlainDate.from(changes.deadline) }
+      : {}),
+  };
+}
 
 const taskClassifySchema = z
   .object({

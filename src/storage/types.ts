@@ -5,6 +5,7 @@ import type {
   TaskStatus,
   Subtask,
   TaskComment,
+  WaitingDetails,
 } from '../domain';
 export type HistoryEntry = {
   id: string;
@@ -74,7 +75,12 @@ export type StorageCommand =
   | { kind: 'attachment.remove'; attachmentId: string }
   | { kind: 'column.create'; column: TaskColumn }
   | { kind: 'column.rename'; id: string; name: string; description: string }
-  | { kind: 'column.delete'; id: string; targetColumnId?: string }
+  | {
+      kind: 'column.delete';
+      id: string;
+      targetColumnId?: string;
+      waiting?: WaitingDetails;
+    }
   | { kind: 'setting.set'; key: string; value: unknown };
 
 export type HistoryPage = {

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -213,5 +214,27 @@ describe('database migrations', () => {
       expect.objectContaining({ id: 'custom', name: 'Custom' }),
     );
     repository.close();
+  });
+
+  it('rejects a database without a FlowPilot version without changing it', () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), 'flowpilot-foreign-database-'),
+    );
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const database = new Database(path);
+    database.exec('CREATE TABLE tasks (id TEXT PRIMARY KEY)');
+    database.close();
+    const before = createHash('sha256')
+      .update(readFileSync(path))
+      .digest('hex');
+
+    expect(
+      () => new Repository(path, { now: () => Temporal.Now.instant() }),
+    ).toThrow('Foreign database schema is not supported');
+
+    expect(createHash('sha256').update(readFileSync(path)).digest('hex')).toBe(
+      before,
+    );
   });
 });

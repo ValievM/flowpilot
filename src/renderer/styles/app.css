@@ -109,6 +109,9 @@ svg {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .nav-item svg {
@@ -204,6 +207,9 @@ svg {
   border-radius: var(--r2);
   background: var(--panel);
   cursor: pointer;
+  transition:
+    background-color var(--speed) var(--ease),
+    color var(--speed) var(--ease);
 }
 
 .button:hover {

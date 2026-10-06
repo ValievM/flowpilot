@@ -3,10 +3,15 @@ import { contextBridge } from 'electron';
 import { ipcRenderer } from 'electron';
 import {
   ipcChannels,
+  type AppInfo,
   type FlowPilotApi,
   type CommandsApplyRequest,
   type SettingsSetRequest,
   type IpcSnapshot,
+  type AiIpcRequest,
+  type AiIpcResult,
+  type AiCancelResult,
+  type AiManualReplyResult,
 } from '../shared/contracts';
 import type { Result } from '../shared/ipc-result';
 // Electron types invoke as untyped; main validates requests and returns this FlowPilotApi contract.
@@ -33,11 +38,27 @@ const api: FlowPilotApi = Object.freeze({
         Result<IpcSnapshot>
       >,
   },
+  ai: {
+    run: (request: AiIpcRequest) =>
+      ipcRenderer.invoke(ipcChannels.aiRun, request) as Promise<AiIpcResult>,
+    cancel: (request: { operationId: string }) =>
+      ipcRenderer.invoke(
+        ipcChannels.aiCancel,
+        request,
+      ) as Promise<AiCancelResult>,
+    prompt: (request: { operationId: string }) =>
+      ipcRenderer.invoke(ipcChannels.aiPrompt, request) as Promise<
+        Result<string>
+      >,
+    reply: (request: { operationId: string; text: string }) =>
+      ipcRenderer.invoke(
+        ipcChannels.aiReply,
+        request,
+      ) as Promise<AiManualReplyResult>,
+  },
   app: {
     info: () =>
-      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<
-        Result<{ name: string; version: string }>
-      >,
+      ipcRenderer.invoke(ipcChannels.appInfo, {}) as Promise<Result<AppInfo>>,
   },
 });
 

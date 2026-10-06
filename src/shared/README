@@ -11,7 +11,8 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
 - `settings.get()` (`settings.get`): empty strict request; returns settings.
 - `settings.set()` (`settings.set`): strict
   `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
-- `app.info()` (`app.info`): empty strict request; returns `{ name, version }`.
+- `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
+  where `now` is the ISO timestamp from the main-process clock.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
 `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
@@ -24,13 +25,42 @@ AI proposals use a separate strict command contract in `ai-commands.ts`.
 main-to-storage commands and are intentionally absent from `ipcCommandSchema`.
 The proposal validator checks snapshot IDs and revision/rule fingerprints before
 returning commands tagged with `source: 'ai'`; it does not call a provider or
-apply writes itself.
+apply writes itself. The provider boundary checks task, nested, and column
+references against authoritative request data. Task-type, discipline, and rule
+references fail closed until #40 provides authoritative catalogs in main-process
+state; no such catalog source currently exists in the repository API.
 AI `task.update` accepts only user-editable fields. AI `task.create` uses a
 separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without
 accepting system fields from the proposal.
+Task fields may enter the model only with a migration, storage write, read path,
+command schema, and invariant test in the same change.
 
-Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, and
-`FLOWPILOT_TEST_PROFILE` are honored only for unpackaged applications with
-`FLOWPILOT_TEST=1`. Packaged apps always use system time and Electron's
-user-data directory. The injected `Clock` makes tests deterministic.
+AI calls are explicit through `ai.run()` and `ai.cancel()`. The main-process
+`ai.run()` boundary serializes Temporal date and time values to canonical ISO
+strings before returning a proposal to the renderer. The manual provider also
+exposes `ai.prompt()` and `ai.reply()` for text exchange without clipboard or
+network access. Replies pass strict proposal and command validation before they
+leave the provider. The fake provider is selected only in unpackaged
+`FLOWPILOT_TEST=1` builds; manual exchange is the default. No persisted setting
+selects an AI provider.
+
+The main process builds a private `referenceIndex` from its repository snapshot,
+separate from the limited model-visible context. It contains task/column IDs
+and states and is never accepted from or included in the renderer/model request.
+This lets validation detect collisions with completed, over-limit, and nested
+records without exposing those records to the model. Move/create validation also
+enforces the #44 column/status semantics. The current repository API does not
+provide authoritative task-type, discipline, or rule catalogs; those references
+are rejected at the IPC provider boundary until such catalogs are available from
+main-process state. `task.move.status.until` is serialized to an ISO date string
+at the IPC boundary.
+
+`FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded proposal in an unpackaged
+test build with `FLOWPILOT_TEST=1`; the startup fake returns it through
+`ai.run`. Missing or invalid test replies return `ProviderUnavailable`.
+
+Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, `FLOWPILOT_TEST_PROFILE`,
+and `FLOWPILOT_TEST_AI_REPLY` are honored only for unpackaged applications with
+`FLOWPILOT_TEST=1`. Packaged apps always use system time, Electron's user-data
+directory, and manual exchange for AI. The injected `Clock` makes tests deterministic.
