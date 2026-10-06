@@ -80,7 +80,12 @@ test.afterEach(async () => {
   rmSync(profilePath, { recursive: true, force: true });
 });
 
-test('opens the app without exposing Node globals', async () => {
+test('keeps the E2E window hidden without exposing Node globals', async () => {
+  const windowState = await app?.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowState).toEqual({ visible: false, focused: false });
   await expect(page.getByText('Сохранено')).toBeVisible();
   expect(
     await page.evaluate(
@@ -93,6 +98,7 @@ test('opens the app without exposing Node globals', async () => {
     ),
   ).toBe('undefined');
 });
+
 test('uses shifted main time for the Today header and Сейчас availability', async () => {
   const shiftedNow = Temporal.Instant.from(TEST_NOW)
     .add({ hours: 720 })
