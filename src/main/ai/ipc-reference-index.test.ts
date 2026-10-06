@@ -186,7 +186,7 @@ describe('AI IPC reference index', () => {
     repository.close();
   });
 
-  it('rejects catalog references when no authoritative catalog is available', async () => {
+  it('fails closed on catalog references until #40 provides authoritative catalogs', async () => {
     const directory = mkdtempSync(
       join(tmpdir(), 'flowpilot-ai-missing-catalog-'),
     );
