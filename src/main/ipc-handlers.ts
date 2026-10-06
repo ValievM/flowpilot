@@ -1,7 +1,15 @@
-import { ipcChannels } from '../shared/contracts';
-import type { Repository } from '../storage/repository';
 import { nativeTheme, type IpcMain } from 'electron';
+import { ipcChannels } from '../shared/contracts';
+import type { Clock, Repository } from '../storage';
 import { applyAppearanceTheme, initializeAppearanceTheme } from './appearance';
+import type { AiRunner } from './ai/ai-runner';
+import {
+  cancelAiRequest,
+  getManualPrompt,
+  runAiRequest,
+  submitManualReply,
+} from './ai/ipc';
+import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import {
   applyCommands,
   getAppInfo,
@@ -10,16 +18,11 @@ import {
   setSetting,
 } from './handlers';
 import {
-  cancelAiRequest,
-  getManualPrompt,
-  runAiRequest,
-  submitManualReply,
-} from './ai/ipc';
-import type { AiRunner } from './ai/ai-runner';
-import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
-
-type RegistrationDependencies = {
-  readonly repository: Repository;
+  createHistoryFileHandlers,
+  type HistoryFileHandlers,
+} from './history-file-handlers';
+export type RegistrationDependencies = {
+  repository: Repository;
   readonly appInfo: {
     getName(): string;
     getVersion(): string;
@@ -28,10 +31,49 @@ type RegistrationDependencies = {
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
   readonly onAppearanceReady: () => void;
+  readonly onRepositoryReplaced: (repository: Repository) => void;
+  readonly dialogs: {
+    pickFile(): Promise<string | undefined>;
+    pickFolder(): Promise<string | undefined>;
+  };
+  readonly shell: { open(path: string): Promise<string> };
+  readonly profilePath: string;
+  readonly clock: Clock;
 };
 
+type IpcRegistrar = Pick<IpcMain, 'handle'>;
+
 export function registerIpcHandlers(
-  ipc: Pick<IpcMain, 'handle'>,
+  ipc: IpcRegistrar,
+  deps: RegistrationDependencies,
+): void {
+  const historyFiles = createHistoryFileHandlers({
+    dialogs: deps.dialogs,
+    repositories: {
+      current: () => deps.repository,
+      replace: (repository) => {
+        replaceRepository(repository, deps);
+      },
+    },
+    shell: deps.shell,
+    profilePath: deps.profilePath,
+    clock: deps.clock,
+  });
+  registerCoreChannels(ipc, deps);
+  registerAiChannels(ipc, deps);
+  registerHistoryFileChannels(ipc, historyFiles);
+}
+
+function replaceRepository(
+  repository: Repository,
+  deps: RegistrationDependencies,
+): void {
+  deps.repository = repository;
+  deps.onRepositoryReplaced(repository);
+}
+
+function registerCoreChannels(
+  ipc: IpcRegistrar,
   deps: RegistrationDependencies,
 ): void {
   ipc.handle(ipcChannels.appearanceInitialize, (_event, request: unknown) =>
@@ -64,6 +106,12 @@ export function registerIpcHandlers(
   ipc.handle(ipcChannels.appInfo, (_event, request: unknown) =>
     getAppInfo(request, deps.appInfo),
   );
+}
+
+function registerAiChannels(
+  ipc: IpcRegistrar,
+  deps: RegistrationDependencies,
+): void {
   ipc.handle(ipcChannels.aiRun, (_event, request: unknown) =>
     runAiRequest(request, deps.aiRunner, deps.repository.load()),
   );
@@ -75,5 +123,35 @@ export function registerIpcHandlers(
   );
   ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
     submitManualReply(request, deps.manualProvider),
+  );
+}
+
+function registerHistoryFileChannels(
+  ipc: IpcRegistrar,
+  handlers: HistoryFileHandlers,
+): void {
+  ipc.handle(ipcChannels.historyList, (_event, request: unknown) =>
+    handlers.historyList(request),
+  );
+  ipc.handle(ipcChannels.historyUndo, (_event, request: unknown) =>
+    handlers.historyUndo(request),
+  );
+  ipc.handle(ipcChannels.attachmentsAdd, (_event, request: unknown) =>
+    handlers.attachmentsAdd(request),
+  );
+  ipc.handle(ipcChannels.attachmentsOpen, (_event, request: unknown) =>
+    handlers.attachmentsOpen(request),
+  );
+  ipc.handle(ipcChannels.attachmentsRemove, (_event, request: unknown) =>
+    handlers.attachmentsRemove(request),
+  );
+  ipc.handle(ipcChannels.backupExport, (_event, request: unknown) =>
+    handlers.backupExport(request),
+  );
+  ipc.handle(ipcChannels.backupVerify, (_event, request: unknown) =>
+    handlers.backupVerify(request),
+  );
+  ipc.handle(ipcChannels.backupRestore, (_event, request: unknown) =>
+    handlers.backupRestore(request),
   );
 }

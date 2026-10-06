@@ -142,6 +142,10 @@ export class Repository {
       now: this.clock.now().toString(),
     });
   }
+  attachmentPath(attachmentId: string): string | undefined {
+    return this.attachments.getPath(attachmentId);
+  }
+
   close(): void {
     this.database.close();
   }

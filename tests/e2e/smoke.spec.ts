@@ -46,6 +46,7 @@ async function startApp(now: string, verifyDate = true): Promise<void> {
     env: {
       ...process.env,
       FLOWPILOT_TEST: '1',
+      FLOWPILOT_E2E: '1',
       FLOWPILOT_TEST_NOW: now,
       FLOWPILOT_TEST_PROFILE: profilePath,
     },
@@ -97,6 +98,12 @@ test('keeps the E2E window hidden without exposing Node globals', async () => {
       () => typeof (window as Window & { process?: unknown }).process,
     ),
   ).toBe('undefined');
+});
+test('exposes an array from the history preload API', async () => {
+  const result = await page.evaluate(() => window.flowpilot.history.list());
+
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(Array.isArray(result.value)).toBe(true);
 });
 
 test('uses shifted main time for the Today header and Сейчас availability', async () => {
