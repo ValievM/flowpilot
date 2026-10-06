@@ -81,6 +81,42 @@ describe('AI proposal application', () => {
       versions: [{ version: draftVersion }],
     });
   });
+  it('imports and activates a new rule in one AI proposal', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'new-rule',
+      title: 'Новое правило',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const { repository, application } = setup();
+    const seeded = repository.apply(
+      [{ kind: 'taskType.create', taskType: { id: 'type-1', name: 'Тип' } }],
+      0,
+    );
+    expect(seeded.ok).toBe(true);
+
+    const outcome = application.applyProposal(
+      proposal('import-activate', 1, [
+        { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+        { kind: 'rule.activate', ruleId: rule.id },
+      ]),
+      'auto',
+    );
+
+    expect(outcome).toMatchObject({ kind: 'applied', revision: 2 });
+    expect(outcome).toMatchObject({ rejectedCommands: [] });
+    expect(repository.load().rules).toHaveLength(1);
+    expect(repository.load().rules[0]).toMatchObject({
+      id: rule.id,
+      status: 'active',
+      version: 2,
+      activeDocument: rule,
+      versions: [{ version: 1 }],
+    });
+  });
   it('shows an existing rule document replacement in the confirmation diff', () => {
     const rule = {
       schema_version: 'v1',

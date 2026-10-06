@@ -253,6 +253,54 @@ describe('AI proposal contract', () => {
     );
     expect(rejected.rejectedCommands[0]?.reason).toBe('type-not-found');
   });
+  it('activates a rule imported earlier in the same proposal', () => {
+    const documentJson = JSON.stringify({
+      schema_version: 'v1',
+      id: 'rule-1',
+      title: 'Priority',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'important', kind: 'priority', level: 'high', reason: 'Reason' },
+      ],
+    });
+    const result = validateProposal(
+      proposal([
+        { kind: 'rule.import', documentJson },
+        { kind: 'rule.activate', ruleId: 'rule-1' },
+      ]),
+      snapshot,
+    );
+    expect(result.rejectedCommands).toEqual([]);
+    expect(result.validCommands).toEqual([
+      { kind: 'rule.import', documentJson },
+      { kind: 'rule.activate', ruleId: 'rule-1' },
+    ]);
+  });
+  it('rejects activation of rules that are unknown or invalid imports', () => {
+    const invalidJson = JSON.stringify({
+      schema_version: 'v1',
+      id: 'broken-rule',
+      title: 'Priority',
+      scope: { task_type_ids: ['missing'] },
+      rules: [
+        { id: 'important', kind: 'priority', level: 'high', reason: 'Reason' },
+      ],
+    });
+    const result = validateProposal(
+      proposal([
+        { kind: 'rule.import', documentJson: invalidJson },
+        { kind: 'rule.activate', ruleId: 'broken-rule' },
+        { kind: 'rule.activate', ruleId: 'never-seen' },
+      ]),
+      snapshot,
+    );
+    expect(result.validCommands).toEqual([]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'rule.import', reason: 'type-not-found' },
+      { index: 1, kind: 'rule.activate', reason: 'rule-not-found' },
+      { index: 2, kind: 'rule.activate', reason: 'rule-not-found' },
+    ]);
+  });
 
   it('preserves command order and marks translated batches as AI sourced', () => {
     const commands = [

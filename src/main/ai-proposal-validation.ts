@@ -69,6 +69,11 @@ export function recordCommandIds(
     case 'comment.add':
       state.commentIds.add(command.comment.id);
       return;
+    case 'rule.import': {
+      const document = parsedRuleDocument(command.documentJson);
+      if (document) state.ruleIds.add(document.id);
+      return;
+    }
     default:
       return;
   }
@@ -232,11 +237,8 @@ function validateRuleImport(
   documentJson: string,
   snapshot: AiSnapshot,
 ): string | undefined {
-  const parsed = parseRulesJson(documentJson);
-  if (!parsed.ok) return 'invalid-rule-document';
-  const validated = validateRulesDocument(parsed.value);
-  if (!validated.ok) return 'invalid-rule-document';
-  const document = validated.document;
+  const document = parsedRuleDocument(documentJson);
+  if (!document) return 'invalid-rule-document';
   if (
     document.scope.task_type_ids.some(
       (id) => !snapshot.taskTypes.some((type) => type.id === id),
@@ -250,4 +252,11 @@ function validateRuleImport(
   )
     return 'discipline-not-found';
   return undefined;
+}
+
+function parsedRuleDocument(documentJson: string): RulesDocument | undefined {
+  const parsed = parseRulesJson(documentJson);
+  if (!parsed.ok) return undefined;
+  const validated = validateRulesDocument(parsed.value);
+  return validated.ok ? validated.document : undefined;
 }
