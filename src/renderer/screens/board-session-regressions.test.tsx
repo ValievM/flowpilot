@@ -195,6 +195,70 @@ describe('board dialog session regressions', () => {
     expect(api.applyMock).not.toHaveBeenCalled();
     expect(dialog).toBeInTheDocument();
   });
+  it('closes a reopened editor when a cancelled delete succeeds late', async () => {
+    const custom = {
+      id: 'custom',
+      name: 'Своя',
+      description: '',
+      state: 'todo' as const,
+      builtIn: false,
+    };
+    const initial = {
+      ...snapshot([task('other', 'custom')]),
+      columns: [...columns, custom],
+    };
+    const deleted = {
+      ...initial,
+      columns,
+      tasks: [task('other', 'todo')],
+      revision: initial.revision + 1,
+    };
+    const api = createBoardApi(initial);
+    const pending = deferApplies(api);
+    renderBoard(api);
+
+    const boardColumn = await screen.findByRole('region', { name: 'Своя' });
+    fireEvent.click(
+      within(boardColumn).getByRole('button', { name: 'Удалить колонку' }),
+    );
+    const deleteDialog = screen.getByRole('dialog', {
+      name: 'Удалить колонку?',
+    });
+    fireEvent.change(
+      within(deleteDialog).getByLabelText('Переместить карточки в'),
+      { target: { value: 'todo' } },
+    );
+    fireEvent.click(
+      within(deleteDialog).getByRole('button', { name: 'Удалить колонку' }),
+    );
+    fireEvent.click(
+      within(deleteDialog).getByRole('button', { name: 'Отмена' }),
+    );
+
+    fireEvent.click(
+      within(await screen.findByRole('region', { name: 'Своя' })).getByRole(
+        'button',
+        { name: 'Переименовать колонку Своя' },
+      ),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Изменить колонку' }),
+    ).toBeInTheDocument();
+
+    await resolveDeferred(pending, { ok: true, value: deleted });
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Изменить колонку' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'Своя' }),
+    ).not.toBeInTheDocument();
+    expect(api.applyMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить колонку' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Новая колонка' }),
+    ).toBeInTheDocument();
+  });
 });
 
 function deferApplies(

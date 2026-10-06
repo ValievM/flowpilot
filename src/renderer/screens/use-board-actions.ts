@@ -12,7 +12,7 @@ type ActionsInput = {
   snapshot: IpcSnapshot | undefined;
   apply: Apply;
   dialogSubmission: React.RefObject<number | undefined>;
-  moveSubmission: React.RefObject<Map<string, Map<string, number>>>;
+  inFlightMoves: React.RefObject<Map<string, Set<string>>>;
   dialogSession: { current: number };
   editingColumn: Column | undefined;
   setEditingColumn: (column: Column | undefined) => void;
@@ -79,10 +79,10 @@ async function applyTaskMove(
 ): Promise<void> {
   const session = input.dialogSession.current;
   const taskTargets =
-    input.moveSubmission.current.get(taskId) ?? new Map<string, number>();
-  if (taskTargets.get(column.id) === session) return;
-  taskTargets.set(column.id, session);
-  input.moveSubmission.current.set(taskId, taskTargets);
+    input.inFlightMoves.current.get(taskId) ?? new Set<string>();
+  if (taskTargets.has(column.id)) return;
+  taskTargets.add(column.id);
+  input.inFlightMoves.current.set(taskId, taskTargets);
   try {
     await input.apply(
       [
@@ -96,9 +96,18 @@ async function applyTaskMove(
       () => session === input.dialogSession.current,
     );
   } finally {
-    if (taskTargets.get(column.id) === session) taskTargets.delete(column.id);
-    if (taskTargets.size === 0) input.moveSubmission.current.delete(taskId);
+    releaseInFlightMove(input, taskId, column.id);
   }
+}
+function releaseInFlightMove(
+  input: ActionsInput,
+  taskId: string,
+  columnId: string,
+): void {
+  const taskTargets = input.inFlightMoves.current.get(taskId);
+  if (!taskTargets) return;
+  taskTargets.delete(columnId);
+  if (taskTargets.size === 0) input.inFlightMoves.current.delete(taskId);
 }
 
 async function confirmWaitingMove(
@@ -110,7 +119,15 @@ async function confirmWaitingMove(
   const waitingMove = input.waitingMove;
   if (!waitingMove || !reason) return;
   const session = input.dialogSession.current;
-  if (input.dialogSubmission.current === session) return;
+  const taskTargets =
+    input.inFlightMoves.current.get(waitingMove.taskId) ?? new Set<string>();
+  if (
+    input.dialogSubmission.current === session ||
+    taskTargets.has(waitingMove.columnId)
+  )
+    return;
+  taskTargets.add(waitingMove.columnId);
+  input.inFlightMoves.current.set(waitingMove.taskId, taskTargets);
   input.dialogSubmission.current = session;
   input.setDialogError('');
   const status = input.waitingUntil
@@ -138,6 +155,7 @@ async function confirmWaitingMove(
   } finally {
     if (input.dialogSubmission.current === session)
       input.dialogSubmission.current = undefined;
+    releaseInFlightMove(input, waitingMove.taskId, waitingMove.columnId);
   }
 }
 

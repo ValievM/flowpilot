@@ -28,7 +28,7 @@ type BoardUiState = {
   setDialogError: (message: string) => void;
   dialogSession: React.RefObject<number>;
   dialogSubmission: React.RefObject<number | undefined>;
-  moveSubmission: React.RefObject<Map<string, Map<string, number>>>;
+  inFlightMoves: React.RefObject<Map<string, Set<string>>>;
   advanceDialogSession: () => void;
 };
 
@@ -52,9 +52,9 @@ export function BoardScreen(): React.JSX.Element {
     apply: data.apply,
     ...ui,
     editingColumn: ui.editingColumn
-      ? (data.snapshot?.columns.find(
+      ? data.snapshot?.columns.find(
           (column) => column.id === ui.editingColumn?.id,
-        ) ?? ui.editingColumn)
+        )
       : undefined,
   });
   if (data.loading && !data.snapshot) return <BoardLoading />;
@@ -74,7 +74,7 @@ function useBoardUiState(): BoardUiState {
   const [deleteTarget, setDeleteTarget] = React.useState('');
   const dialogSession = React.useRef(0);
   const dialogSubmission = React.useRef<number | undefined>(undefined);
-  const moveSubmission = React.useRef(new Map<string, Map<string, number>>());
+  const inFlightMoves = React.useRef(new Map<string, Set<string>>());
   const advanceDialogSession = (): void => {
     dialogSession.current += 1;
   };
@@ -99,7 +99,7 @@ function useBoardUiState(): BoardUiState {
     advanceDialogSession,
     dialogSession,
     dialogSubmission,
-    moveSubmission,
+    inFlightMoves,
   };
 }
 
@@ -165,9 +165,9 @@ function BoardDialogWorkspace({
       columns={snapshot.columns}
       editing={
         ui.editingColumn
-          ? (snapshot.columns.find(
+          ? snapshot.columns.find(
               (column) => column.id === ui.editingColumn?.id,
-            ) ?? ui.editingColumn)
+            )
           : undefined
       }
       creating={ui.creatingColumn}
