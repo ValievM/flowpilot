@@ -5,8 +5,22 @@ import type {
   TaskStatus,
   Subtask,
   TaskComment,
-  AttachmentMetadata,
 } from '../domain';
+export type HistoryEntry = {
+  id: string;
+  revision: number;
+  occurredAt: string;
+  source: 'user' | 'ai' | 'undo';
+  batchId: string;
+  undoneEntryId: string | null;
+  entities: readonly {
+    kind: string;
+    id: string;
+    before: unknown;
+    after: unknown;
+    versionAfter: number | null;
+  }[];
+};
 
 export interface Clock {
   now(): Temporal.Instant;
@@ -56,11 +70,16 @@ export type StorageCommand =
       completed: boolean;
     }
   | { kind: 'comment.add'; taskId: string; comment: TaskComment }
-  | { kind: 'attachment.add'; taskId: string; attachment: AttachmentMetadata }
+  | { kind: 'attachment.add'; taskId: string; sourcePath: string }
+  | { kind: 'attachment.remove'; attachmentId: string }
   | { kind: 'column.create'; column: TaskColumn }
   | { kind: 'column.rename'; id: string; name: string; description: string }
   | { kind: 'column.delete'; id: string; targetColumnId?: string }
   | { kind: 'setting.set'; key: string; value: unknown };
+
+export type HistoryPage = {
+  readonly entries: readonly HistoryEntry[];
+};
 
 export type ApplyResult =
   | { ok: true; value: { revision: number } }
@@ -69,4 +88,19 @@ export type ApplyResult =
       error:
         | { kind: 'StaleRevision'; expected: number; actual: number }
         | { kind: 'InvalidCommand'; message: string };
+    };
+
+export type UndoResult =
+  | { ok: true; value: { revision: number } }
+  | {
+      ok: false;
+      error:
+        | {
+            kind: 'NotFound' | 'AlreadyUndone' | 'NotUndoable';
+            reason?: string;
+          }
+        | {
+            kind: 'UndoConflict';
+            entities: readonly { kind: string; id: string }[];
+          };
     };

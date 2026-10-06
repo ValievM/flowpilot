@@ -32,6 +32,8 @@ const taskSchema = z
     description: z.string().optional(),
     status: statusSchema,
     columnId: z.string().min(1),
+    typeId: z.string().min(1).optional(),
+    disciplineId: z.string().min(1).optional(),
     day: dateSchema,
     time: timeSchema,
     deadline: dateSchema,
@@ -104,7 +106,10 @@ const ipcTaskSchema = taskSchema
   .strict();
 
 const taskCreateSchema = z
-  .object({ kind: z.literal('task.create'), task: taskSchema })
+  .object({
+    kind: z.literal('task.create'),
+    task: taskSchema.extend({ attachments: z.array(z.never()) }),
+  })
   .strict();
 const ipcTaskCreateSchema = z
   .object({ kind: z.literal('task.create'), task: ipcTaskSchema })
@@ -162,7 +167,13 @@ const attachmentAddSchema = z
   .object({
     kind: z.literal('attachment.add'),
     taskId: z.string().min(1),
-    attachment: taskSchema.shape.attachments.element,
+    sourcePath: z.string().min(1),
+  })
+  .strict();
+const attachmentRemoveSchema = z
+  .object({
+    kind: z.literal('attachment.remove'),
+    attachmentId: z.string().min(1),
   })
   .strict();
 const columnCreateSchema = z
@@ -196,6 +207,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
   subtaskCompleteSchema,
   commentAddSchema,
   attachmentAddSchema,
+  attachmentRemoveSchema,
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,

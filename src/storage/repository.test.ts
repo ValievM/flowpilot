@@ -27,7 +27,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 2 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 6 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);
@@ -54,14 +54,7 @@ describe('Repository', () => {
       estimate: { unit: 'workdays' as const, value: 3 },
       subtasks: [{ id: 'sub-1', title: 'Outline', completed: true }],
       comments: [{ id: 'comment-1', text: 'Initial note' }],
-      attachments: [
-        {
-          id: 'file-1',
-          name: 'notes.txt',
-          mediaType: 'text/plain',
-          sizeBytes: 24,
-        },
-      ],
+      attachments: [],
       rolledOverFrom: Temporal.PlainDate.from('2026-10-04'),
       addedOrder: 42,
     };
@@ -113,6 +106,30 @@ describe('Repository', () => {
     expect(snapshot.revision).toBe(0);
     expect(snapshot.columns.map(({ id }) => id)).not.toContain('custom');
     expect(snapshot.settings).toEqual({ workdays: [1, 2, 3, 4, 5] });
+    repository.close();
+  });
+
+  it('does not let an empty command batch intercept undo of a real change', () => {
+    const { repository } = openRepository();
+    expect(
+      repository.apply(
+        [{ kind: 'setting.set', key: 'workdays', value: [1, 2, 3] }],
+        0,
+      ),
+    ).toMatchObject({ ok: true, value: { revision: 1 } });
+    const historyAfterChange = repository.history(10).entries;
+
+    const emptyBatch = repository.apply([], 1);
+    expect(emptyBatch).toEqual({ ok: true, value: { revision: 1 } });
+    expect(repository.load().revision).toBe(1);
+    expect(repository.history(10).entries).toEqual(historyAfterChange);
+
+    expect(repository.undo()).toMatchObject({
+      ok: true,
+      value: { revision: 2 },
+    });
+    expect(repository.load().settings.workdays).toEqual([1, 2, 3, 4, 5]);
+    expect(repository.history(10).entries).toHaveLength(2);
     repository.close();
   });
 

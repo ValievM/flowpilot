@@ -2,25 +2,33 @@ import { Temporal } from 'temporal-polyfill';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from './task';
 
+type OrderedTask = { readonly task: Task; readonly index: number };
+
+function compareAiRank(left: Task, right: Task): number {
+  if (left.aiRank === undefined) return right.aiRank === undefined ? 0 : 1;
+  if (right.aiRank === undefined) return -1;
+  return left.aiRank - right.aiRank;
+}
+
+function compareDeadlines(left: Task, right: Task): number {
+  if (left.deadline === undefined) return right.deadline === undefined ? 0 : 1;
+  if (right.deadline === undefined) return -1;
+  return Temporal.PlainDate.compare(left.deadline, right.deadline);
+}
+
+function compareTaskOrder(left: OrderedTask, right: OrderedTask): number {
+  return (
+    compareAiRank(left.task, right.task) ||
+    compareDeadlines(left.task, right.task) ||
+    left.task.addedOrder - right.task.addedOrder ||
+    left.index - right.index
+  );
+}
+
 function orderTasks(tasks: readonly Task[]): Task[] {
   return tasks
     .map((task, index) => ({ task, index }))
-    .sort((left, right) => {
-      if (left.task.deadline && right.task.deadline) {
-        const byDeadline = Temporal.PlainDate.compare(
-          left.task.deadline,
-          right.task.deadline,
-        );
-        if (byDeadline !== 0) return byDeadline;
-      } else if (left.task.deadline) {
-        return -1;
-      } else if (right.task.deadline) {
-        return 1;
-      }
-      return (
-        left.task.addedOrder - right.task.addedOrder || left.index - right.index
-      );
-    })
+    .sort(compareTaskOrder)
     .map(({ task }) => task);
 }
 

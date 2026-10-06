@@ -1,13 +1,9 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
-  closeSync,
   copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
-  openSync,
-  readdirSync,
-  readSync,
   renameSync,
   statSync,
   unlinkSync,
@@ -16,6 +12,13 @@ import type Database from 'better-sqlite3';
 import { basename, extname, join } from 'node:path';
 import type { Clock } from '../types';
 import { cleanAttachmentName, mediaTypeFor } from './attachment-metadata';
+import {
+  moveToTrash as moveFileToTrash,
+  restoreFromTrash as restoreFileFromTrash,
+} from './attachment-trash';
+import { collectOrphanAttachments } from './attachment-gc';
+import { hashAttachment } from './attachment-hash';
+import { recoverInterruptedAttachmentMoves } from './attachment-recovery';
 
 export const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;
 
@@ -26,7 +29,7 @@ type AddError =
   | { kind: 'NotReadable' }
   | { kind: 'CopyFailed' };
 
-type AttachmentRecord = {
+export type AttachmentRecord = {
   id: string;
   taskId: string;
   name: string;
@@ -55,7 +58,7 @@ export class AttachmentStore {
     this.makeId = options.makeId ?? randomUUID;
   }
 
-  add(
+  prepare(
     taskId: string,
     sourcePath: string,
   ): { ok: true; value: AttachmentRecord } | { ok: false; error: AddError } {
@@ -63,7 +66,46 @@ export class AttachmentStore {
     if (!source.ok) return source;
     if (source.value.size > this.limit)
       return { ok: false, error: { kind: 'TooLarge', limitBytes: this.limit } };
-    return this.copyAndRecord(taskId, sourcePath, source.value.size);
+    return this.copyFile(taskId, sourcePath, source.value.size);
+  }
+
+  insert(record: AttachmentRecord): void {
+    this.database
+      .prepare(
+        'INSERT INTO attachments(id, task_id, name, media_type, size_bytes, position, sha256, created_at) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(position) + 1 FROM attachments WHERE task_id = ?), 0), ?, ?)',
+      )
+      .run(
+        record.id,
+        record.taskId,
+        record.name,
+        record.mediaType,
+        record.sizeBytes,
+        record.taskId,
+        record.sha256,
+        record.createdAt,
+      );
+  }
+
+  discard(attachmentId: string): void {
+    if (!safeAttachmentId(attachmentId)) return;
+    removeFile(join(this.attachmentDir(), attachmentId));
+  }
+
+  add(
+    taskId: string,
+    sourcePath: string,
+  ): { ok: true; value: AttachmentRecord } | { ok: false; error: AddError } {
+    const prepared = this.prepare(taskId, sourcePath);
+    if (!prepared.ok) return prepared;
+    try {
+      this.database.transaction(() => {
+        this.insert(prepared.value);
+      })();
+      return prepared;
+    } catch (error) {
+      this.discard(prepared.value.id);
+      return { ok: false, error: classifyCopyError(error) };
+    }
   }
 
   getPath(attachmentId: string): string | undefined {
@@ -90,7 +132,7 @@ export class AttachmentStore {
     try {
       const path = join(this.attachmentDir(), row.id);
       if (!lstatSync(path).isFile()) return { kind: 'Missing' };
-      return hashFile(path) === row.sha256
+      return hashAttachment(path) === row.sha256
         ? { kind: 'Valid' }
         : { kind: 'ChecksumMismatch' };
     } catch {
@@ -98,37 +140,25 @@ export class AttachmentStore {
     }
   }
 
-  remove(attachmentId: string): boolean {
-    if (!safeAttachmentId(attachmentId)) return false;
-    const path = join(this.attachmentDir(), attachmentId);
-    const transaction = this.database.transaction(() =>
-      this.database
-        .prepare('DELETE FROM attachments WHERE id = ?')
-        .run(attachmentId),
-    );
-    const deleted = transaction().changes > 0;
-    if (deleted) removeFile(path);
-    return deleted;
+  moveToTrash(attachmentId: string): boolean {
+    return moveFileToTrash(this.attachmentDir(), attachmentId);
+  }
+
+  restoreFromTrash(attachmentId: string): boolean {
+    return restoreFileFromTrash(this.attachmentDir(), attachmentId);
+  }
+  recoverInterruptedRemovals(): void {
+    recoverInterruptedAttachmentMoves(this.database, this.attachmentDir());
   }
 
   gc(): number {
     const directory = this.attachmentDir();
-    if (!isAttachmentDirectory(directory)) return 0;
-    const rows = this.database.prepare('SELECT id FROM attachments').all() as {
-      id: string;
-    }[];
-    const recorded = new Set(rows.map(({ id }) => id));
-    let removed = 0;
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isFile() && !recorded.has(entry.name)) {
-        unlinkSync(join(directory, entry.name));
-        removed += 1;
-      }
-    }
-    return removed;
+    return isAttachmentDirectory(directory)
+      ? collectOrphanAttachments(this.database, directory)
+      : 0;
   }
 
-  private copyAndRecord(
+  private copyFile(
     taskId: string,
     sourcePath: string,
     sourceSize: number,
@@ -154,7 +184,7 @@ export class AttachmentStore {
       }
       if (sizeBytes !== sourceSize)
         throw new Error('Source changed during copy');
-      const sha256 = hashFile(temporaryPath);
+      const sha256 = hashAttachment(temporaryPath);
       renameSync(temporaryPath, finalPath);
       const record = makeRecord(
         id,
@@ -162,32 +192,12 @@ export class AttachmentStore {
         { sourcePath, sizeBytes, sha256 },
         this.clock,
       );
-      this.insertRecord(record);
       return { ok: true, value: record };
     } catch (error) {
       removeFile(temporaryPath);
       removeFile(finalPath);
       return { ok: false, error: classifyCopyError(error) };
     }
-  }
-
-  private insertRecord(record: AttachmentRecord): void {
-    this.database.transaction(() => {
-      this.database
-        .prepare(
-          'INSERT INTO attachments(id, task_id, name, media_type, size_bytes, position, sha256, created_at) VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(position) + 1 FROM attachments WHERE task_id = ?), 0), ?, ?)',
-        )
-        .run(
-          record.id,
-          record.taskId,
-          record.name,
-          record.mediaType,
-          record.sizeBytes,
-          record.taskId,
-          record.sha256,
-          record.createdAt,
-        );
-    })();
   }
 
   private record(id: string): AttachmentRecord | undefined {
@@ -234,22 +244,6 @@ function makeRecord(
     sha256: details.sha256,
     createdAt: clock.now().toString(),
   };
-}
-
-function hashFile(path: string): string {
-  const descriptor = openSync(path, 'r');
-  const hash = createHash('sha256');
-  const buffer = Buffer.allocUnsafe(64 * 1024);
-  try {
-    let bytesRead = 0;
-    do {
-      bytesRead = readSync(descriptor, buffer, 0, buffer.length, null);
-      if (bytesRead > 0) hash.update(buffer.subarray(0, bytesRead));
-    } while (bytesRead > 0);
-    return hash.digest('hex');
-  } finally {
-    closeSync(descriptor);
-  }
 }
 
 function classifySourceError(error: unknown): AddError {
