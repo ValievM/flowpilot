@@ -31,11 +31,20 @@ export function setup(
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'flowpilot-ai-proposal-'));
   directories.push(directory);
-  const repository = new Repository(join(directory, 'tasks.sqlite'), clock);
+  const path = join(directory, 'tasks.sqlite');
+  let repository = new Repository(path, clock);
   repositories.push(repository);
+  const reopenRepository = () => {
+    repository.close();
+    const reopened = new Repository(path, clock);
+    repositories[repositories.indexOf(repository)] = reopened;
+    repository = reopened;
+    return reopened;
+  };
   return {
     repository,
     application: new AiProposalApplication(repository, references),
+    reopenRepository,
   };
 }
 

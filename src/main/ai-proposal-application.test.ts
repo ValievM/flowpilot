@@ -417,4 +417,45 @@ describe('AI proposal application', () => {
     expect(repository.load().tasks).toHaveLength(1);
     expect(repository.history(10).entries).toHaveLength(1);
   });
+
+  it('preserves rejected commands when replaying after reloading the repository', () => {
+    const { repository, application, reopenRepository } = setup();
+    const value = proposal('partial-replay', 0, [
+      { kind: 'task.create', task: aiTask('once', 'Only once') },
+      { kind: 'task.update', id: 'missing', changes: { title: 'Invalid' } },
+    ]);
+    const first = application.applyProposal(value, 'auto');
+    const replay = new AiProposalApplication(
+      repository,
+      () => emptyReferences,
+    ).applyProposal(value, 'auto');
+    const reloadedRepository = reopenRepository();
+    const reloadedReplay = new AiProposalApplication(
+      reloadedRepository,
+      () => emptyReferences,
+    ).applyProposal(value, 'auto');
+
+    expect(first).toMatchObject({
+      kind: 'applied',
+      revision: 1,
+      replayed: false,
+      rejectedCommands: [
+        { index: 1, kind: 'task.update', reason: 'task-not-found' },
+      ],
+    });
+    expect(replay).toEqual({
+      kind: 'applied',
+      revision: 1,
+      replayed: true,
+      rejectedCommands: [
+        { index: 1, kind: 'task.update', reason: 'task-not-found' },
+      ],
+    });
+    expect(reloadedReplay).toEqual(replay);
+    expect(reloadedRepository.load().tasks.map(({ id }) => id)).toEqual([
+      'once',
+    ]);
+    expect(reloadedRepository.load().revision).toBe(1);
+    expect(reloadedRepository.history(10).entries).toHaveLength(1);
+  });
 });

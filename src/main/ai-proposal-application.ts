@@ -111,9 +111,13 @@ export class AiProposalApplication {
     const proposalId = parsed.data.id;
     const completed = this.completed.get(proposalId);
     if (completed) return { ...completed, replayed: true };
-    const appliedRevision = this.repository.appliedProposal(proposalId);
-    if (appliedRevision !== undefined)
-      return applied(appliedRevision, [], true);
+    const appliedOperation = this.repository.appliedOperation(proposalId);
+    if (appliedOperation !== undefined)
+      return applied(
+        appliedOperation.revision,
+        appliedOperation.rejectedCommands,
+        true,
+      );
     if (!isAiMode(mode))
       return rejected({
         kind: 'InvalidProposal',
@@ -123,12 +127,16 @@ export class AiProposalApplication {
   }
 
   confirmProposal(proposalId: string): ProposalOutcome {
-    const alreadyApplied = this.repository.appliedProposal(proposalId);
-    if (alreadyApplied !== undefined) {
+    const appliedOperation = this.repository.appliedOperation(proposalId);
+    if (appliedOperation !== undefined) {
       const completed = this.completed.get(proposalId);
       return completed
         ? { ...completed, replayed: true }
-        : applied(alreadyApplied, [], true);
+        : applied(
+            appliedOperation.revision,
+            appliedOperation.rejectedCommands,
+            true,
+          );
     }
     const pending = this.pending.get(proposalId);
     if (!pending) return rejected({ kind: 'NotPending', proposalId });
@@ -186,6 +194,7 @@ export class AiProposalApplication {
     const result = this.repository.apply(commands, parsed.data.baseRevision, {
       source: 'ai',
       proposalId: parsed.data.id,
+      rejectedCommands,
     });
     const outcome = applyResult(result, rejectedCommands);
     if (outcome.kind === 'applied') {

@@ -8,7 +8,7 @@ import {
 import { writeHistory } from './history-log';
 import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
-import type { ApplyResult, StorageCommand } from './types';
+import type { ApplyResult, RejectedAiCommand, StorageCommand } from './types';
 
 type AttachmentFiles = {
   insert(record: AttachmentRecord): void;
@@ -24,6 +24,7 @@ type ApplyOptions = {
   preparedAttachments: ReadonlyMap<number, AttachmentRecord>;
   source: 'user' | 'ai';
   proposalId?: string;
+  rejectedCommands?: readonly RejectedAiCommand[] | undefined;
 };
 type CommandCapture = { index: number; options: ApplyOptions };
 type ChangeSet = Map<string, { before: EntitySnapshot; after: EntitySnapshot }>;
@@ -79,7 +80,12 @@ function applyTransaction(
       source: options.source,
     });
     if (options.proposalId)
-      recordAppliedProposal(database, options.proposalId, revision);
+      recordAppliedProposal(
+        database,
+        options.proposalId,
+        revision,
+        options.rejectedCommands,
+      );
     return { revision, replayed: false };
   });
   return transaction();
@@ -99,12 +105,18 @@ function recordAppliedProposal(
   database: Database.Database,
   proposalId: string,
   revision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
 ): void {
   database
     .prepare(
-      'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
+      'INSERT INTO applied_operations(operation_id,proposal_id,revision,rejected_commands_json) VALUES(?,?,?,?)',
     )
-    .run(proposalId, proposalId, revision);
+    .run(
+      proposalId,
+      proposalId,
+      revision,
+      JSON.stringify(rejectedCommands ?? []),
+    );
 }
 
 function captureAndExecute(

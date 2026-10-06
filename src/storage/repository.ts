@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { z } from 'zod';
 import { dirname } from 'node:path';
 import {
   AttachmentStore,
@@ -13,10 +14,12 @@ import { applyCommands } from './write-commands';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
+  AppliedOperation,
   ApplyOptions,
   ApplyResult,
   Clock,
   HistoryPage,
+  RejectedAiCommand,
   Snapshot,
   StorageCommand,
   UndoResult,
@@ -29,6 +32,15 @@ type ColumnRow = {
   state: TaskColumn['state'];
   built_in: number;
 };
+const rejectedAiCommandsSchema = z.array(
+  z
+    .object({
+      index: z.number().int(),
+      kind: z.string(),
+      reason: z.string(),
+    })
+    .strict(),
+);
 
 export class Repository {
   private readonly database: Database.Database;
@@ -99,6 +111,7 @@ export class Repository {
         this.database,
         options.proposalId,
         expectedRevision,
+        options.rejectedCommands,
       );
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
@@ -123,6 +136,7 @@ export class Repository {
       ...(options.proposalId !== undefined
         ? { proposalId: options.proposalId }
         : {}),
+      rejectedCommands: options.rejectedCommands,
     });
   }
 
@@ -152,10 +166,24 @@ export class Repository {
   }
 
   appliedProposal(proposalId: string): number | undefined {
+    return this.appliedOperation(proposalId)?.revision;
+  }
+
+  appliedOperation(proposalId: string): AppliedOperation | undefined {
     const row = this.database
-      .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
-      .get(proposalId) as { revision: number } | undefined;
-    return row?.revision;
+      .prepare(
+        'SELECT revision,rejected_commands_json FROM applied_operations WHERE proposal_id = ?',
+      )
+      .get(proposalId) as
+      { revision: number; rejected_commands_json: string | null } | undefined;
+    if (!row) return undefined;
+    const rejectedCommands =
+      row.rejected_commands_json === null
+        ? []
+        : rejectedAiCommandsSchema.parse(
+            JSON.parse(row.rejected_commands_json) as unknown,
+          );
+    return { revision: row.revision, rejectedCommands };
   }
 
   history(limit: number, before?: string): HistoryPage {
@@ -195,9 +223,15 @@ function applyEmptyCommands(
   database: Database.Database,
   proposalId: string | undefined,
   expectedRevision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
 ): ApplyResult {
   if (proposalId !== undefined)
-    return applyEmptyProposal(database, proposalId, expectedRevision);
+    return applyEmptyProposal(
+      database,
+      proposalId,
+      expectedRevision,
+      rejectedCommands,
+    );
   const actual = readRevision(database);
   if (actual !== expectedRevision)
     return {
@@ -211,6 +245,7 @@ function applyEmptyProposal(
   database: Database.Database,
   proposalId: string,
   expectedRevision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
 ): ApplyResult {
   return database.transaction(() => {
     const previous = database
@@ -230,9 +265,14 @@ function applyEmptyProposal(
       };
     database
       .prepare(
-        'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
+        'INSERT INTO applied_operations(operation_id,proposal_id,revision,rejected_commands_json) VALUES(?,?,?,?)',
       )
-      .run(proposalId, proposalId, actual);
+      .run(
+        proposalId,
+        proposalId,
+        actual,
+        JSON.stringify(rejectedCommands ?? []),
+      );
     return { ok: true as const, value: { revision: actual } };
   })();
 }

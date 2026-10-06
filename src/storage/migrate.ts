@@ -7,6 +7,7 @@ import entityVersions from './migrations/0004_entity_versions.sql?raw';
 import columnGenerations from './migrations/0005_column_generations.sql?raw';
 import legacyTombstoneGenerations from './migrations/0006_legacy_tombstone_generations.sql?raw';
 import aiApplication from './migrations/0007_ai_application.sql?raw';
+import rejectedAiCommands from './migrations/0008_rejected_ai_commands.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -16,6 +17,7 @@ const MIGRATIONS = [
   { version: 5, sql: columnGenerations },
   { version: 6, sql: legacyTombstoneGenerations },
   { version: 7, sql: aiApplication },
+  { version: 8, sql: rejectedAiCommands },
 ] as const;
 
 export function migrate(database: Database.Database, path: string): void {

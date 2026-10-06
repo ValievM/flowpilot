@@ -79,9 +79,21 @@ export type StorageCommand =
   | { kind: 'column.delete'; id: string; targetColumnId?: string }
   | { kind: 'setting.set'; key: string; value: unknown };
 
+export interface RejectedAiCommand {
+  readonly index: number;
+  readonly kind: string;
+  readonly reason: string;
+}
+
+export interface AppliedOperation {
+  readonly revision: number;
+  readonly rejectedCommands: readonly RejectedAiCommand[];
+}
+
 export interface ApplyOptions {
   readonly source?: 'user' | 'ai';
   readonly proposalId?: string;
+  readonly rejectedCommands?: readonly RejectedAiCommand[];
 }
 
 export type HistoryPage = {
