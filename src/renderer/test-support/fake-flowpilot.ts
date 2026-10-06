@@ -208,6 +208,12 @@ function fakeApiFor(
       get: () => Promise.resolve({ ok: true, value: {} }),
       set: () => Promise.resolve({ ok: false, error: 'InternalError' }),
     },
+    ai: {
+      run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
+      cancel: () => Promise.resolve({ ok: false, error: 'ValidationFailed' }),
+      prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),
+      reply: () => Promise.resolve({ ok: false, error: 'NotFound' }),
+    },
     app: {
       info: () =>
         Promise.resolve({

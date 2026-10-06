@@ -347,6 +347,7 @@ describe('IPC handlers', () => {
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
+          getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner,
         manualProvider,
