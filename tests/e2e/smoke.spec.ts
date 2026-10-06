@@ -295,6 +295,84 @@ test('creates and starts a task through persisted Today and Now flows', async ()
   });
 });
 
+test('persists settings and applies reduced motion to control transitions', async () => {
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  const theme = page.getByRole('combobox', { name: 'Тема' });
+  await theme.selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('flowpilot-theme')))
+    .toBe('dark');
+  const friday = page.getByRole('checkbox', { name: 'Пятница' });
+  await friday.click();
+  await expect(friday).not.toBeChecked();
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const result = await window.flowpilot.snapshot.load();
+        return result.ok ? result.value.settings.workdays : undefined;
+      }),
+    )
+    .toEqual([1, 2, 3, 4]);
+  const motion = page.getByRole('combobox', { name: 'Уменьшить движение' });
+  await motion.selectOption('reduce');
+  await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
+  await expect
+    .poll(() =>
+      page
+        .getByRole('button', { name: 'Задача' })
+        .evaluate((element) => getComputedStyle(element).transitionDuration),
+    )
+    .toBe('0s');
+  await motion.selectOption('full');
+  await expect(page.locator('html')).not.toHaveAttribute('data-reduce-motion');
+  await expect
+    .poll(() =>
+      page
+        .getByRole('button', { name: 'Задача' })
+        .evaluate((element) => getComputedStyle(element).transitionDuration),
+    )
+    .toBe('0.14s, 0.14s');
+  await motion.selectOption('reduce');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Настройки' })).toBeVisible();
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await expect(
+    page.getByRole('checkbox', { name: 'Пятница' }),
+  ).not.toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'Тема' })).toHaveValue(
+    'dark',
+  );
+  await expect(motion).toHaveValue('reduce');
+  await expect(page.locator('html')).toHaveAttribute('data-reduce-motion');
+});
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.getByRole('button', { name: 'Настройки' }).click();
+      await page.getByRole('combobox', { name: 'Тема' }).selectOption(theme);
+      expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+      await page.evaluate(() => {
+        window.getSelection()?.removeAllRanges();
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(page).toHaveScreenshot(
+        `settings-${theme}-${width.toString()}.png`,
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
+      );
+    });
+  }
+}
+
 for (const screen of ['today', 'now'] as const) {
   for (const width of [900, 1280]) {
     for (const theme of ['light', 'dark'] as const) {

@@ -1,5 +1,6 @@
 import { createRef } from 'react';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -11,12 +12,10 @@ import { Temporal } from 'temporal-polyfill';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { QuickAddDialog } from './components/quick-add-dialog';
-import {
-  fakeApi,
-  mockSystemTheme,
-  taskRecord,
-} from './test-support/fake-flowpilot';
+import { fakeApi, taskRecord } from './test-support/fake-flowpilot';
+import { mockSystemTheme } from './test-support/mock-system-theme';
 import { isThemeChoice } from './theme/use-theme';
+import { isMotionChoice } from './use-reduced-motion';
 
 if (
   Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'showModal') ===
@@ -62,6 +61,8 @@ describe('persisted today and now screens', () => {
   afterEach(() => {
     cleanup();
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-motion-choice');
+    document.documentElement.removeAttribute('data-reduce-motion');
     vi.restoreAllMocks();
   });
 
@@ -95,6 +96,181 @@ describe('persisted today and now screens', () => {
     expect(
       within(nav).getByRole('button', { name: 'Сегодня' }),
     ).toHaveAttribute('aria-current', 'page');
+  });
+  it('opens saved theme, workday, and motion settings with accessible choices', async () => {
+    const app = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue(
+      'system',
+    );
+    expect(
+      screen.getByRole('combobox', { name: 'Уменьшить движение' }),
+    ).toHaveValue('system');
+    const group = screen.getByRole('group', {
+      name: 'Дни недели, учитываемые при расчёте срока',
+    });
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(7);
+    for (const [day, checked] of [
+      ['Понедельник', true],
+      ['Вторник', true],
+      ['Среда', true],
+      ['Четверг', true],
+      ['Пятница', true],
+      ['Суббота', false],
+      ['Воскресенье', false],
+    ] as const) {
+      expect(screen.getByRole('checkbox', { name: day })).toHaveProperty(
+        'checked',
+        checked,
+      );
+    }
+    expect(app.settingsCalls).toEqual([]);
+  });
+
+  it('persists theme changes and keeps the system preference available', async () => {
+    const changeSystemTheme = mockSystemTheme(true);
+    const app = fakeApi();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
+      target: { value: 'dark' },
+    });
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(window.localStorage.getItem('flowpilot-theme')).toBe('dark');
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(screen.getByRole('combobox', { name: 'Тема' })).toHaveValue('dark');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Тема' }), {
+      target: { value: 'system' },
+    });
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    act(() => {
+      changeSystemTheme(false);
+    });
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
+    expect(isThemeChoice('ultraviolet')).toBe(false);
+  });
+
+  it('persists workdays, reloads them, and recalculates visible deadline risk', async () => {
+    const app = fakeApi(
+      [
+        taskRecord({
+          id: 'workday-risk',
+          day: today(),
+          deadline: '2026-10-09',
+          estimate: { unit: 'workdays', value: 4 },
+        }),
+      ],
+      () => TEST_NOW,
+    );
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'workday-risk', level: 3 });
+    expect(screen.queryByText(/Риск не успеть/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    await waitFor(() => {
+      expect(app.settingsCalls).toEqual([
+        { key: 'workdays', value: [2, 3, 4, 5], expectedRevision: 0 },
+      ]);
+    });
+    expect(app.snapshot().settings.workdays).toEqual([2, 3, 4, 5]);
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    expect(screen.getByText(/Риск не успеть/)).toBeVisible();
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'workday-risk', level: 3 });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    expect(
+      screen.getByRole('checkbox', { name: 'Понедельник' }),
+    ).not.toBeChecked();
+  });
+
+  it('rejects an empty workday set without saving or changing the selected day', async () => {
+    const app = fakeApi([], () => TEST_NOW, [1]);
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: app.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    expect(
+      await screen.findByText('Выберите хотя бы один рабочий день.'),
+    ).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Понедельник' })).toBeChecked();
+    expect(app.settingsCalls).toEqual([]);
+  });
+
+  it('shows a settings save failure and retains the persisted value', async () => {
+    const app = renderApp();
+    app.setSettingsFailure();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Пятница' }));
+    const alerts = await screen.findAllByText(
+      'Не удалось сохранить рабочие дни. Настройка не изменена; попробуйте снова.',
+    );
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(screen.getByRole('checkbox', { name: 'Пятница' })).toBeChecked();
+    expect(app.snapshot().settings.workdays).toEqual([1, 2, 3, 4, 5]);
+    expect(screen.getByRole('status')).toHaveTextContent('Ошибка сохранения');
+  });
+
+  it('defaults reduced motion to the system and persists manual overrides', async () => {
+    const changeSystemMotion = mockSystemTheme(true);
+    const fake = fakeApi();
+    Object.defineProperty(window, 'flowpilot', {
+      configurable: true,
+      value: fake.api,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(window.localStorage.getItem('flowpilot-reduce-motion')).toBeNull();
+    expect(document.documentElement).toHaveAttribute('data-reduce-motion');
+    act(() => {
+      changeSystemMotion(false);
+    });
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    act(() => {
+      changeSystemMotion(true);
+    });
+    expect(document.documentElement).toHaveAttribute('data-reduce-motion');
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки' }));
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Уменьшить движение' }),
+      {
+        target: { value: 'full' },
+      },
+    );
+    expect(window.localStorage.getItem('flowpilot-reduce-motion')).toBe('full');
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement).toHaveAttribute(
+      'data-motion-choice',
+      'full',
+    );
+    expect(isMotionChoice('none')).toBe(false);
+    cleanup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(document.documentElement).not.toHaveAttribute('data-reduce-motion');
+    expect(document.documentElement).toHaveAttribute(
+      'data-motion-choice',
+      'full',
+    );
   });
 
   it('shows empty persisted state and never uses sample tasks', async () => {

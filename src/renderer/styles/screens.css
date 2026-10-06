@@ -71,6 +71,31 @@
   background: var(--panel);
 }
 
+.workdays-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--panel-min), 1fr));
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+}
+
+.workdays-options legend {
+  padding: 0 var(--space-8);
+  color: var(--muted);
+}
+
+.workday-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--control-height);
+}
+
+.settings-error {
+  color: var(--danger);
+}
+
 .motion-setting {
   display: flex;
   align-items: center;
