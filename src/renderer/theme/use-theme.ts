@@ -7,22 +7,14 @@ import {
   type SetStateAction,
 } from 'react';
 
-const themeStorageKey = 'flowpilot-theme';
-
 export function isThemeChoice(value: unknown): value is ThemeChoice {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
-function initialTheme(): ThemeChoice {
-  const stored = window.localStorage.getItem(themeStorageKey);
-  return isThemeChoice(stored) ? stored : 'system';
-}
-
-export function useTheme(): readonly [
-  ThemeChoice,
-  Dispatch<SetStateAction<ThemeChoice>>,
-] {
-  const [theme, setTheme] = useState<ThemeChoice>(initialTheme);
+export function useTheme(
+  initialChoice: ThemeChoice,
+): readonly [ThemeChoice, Dispatch<SetStateAction<ThemeChoice>>] {
+  const [theme, setTheme] = useState<ThemeChoice>(initialChoice);
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -33,19 +25,17 @@ export function useTheme(): readonly [
     };
     media.addEventListener('change', applyTheme);
     applyTheme();
-    if (theme === 'system') {
-      window.localStorage.removeItem(themeStorageKey);
-    } else {
-      window.localStorage.setItem(themeStorageKey, theme);
-    }
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-    } else {
-      void window.flowpilot.appearance.setTheme({ theme });
-    }
     return () => {
       media.removeEventListener('change', applyTheme);
     };
+  }, [theme]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    void window.flowpilot.appearance.setTheme({ theme });
   }, [theme]);
 
   return [theme, setTheme];

@@ -65,9 +65,10 @@ describe('persisted today and now screens', () => {
     vi.restoreAllMocks();
   });
 
-  it('follows system theme and persists a manual choice', async () => {
+  it('uses the main appearance API for manual theme choices', async () => {
     mockSystemTheme(true);
     const fake = fakeApi();
+    const setTheme = vi.spyOn(fake.api.appearance, 'setTheme');
     Object.defineProperty(window, 'flowpilot', {
       configurable: true,
       value: fake.api,
@@ -78,7 +79,10 @@ describe('persisted today and now screens', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
     fireEvent.click(screen.getByRole('button', { name: /Тема:/ }));
     expect(document.documentElement.dataset.theme).toBe('light');
-    expect(window.localStorage.getItem('flowpilot-theme')).toBe('light');
+    await waitFor(() => {
+      expect(setTheme).toHaveBeenCalledWith({ theme: 'light' });
+    });
+    expect(window.localStorage.getItem('flowpilot-theme')).toBeNull();
   });
   it('marks the titlebar action as non-draggable', async () => {
     renderApp();

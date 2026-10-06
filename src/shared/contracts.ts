@@ -2,7 +2,7 @@ import { z } from 'zod';
 import {
   ipcCommandSchema,
   settingFields,
-  validateSettingValue,
+  validateGenericSettingValue,
 } from './command-schema';
 import type { Task, TaskStatus } from '../domain';
 import type { Snapshot } from '../storage';
@@ -79,11 +79,19 @@ export const ipcChannels = {
   aiPrompt: 'ai.prompt',
   aiReply: 'ai.reply',
   appearanceSetTheme: 'appearance.set-theme',
+  appearanceInitialize: 'appearance.initialize',
+  appearanceReady: 'appearance.ready',
 } as const;
 export const appearanceThemeRequestSchema = z
   .object({ theme: z.enum(['system', 'light', 'dark']) })
   .strict();
+export const appearanceInitializeRequestSchema = z
+  .object({ legacyTheme: z.enum(['light', 'dark']).optional() })
+  .strict();
 export type ThemeChoice = z.infer<typeof appearanceThemeRequestSchema>['theme'];
+export type AppearanceInitializeRequest = z.infer<
+  typeof appearanceInitializeRequestSchema
+>;
 export const aiRequestSchema = z
   .object({
     operationId: z.string().min(1),
@@ -131,7 +139,7 @@ export const settingsSetRequestSchema = z
     expectedRevision: z.number().int().nonnegative(),
   })
   .strict()
-  .superRefine(validateSettingValue);
+  .superRefine(validateGenericSettingValue);
 export const appInfoRequestSchema = z.object({}).strict();
 export const appInfoResponseSchema = z
   .object({
@@ -148,6 +156,10 @@ export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
 
 export type FlowPilotApi = {
   appearance: {
+    initialize(
+      request: AppearanceInitializeRequest,
+    ): Promise<Result<ThemeChoice>>;
+    ready(): Promise<void>;
     setTheme(request: ThemeChoiceRequest): Promise<Result<null>>;
   };
   snapshot: { load(): Promise<Result<IpcSnapshot>> };

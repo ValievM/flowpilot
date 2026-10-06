@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ThemeChoice } from '../shared/contracts';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
 import { QuickAddDialog } from './components/quick-add-dialog';
@@ -40,8 +41,8 @@ interface AppModel {
   readonly addTask: (title: string) => Promise<boolean>;
 }
 
-function useAppModel(): AppModel {
-  const [theme, setTheme] = useTheme();
+function useAppModel(initialTheme: ThemeChoice): AppModel {
+  const [theme, setTheme] = useTheme(initialTheme);
   const [view, setView] = React.useState<View>('today');
   const [quickAddOpen, setQuickAddOpen] = React.useState(false);
   const [reduceMotion, setReduceMotion] = React.useState(false);
@@ -292,6 +293,10 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   );
 }
 
-export function App(): React.JSX.Element {
-  return <AppLayout model={useAppModel()} />;
+export function App({
+  initialTheme = 'system',
+}: {
+  readonly initialTheme?: ThemeChoice;
+}): React.JSX.Element {
+  return <AppLayout model={useAppModel(initialTheme)} />;
 }

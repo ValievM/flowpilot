@@ -1,32 +1,38 @@
-import { contextBridge } from 'electron';
-
-import { ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import {
   ipcChannels,
   type AppInfo,
-  type FlowPilotApi,
+  type AppearanceInitializeRequest,
   type CommandsApplyRequest,
-  type SettingsSetRequest,
+  type FlowPilotApi,
   type IpcSnapshot,
+  type SettingsSetRequest,
+  type ThemeChoice,
+  type ThemeChoiceRequest,
   type AiIpcRequest,
   type AiIpcResult,
   type AiCancelResult,
   type AiManualReplyResult,
-  type ThemeChoiceRequest,
 } from '../shared/contracts';
 import type { Result } from '../shared/ipc-result';
-// Electron types invoke as untyped; main validates requests and returns this FlowPilotApi contract.
+
 const api: FlowPilotApi = Object.freeze({
+  appearance: {
+    initialize: (request: AppearanceInitializeRequest) =>
+      ipcRenderer.invoke(ipcChannels.appearanceInitialize, request) as Promise<
+        Result<ThemeChoice>
+      >,
+    ready: () =>
+      ipcRenderer.invoke(ipcChannels.appearanceReady, {}) as Promise<void>,
+    setTheme: (request: ThemeChoiceRequest) =>
+      ipcRenderer.invoke(ipcChannels.appearanceSetTheme, request) as Promise<
+        Result<null>
+      >,
+  },
   snapshot: {
     load: () =>
       ipcRenderer.invoke(ipcChannels.snapshotLoad, {}) as Promise<
         Result<IpcSnapshot>
-      >,
-  },
-  appearance: {
-    setTheme: (request: ThemeChoiceRequest) =>
-      ipcRenderer.invoke(ipcChannels.appearanceSetTheme, request) as Promise<
-        Result<null>
       >,
   },
   commands: {

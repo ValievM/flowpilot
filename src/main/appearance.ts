@@ -1,5 +1,6 @@
 import type { NativeTheme } from 'electron';
 import {
+  appearanceInitializeRequestSchema,
   appearanceThemeRequestSchema,
   type ThemeChoice,
 } from '../shared/contracts';
@@ -18,6 +19,33 @@ export function initialAppearanceTheme(
   return theme === 'light' || theme === 'dark' || theme === 'system'
     ? theme
     : 'system';
+}
+
+export function initializeAppearanceTheme(
+  request: unknown,
+  dependencies: AppearanceDependencies,
+): Result<ThemeChoice> {
+  const parsed = appearanceInitializeRequestSchema.safeParse(request);
+  if (!parsed.success) return { ok: false, error: 'ValidationFailed' };
+  try {
+    const { repository, nativeTheme } = dependencies;
+    const current = repository.load();
+    const hasSavedTheme = Object.hasOwn(current.settings, 'theme');
+    const theme = hasSavedTheme
+      ? initialAppearanceTheme(current.settings)
+      : (parsed.data.legacyTheme ?? 'system');
+    if (!hasSavedTheme && parsed.data.legacyTheme) {
+      const result = repository.apply(
+        [{ kind: 'setting.set', key: 'theme', value: theme }],
+        current.revision,
+      );
+      if (!result.ok) return { ok: false, error: 'StaleRevision' };
+    }
+    nativeTheme.themeSource = theme;
+    return { ok: true, value: theme };
+  } catch {
+    return { ok: false, error: 'InternalError' };
+  }
 }
 
 export function applyAppearanceTheme(

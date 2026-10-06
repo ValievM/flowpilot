@@ -304,6 +304,107 @@ test('persists the selected frame theme and applies it before reopening', async 
     await app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
   ).toBe('light');
 });
+
+test('migrates a legacy renderer theme before the first visible frame', async () => {
+  const initialProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+  }));
+  expect(initialProfile.settings).toMatchObject({ ok: true });
+  if (initialProfile.settings.ok) {
+    expect(Object.hasOwn(initialProfile.settings.value, 'theme')).toBe(false);
+  }
+  expect(initialProfile.snapshot).toMatchObject({
+    ok: true,
+    value: { revision: 0 },
+  });
+  await page.evaluate(() => {
+    window.localStorage.setItem('flowpilot-theme', 'light');
+  });
+  await app?.close();
+
+  await startApp(TEST_NOW);
+  const firstFrameVisible = await app?.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible(),
+  );
+  const firstFrameNativeTheme = await app?.evaluate(
+    ({ nativeTheme }) => nativeTheme.themeSource,
+  );
+  const firstFrameRendererTheme = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
+  expect({
+    visible: firstFrameVisible,
+    nativeTheme: firstFrameNativeTheme,
+    rendererTheme: firstFrameRendererTheme,
+  }).toEqual({
+    visible: process.env.FLOWPILOT_E2E !== '1',
+    nativeTheme: 'light',
+    rendererTheme: 'light',
+  });
+  const migratedProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+    legacyTheme: window.localStorage.getItem('flowpilot-theme'),
+  }));
+  expect(migratedProfile).toMatchObject({
+    settings: { ok: true, value: { theme: 'light' } },
+    snapshot: { ok: true, value: { revision: 1 } },
+    legacyTheme: null,
+  });
+});
+
+test('rejects generic theme writes without changing the live appearance', async () => {
+  const nativeThemeBefore = await app?.evaluate(
+    ({ nativeTheme }) => nativeTheme.themeSource,
+  );
+  const rendererThemeBefore = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
+  const windowVisible = await app?.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.isVisible(),
+  );
+  expect(windowVisible).toBe(process.env.FLOWPILOT_E2E !== '1');
+  const settingsBefore = await page.evaluate(() =>
+    window.flowpilot.settings.get(),
+  );
+  const attempts = await page.evaluate(async () => {
+    const setting = await window.flowpilot.settings.set({
+      key: 'theme',
+      value: 'light',
+      expectedRevision: 0,
+    });
+    const snapshot = await window.flowpilot.snapshot.load();
+    if (!snapshot.ok) {
+      throw new Error('Could not read the current repository revision');
+    }
+    const command = await window.flowpilot.commands.apply({
+      commands: [{ kind: 'setting.set', key: 'theme', value: 'dark' }],
+      expectedRevision: snapshot.value.revision,
+    });
+    return { setting, command };
+  });
+  expect(attempts).toEqual({
+    setting: { ok: false, error: 'ValidationFailed' },
+    command: { ok: false, error: 'ValidationFailed' },
+  });
+  expect(
+    await app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource),
+  ).toBe(nativeThemeBefore);
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.theme),
+  ).toBe(rendererThemeBefore);
+  const unchangedProfile = await page.evaluate(async () => ({
+    settings: await window.flowpilot.settings.get(),
+    snapshot: await window.flowpilot.snapshot.load(),
+  }));
+  expect(unchangedProfile.settings).toEqual(settingsBefore);
+  expect(unchangedProfile.snapshot).toMatchObject({
+    ok: true,
+    value: { revision: 0 },
+  });
+});
+
 test('removes the titlebar inset in native full screen', async () => {
   await app?.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.setFullScreen(true);

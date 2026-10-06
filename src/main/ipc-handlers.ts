@@ -1,7 +1,7 @@
-import { nativeTheme, type IpcMain } from 'electron';
 import { ipcChannels } from '../shared/contracts';
-import { applyAppearanceTheme } from './appearance';
 import type { Repository } from '../storage/repository';
+import { nativeTheme, type IpcMain } from 'electron';
+import { applyAppearanceTheme, initializeAppearanceTheme } from './appearance';
 import {
   applyCommands,
   getAppInfo,
@@ -27,12 +27,22 @@ type RegistrationDependencies = {
   };
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
+  readonly onAppearanceReady: () => void;
 };
 
 export function registerIpcHandlers(
   ipc: Pick<IpcMain, 'handle'>,
   deps: RegistrationDependencies,
 ): void {
+  ipc.handle(ipcChannels.appearanceInitialize, (_event, request: unknown) =>
+    initializeAppearanceTheme(request, {
+      repository: deps.repository,
+      nativeTheme,
+    }),
+  );
+  ipc.handle(ipcChannels.appearanceReady, () => {
+    deps.onAppearanceReady();
+  });
   ipc.handle(ipcChannels.appearanceSetTheme, (_event, request: unknown) =>
     applyAppearanceTheme(request, {
       repository: deps.repository,

@@ -10,6 +10,7 @@ import {
 } from '../shared/contracts';
 import {
   applyAppearanceTheme,
+  initializeAppearanceTheme,
   initialAppearanceTheme,
   isTrustedNavigation,
 } from './appearance';
@@ -65,7 +66,7 @@ describe('window appearance', () => {
         value: 'light',
         expectedRevision: 0,
       }).success,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       settingsSetRequestSchema.safeParse({
         key: 'theme',
@@ -93,6 +94,44 @@ describe('window appearance', () => {
     expect(initialAppearanceTheme({ theme: 'dark' })).toBe('dark');
     expect(initialAppearanceTheme({ theme: 'unknown' })).toBe('system');
     expect(initialAppearanceTheme({})).toBe('system');
+  });
+
+  it('migrates a legacy choice from an empty settings database before reveal', () => {
+    const repository = openRepository();
+    const initial = repository.load();
+    expect(initial.revision).toBe(0);
+    expect(Object.hasOwn(initial.settings, 'theme')).toBe(false);
+    const nativeTheme = {
+      themeSource: 'system' as 'system' | 'light' | 'dark',
+    };
+    expect(
+      initializeAppearanceTheme(
+        { legacyTheme: 'light' },
+        { repository, nativeTheme },
+      ),
+    ).toEqual({ ok: true, value: 'light' });
+    expect(nativeTheme.themeSource).toBe('light');
+    expect(repository.load().settings.theme).toBe('light');
+    expect(repository.load().revision).toBe(1);
+    repository.close();
+  });
+
+  it('keeps the database theme authoritative over stale renderer state', () => {
+    const repository = openRepository();
+    repository.apply([{ kind: 'setting.set', key: 'theme', value: 'dark' }], 0);
+    const nativeTheme = {
+      themeSource: 'system' as 'system' | 'light' | 'dark',
+    };
+    expect(
+      initializeAppearanceTheme(
+        { legacyTheme: 'light' },
+        { repository, nativeTheme },
+      ),
+    ).toEqual({ ok: true, value: 'dark' });
+    expect(nativeTheme.themeSource).toBe('dark');
+    expect(repository.load().settings.theme).toBe('dark');
+    expect(repository.load().revision).toBe(1);
+    repository.close();
   });
 
   it('allows only the trusted app document or its development server origin', () => {

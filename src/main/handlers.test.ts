@@ -177,6 +177,31 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('rejects generic theme writes without changing revision or history', () => {
+    const repository = openRepository();
+    const initial = repository.load();
+    const before = repository.history(10).entries;
+    expect(
+      setSetting(
+        { key: 'theme', value: 'light', expectedRevision: 0 },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(
+      applyCommands(
+        {
+          commands: [{ kind: 'setting.set', key: 'theme', value: 'light' }],
+          expectedRevision: 0,
+        },
+        { repository },
+      ),
+    ).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(repository.load().revision).toBe(initial.revision);
+    expect(repository.load().settings).toEqual(initial.settings);
+    expect(repository.history(10).entries).toEqual(before);
+    repository.close();
+  });
+
   it('rejects duplicate and out-of-range workdays through both IPC channels', () => {
     const repository = openRepository();
     for (const value of [[], [1, 1], [8]]) {
@@ -269,9 +294,12 @@ describe('IPC handlers', () => {
         },
         aiRunner: new AiRunner(manualProvider),
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
     expect(channels).toEqual([
+      'appearance.initialize',
+      'appearance.ready',
       'appearance.set-theme',
       'snapshot.load',
       'commands.apply',
@@ -352,6 +380,7 @@ describe('IPC handlers', () => {
         },
         aiRunner,
         manualProvider,
+        onAppearanceReady: () => undefined,
       },
     );
 

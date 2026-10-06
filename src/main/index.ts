@@ -13,6 +13,9 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | undefined;
 let repository: Repository | undefined;
+const WINDOW_STARTUP_FALLBACK_MS = 10_000;
+let windowStartupReady = false;
+let windowStartupTimer: NodeJS.Timeout | undefined;
 const manualProvider = new ManualExchangeProvider();
 const runtime = selectRuntimeOptions(
   app.isPackaged,
@@ -26,6 +29,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
+    if (!windowStartupReady) return;
     mainWindow?.show();
     mainWindow?.focus();
   });
@@ -54,6 +58,7 @@ if (!app.requestSingleInstanceLock()) {
         },
         aiRunner,
         manualProvider,
+        onAppearanceReady: revealMainWindow,
       });
       createWindow();
       app.on('activate', () => {
@@ -65,12 +70,17 @@ if (!app.requestSingleInstanceLock()) {
     });
 }
 
-app.on('will-quit', () => repository?.close());
+app.on('will-quit', () => {
+  clearWindowStartupTimer();
+  repository?.close();
+});
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
 function createWindow(): void {
+  clearWindowStartupTimer();
+  windowStartupReady = false;
   const windowOptions = selectWindowOptions(runtime.isE2E);
   const applicationAddress = MAIN_WINDOW_VITE_DEV_SERVER_URL
     ? MAIN_WINDOW_VITE_DEV_SERVER_URL
@@ -114,8 +124,25 @@ function createWindow(): void {
   } else {
     void mainWindow.loadFile(applicationAddress);
   }
-  if (!runtime.isE2E)
-    mainWindow.once('ready-to-show', () => mainWindow?.show());
+  startWindowRevealFallback();
+}
+
+function startWindowRevealFallback(): void {
+  if (runtime.isE2E) return;
+  windowStartupTimer = setTimeout(revealMainWindow, WINDOW_STARTUP_FALLBACK_MS);
+  mainWindow?.webContents.once('did-fail-load', revealMainWindow);
+}
+
+function revealMainWindow(): void {
+  windowStartupReady = true;
+  clearWindowStartupTimer();
+  if (!runtime.isE2E) mainWindow?.show();
+}
+
+function clearWindowStartupTimer(): void {
+  if (windowStartupTimer === undefined) return;
+  clearTimeout(windowStartupTimer);
+  windowStartupTimer = undefined;
 }
 
 function setFullScreenState(isFullScreen: boolean): void {

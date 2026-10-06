@@ -203,6 +203,8 @@ function fakeApiFor(
 ): FlowPilotApi {
   return {
     appearance: {
+      initialize: () => Promise.resolve({ ok: true, value: 'system' }),
+      ready: () => Promise.resolve(),
       setTheme: () => Promise.resolve({ ok: true, value: null }),
     },
     snapshot: { load: () => apiSnapshot(state) },
