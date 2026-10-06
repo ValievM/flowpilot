@@ -8,7 +8,8 @@ import {
   readSync,
   writeSync,
 } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
+import nativeOpen from '@flowpilot/openat';
 import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
 
 export const MAX_MANIFEST_SIZE_BYTES = 1024 * 1024;
@@ -25,16 +26,16 @@ type CopyRegularFileOptions = {
 };
 
 export function copyRegularFile(
-  sourcePath: string,
+  root: string,
+  relativePath: string,
   destination: string,
   options: CopyRegularFileOptions,
 ): number {
   const remaining = options.aggregateRemaining ?? MAX_PACKAGE_SIZE_BYTES;
-  const source = openRegularAt(
-    dirname(sourcePath),
-    basename(sourcePath),
+  const source = openPackageFile(
+    root,
+    relativePath,
     Math.min(options.maxSizeBytes, remaining),
-    dirname(dirname(sourcePath)),
   );
   let target: number | undefined;
   try {
@@ -141,13 +142,12 @@ export function copyPackageFile(
   }
 }
 
-export function regularFileSize(path: string, maxSizeBytes: number): number {
-  const descriptor = openRegularAt(
-    dirname(path),
-    basename(path),
-    maxSizeBytes,
-    dirname(dirname(path)),
-  );
+export function regularFileSize(
+  root: string,
+  relativePath: string,
+  maxSizeBytes: number,
+): number {
+  const descriptor = openPackageFile(root, relativePath, maxSizeBytes);
   try {
     return fstatSync(descriptor).size;
   } finally {
@@ -156,88 +156,67 @@ export function regularFileSize(path: string, maxSizeBytes: number): number {
 }
 
 function openPackageFile(
-  dir: string,
+  directory: string,
   relativePath: string,
   maxSizeBytes: number,
 ): number {
-  const root = resolve(dir);
-  const relative = relativePath.startsWith('attachments/')
+  const attachmentPath = relativePath.startsWith('attachments/');
+  const name = attachmentPath
     ? relativePath.slice('attachments/'.length)
     : relativePath;
-  const directory = relativePath.startsWith('attachments/')
-    ? join(root, 'attachments')
-    : root;
-  return openRegularAt(directory, relative, maxSizeBytes, root);
-}
+  if (name.length === 0 || name.includes('/'))
+    throw new Error('Недопустимый путь файла');
 
-function openRegularAt(
-  directory: string,
-  name: string,
-  maxSizeBytes: number,
-  root?: string,
-): number {
-  const rootFd = root === undefined ? undefined : openDirectory(root);
-  let directoryFd: number | undefined;
+  const rootFd = openDirectory(resolve(directory));
+  let attachmentFd: number | undefined;
   let descriptor: number | undefined;
   try {
-    directoryFd = openDirectory(directory);
-    assertRootUnchanged(rootFd, root);
-    descriptor = openValidatedFile(join(directory, name), maxSizeBytes);
-    assertDirectoryUnchanged(directoryFd, directory);
-    assertRootUnchanged(rootFd, root);
+    const parentFd = attachmentPath
+      ? (attachmentFd = openDirectoryAt(rootFd, 'attachments'))
+      : rootFd;
+    descriptor = openValidatedFileAt(parentFd, name, maxSizeBytes);
     const result = descriptor;
     descriptor = undefined;
     return result;
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
-    if (directoryFd !== undefined) closeSync(directoryFd);
-    if (rootFd !== undefined) closeSync(rootFd);
+    if (attachmentFd !== undefined) closeSync(attachmentFd);
+    closeSync(rootFd);
   }
 }
 
-function openValidatedFile(path: string, maxSizeBytes: number): number {
-  const listed = lstatSync(path);
-  if (!listed.isFile() || listed.isSymbolicLink())
-    throw new Error('Путь должен быть обычным файлом');
-  if (listed.size > maxSizeBytes)
-    throw new Error('Размер файла превышает лимит');
-  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  const opened = fstatSync(descriptor);
-  if (!sameFile(listed, opened) || !opened.isFile()) {
-    closeSync(descriptor);
-    throw new Error('Файл изменился во время открытия');
-  }
-  if (opened.size > maxSizeBytes) {
-    closeSync(descriptor);
-    throw new Error('Размер файла превышает лимит');
-  }
-  return descriptor;
-}
-
-function assertRootUnchanged(
-  rootFd: number | undefined,
-  root: string | undefined,
-): void {
-  if (
-    rootFd !== undefined &&
-    root !== undefined &&
-    !sameFile(fstatSync(rootFd), lstatSync(root))
-  )
-    throw new Error('Папка пакета изменилась во время открытия');
-}
-
-function assertDirectoryUnchanged(
+function openValidatedFileAt(
   directoryFd: number,
-  directory: string,
-): void {
-  if (!sameFile(fstatSync(directoryFd), lstatSync(directory)))
-    throw new Error('Каталог изменился во время открытия');
+  name: string,
+  maxSizeBytes: number,
+): number {
+  const descriptor = nativeOpen.openAt(
+    directoryFd,
+    name,
+    constants.O_RDONLY | constants.O_NOFOLLOW,
+  );
+  try {
+    const opened = fstatSync(descriptor);
+    if (!opened.isFile()) throw new Error('Путь должен быть обычным файлом');
+    if (opened.size > maxSizeBytes)
+      throw new Error('Размер файла превышает лимит');
+    return descriptor;
+  } catch (error) {
+    closeSync(descriptor);
+    throw error;
+  }
 }
-function sameFile(
-  first: { dev: number; ino: number },
-  second: { dev: number; ino: number },
-): boolean {
-  return first.dev === second.dev && first.ino === second.ino;
+
+function openDirectoryAt(parentFd: number, name: string): number {
+  const descriptor = nativeOpen.openAt(parentFd, name, DIRECTORY_FLAGS);
+  try {
+    if (!fstatSync(descriptor).isDirectory())
+      throw new Error('Путь должен быть обычной директорией');
+    return descriptor;
+  } catch (error) {
+    closeSync(descriptor);
+    throw error;
+  }
 }
 
 function openDirectory(path: string): number {
@@ -245,12 +224,15 @@ function openDirectory(path: string): number {
   if (!before.isDirectory() || before.isSymbolicLink())
     throw new Error('Путь должен быть обычной директорией');
   const descriptor = openSync(path, DIRECTORY_FLAGS);
-  const opened = fstatSync(descriptor);
-  if (before.dev !== opened.dev || before.ino !== opened.ino) {
+  try {
+    const opened = fstatSync(descriptor);
+    if (before.dev !== opened.dev || before.ino !== opened.ino)
+      throw new Error('Каталог изменился во время открытия');
+    return descriptor;
+  } catch (error) {
     closeSync(descriptor);
-    throw new Error('Каталог изменился во время открытия');
+    throw error;
   }
-  return descriptor;
 }
 
 function copyBytes(

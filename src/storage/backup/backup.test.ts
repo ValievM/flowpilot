@@ -18,7 +18,8 @@ import { z } from 'zod';
 import { Repository } from '../repository';
 import type { Clock } from '../types';
 import { exportTo, restore, verifyPackage } from './backup';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import nativeOpen from '@flowpilot/openat';
 import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
 import { MAX_DATA_SIZE_BYTES, MAX_PACKAGE_SIZE_BYTES } from './package-files';
 
@@ -67,6 +68,7 @@ function parsed(path: string): unknown {
 function save(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value));
 }
+
 function exportPackage(root: string, profile: string): string {
   const result = exportTo(root, profile, clock);
   if (!result.ok) throw new Error(result.error);
@@ -244,6 +246,7 @@ describe('backup package', () => {
     );
     expect(readdirSync(externalPath)).toEqual([attachmentId, 'sentinel']);
   });
+
   it('rejects a symlinked attachment file before restore copies it', () => {
     const { root, profile, repository } = setup();
     expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
@@ -902,6 +905,7 @@ describe('backup package', () => {
     const insert = database.prepare(
       'INSERT INTO attachments(id,task_id,name,media_type,size_bytes,position,sha256,created_at) VALUES(?,?,?,?,?,?,?,?)',
     );
+    const attachmentHash = zeroHash(MAX_ATTACHMENT_SIZE_BYTES);
     for (let index = 0; index < 6; index += 1) {
       const id = `sparse-${String(index)}`;
       insert.run(
@@ -911,7 +915,7 @@ describe('backup package', () => {
         'text/plain',
         MAX_ATTACHMENT_SIZE_BYTES,
         index,
-        '0'.repeat(64),
+        attachmentHash,
         clock.now().toString(),
       );
       writeFileSync(join(root, 'attachments', id), Buffer.alloc(0));
@@ -919,7 +923,35 @@ describe('backup package', () => {
     }
     database.close();
 
-    expect(exportTo(root, profile, clock)).toMatchObject({ ok: false });
+    const originalOpenAt = nativeOpen.openAt.bind(nativeOpen);
+    const openCounts = new Map<string, number>();
+    const copyAttempt = vi
+      .spyOn(nativeOpen, 'openAt')
+      .mockImplementation((directoryFd, name, flags, mode) => {
+        if (name.startsWith('sparse-')) {
+          const count = (openCounts.get(name) ?? 0) + 1;
+          openCounts.set(name, count);
+          if (count > 1) {
+            throw new Error(
+              'Attachment copy started before aggregate preflight',
+            );
+          }
+        }
+        return originalOpenAt(directoryFd, name, flags, mode);
+      });
+    const result = (() => {
+      try {
+        return exportTo(root, profile, clock);
+      } finally {
+        copyAttempt.mockRestore();
+      }
+    })();
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'Размер пакета превышает лимит',
+    });
+    expect([...openCounts.values()]).toEqual([1, 1, 1, 1, 1, 1]);
     expect(
       readdirSync(root).filter((name) => name.startsWith('FlowPilot-export-')),
     ).toEqual([]);

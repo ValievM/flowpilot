@@ -164,14 +164,18 @@ function writeAttachments(
   const files: BackupManifest['files'][number][] = [];
   assertAttachmentsFit(profilePath, data.attachments, remaining);
   for (const record of data.attachments) {
-    const source = join(dirname(profilePath), 'attachments', record.id);
     const target = join(temporary, 'attachments', record.id);
     mkdirSync(dirname(target), { recursive: true });
-    const sizeBytes = copyRegularFile(source, target, {
-      maxSizeBytes: MAX_ATTACHMENT_SIZE_BYTES,
-      expected: { sizeBytes: record.size_bytes, sha256: record.sha256 },
-      aggregateRemaining: remaining,
-    });
+    const sizeBytes = copyRegularFile(
+      dirname(profilePath),
+      `attachments/${record.id}`,
+      target,
+      {
+        maxSizeBytes: MAX_ATTACHMENT_SIZE_BYTES,
+        expected: { sizeBytes: record.size_bytes, sha256: record.sha256 },
+        aggregateRemaining: remaining,
+      },
+    );
     remaining -= sizeBytes;
     files.push({
       path: `attachments/${record.id}`,
@@ -181,14 +185,18 @@ function writeAttachments(
   }
   return files;
 }
+
 function assertAttachmentsFit(
   profilePath: string,
   attachments: BackupData['attachments'],
   remaining: number,
 ): void {
   for (const item of attachments) {
-    const path = join(dirname(profilePath), 'attachments', item.id);
-    const size = regularFileSize(path, MAX_ATTACHMENT_SIZE_BYTES);
+    const size = regularFileSize(
+      dirname(profilePath),
+      `attachments/${item.id}`,
+      MAX_ATTACHMENT_SIZE_BYTES,
+    );
     if (size > remaining) throw new Error('Размер пакета превышает лимит');
     remaining -= size;
   }
