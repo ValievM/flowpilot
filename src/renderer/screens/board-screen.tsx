@@ -26,6 +26,8 @@ type BoardUiState = {
   setDeleteTarget: (value: string) => void;
   dialogError: string;
   setDialogError: (message: string) => void;
+  dialogSession: React.RefObject<number>;
+  advanceDialogSession: () => void;
 };
 
 type BoardWorkspaceProps = {
@@ -63,6 +65,10 @@ function useBoardUiState(): BoardUiState {
   const [creatingColumn, setCreatingColumn] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string>();
   const [deleteTarget, setDeleteTarget] = React.useState('');
+  const dialogSession = React.useRef(0);
+  const advanceDialogSession = (): void => {
+    dialogSession.current += 1;
+  };
   const [dialogError, setDialogError] = React.useState('');
   return {
     waitingMove,
@@ -81,6 +87,8 @@ function useBoardUiState(): BoardUiState {
     setDeleteTarget,
     dialogError,
     setDialogError,
+    advanceDialogSession,
+    dialogSession,
   };
 }
 
@@ -115,10 +123,15 @@ function BoardTaskColumns({
     <BoardColumns
       snapshot={snapshot}
       onMove={(id, column) => void actions.move(id, column)}
-      onRename={ui.setEditingColumn}
+      onRename={(column) => {
+        ui.advanceDialogSession();
+        ui.setDialogError('');
+        ui.setEditingColumn(column);
+      }}
       onDelete={(column, hasTasks) => {
         ui.setDialogError('');
         if (hasTasks) {
+          ui.advanceDialogSession();
           ui.setDeletingId(column.id);
           ui.setDeleteTarget('');
           return;
@@ -147,6 +160,7 @@ function BoardDialogWorkspace({
       waitingUntil={ui.waitingUntil}
       onSaveColumn={(event) => void actions.saveColumn(event)}
       onCancelColumn={() => {
+        ui.advanceDialogSession();
         ui.setEditingColumn(undefined);
         ui.setCreatingColumn(false);
         ui.setDialogError('');
@@ -154,6 +168,7 @@ function BoardDialogWorkspace({
       onDeleteTarget={ui.setDeleteTarget}
       onDelete={() => void actions.deleteColumn()}
       onCancelDelete={() => {
+        ui.advanceDialogSession();
         ui.setDeletingId(undefined);
         ui.setDeleteTarget('');
         ui.setDialogError('');
@@ -162,6 +177,7 @@ function BoardDialogWorkspace({
       onWaitingUntil={ui.setWaitingUntil}
       onConfirmWaiting={(event) => void actions.confirmWaiting(event)}
       onCancelWaiting={() => {
+        ui.advanceDialogSession();
         ui.setWaitingMove(undefined);
         ui.setDialogError('');
       }}
@@ -195,6 +211,8 @@ function BoardHeader({
         <button
           className="button"
           onClick={() => {
+            ui.advanceDialogSession();
+            ui.setDialogError('');
             ui.setEditingColumn(undefined);
             ui.setCreatingColumn(true);
           }}
