@@ -107,8 +107,15 @@ function nowActionError(
     return 'Action taskId is not available';
   if (!ids.taskIds.includes(action.taskId))
     return 'Action taskId is not supplied';
-  if (action.subtaskId && !(ids.subtaskIds ?? []).includes(action.subtaskId))
-    return 'Action subtaskId is not supplied';
+  const subtaskId = action.subtaskId;
+  if (
+    subtaskId &&
+    !(ids.subtasksByTask ?? []).some(
+      ({ taskId, subtaskIds }) =>
+        taskId === action.taskId && subtaskIds.includes(subtaskId),
+    )
+  )
+    return 'Action subtaskId is not supplied for taskId';
   return undefined;
 }
 

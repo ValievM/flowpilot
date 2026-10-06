@@ -36,7 +36,7 @@ export const OFFLINE_EVALUATION_CASES: readonly OfflineEvaluationCase[] = [
     context: {
       taskIds: ['task-risk'],
       availableTaskIds: ['task-risk'],
-      subtaskIds: ['part-risk'],
+      subtasksByTask: [{ taskId: 'task-risk', subtaskIds: ['part-risk'] }],
     },
     response: {
       action: { taskId: 'task-risk', subtaskId: 'part-risk' },
@@ -71,10 +71,27 @@ export const OFFLINE_EVALUATION_CASES: readonly OfflineEvaluationCase[] = [
     context: {
       taskIds: ['task-1'],
       availableTaskIds: ['task-1'],
-      subtaskIds: [],
+      subtasksByTask: [{ taskId: 'task-1', subtaskIds: [] }],
     },
     response: {
       action: { taskId: 'task-1', subtaskId: 'phantom-part' },
+      reason: 'Start here',
+    },
+    expectedValid: false,
+  },
+  {
+    name: 'subtask-belongs-to-another-task',
+    answerKind: 'now',
+    context: {
+      taskIds: ['task-a', 'task-b'],
+      availableTaskIds: ['task-a'],
+      subtasksByTask: [
+        { taskId: 'task-a', subtaskIds: [] },
+        { taskId: 'task-b', subtaskIds: ['subtask-b'] },
+      ],
+    },
+    response: {
+      action: { taskId: 'task-a', subtaskId: 'subtask-b' },
       reason: 'Start here',
     },
     expectedValid: false,

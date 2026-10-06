@@ -21,7 +21,7 @@ describe('offline AI answer evaluation', () => {
       };
     });
     console.table(rows);
-    expect(rows).toHaveLength(15);
+    expect(rows).toHaveLength(16);
     expect(rows.every((row) => row.pass)).toBe(true);
   });
 });

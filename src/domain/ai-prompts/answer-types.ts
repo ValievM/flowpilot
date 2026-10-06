@@ -7,7 +7,6 @@ export type ParseAnswerResult<T> =
 export interface AnswerIds {
   readonly taskIds: readonly string[];
   readonly availableTaskIds?: readonly string[];
-  readonly subtaskIds?: readonly string[];
   readonly columnIds?: readonly string[];
   readonly taskTypeIds?: readonly string[];
   readonly disciplineIds?: readonly string[];
@@ -19,6 +18,10 @@ export interface RuleEditIds extends AnswerIds {
 }
 export interface NowAnswerIds extends AnswerIds {
   readonly availableTaskIds: readonly string[];
+  readonly subtasksByTask?: readonly {
+    readonly taskId: string;
+    readonly subtaskIds: readonly string[];
+  }[];
 }
 
 export interface NowAnswer {

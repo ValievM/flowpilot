@@ -19,7 +19,7 @@ import {
 const ids = {
   taskIds: ['task-1'],
   availableTaskIds: ['task-1'],
-  subtaskIds: ['subtask-1'],
+  subtasksByTask: [{ taskId: 'task-1', subtaskIds: ['subtask-1'] }],
   columnIds: ['todo'],
 };
 
@@ -184,7 +184,19 @@ describe('AI prompt templates', () => {
   it('rejects malformed context and preserves complete nested trust markers', () => {
     const valid = JSON.parse(JSON.stringify(promptContext)) as AiContext;
     const malformedCases: readonly unknown[] = [
-      { ...valid, tasks: [{ ...valid.tasks[0], availability: 'bogus' }] },
+      {
+        ...valid,
+        tasks: [
+          {
+            ...valid.tasks[0],
+            untrustedColumn: { name: 'To do', description: 'Ready' },
+          },
+        ],
+      },
+      {
+        ...valid,
+        tasks: [{ ...valid.tasks[0], availability: 'bogus' }],
+      },
       { ...valid, tasks: [{ ...valid.tasks[0], deadlineRisk: {} }] },
       { ...valid, tasks: [{ ...valid.tasks[0], rules: {} }] },
       { ...valid, tasks: [{ ...valid.tasks[0], untrusted: {} }] },
@@ -204,6 +216,29 @@ describe('AI prompt templates', () => {
     expect(data.context.tasks[0]?.rules).toEqual(valid.tasks[0]?.rules);
     expect(data.context.tasks[0]?.untrusted.trust).toBe('untrusted');
     expect(data.context.tasks[0]?.rules.trust).toBe('untrusted');
+    expect(data.context.tasks[0]?.untrustedColumn).toMatchObject({
+      trust: 'untrusted',
+      name: 'To do',
+      description: 'Work ready to start',
+    });
+  });
+
+  it('rejects a subtask that belongs to a different supplied task', () => {
+    const result = parseAnswerNow(
+      {
+        action: { taskId: 'task-1', subtaskId: 'subtask-2' },
+        reason: 'Deadline risk',
+      },
+      {
+        taskIds: ['task-1', 'task-2'],
+        availableTaskIds: ['task-1'],
+        subtasksByTask: [
+          { taskId: 'task-1', subtaskIds: ['subtask-1'] },
+          { taskId: 'task-2', subtaskIds: ['subtask-2'] },
+        ],
+      },
+    );
+    expect(result.ok).toBe(false);
   });
 
   it('instructs replan to use schedule and applicable rules', () => {

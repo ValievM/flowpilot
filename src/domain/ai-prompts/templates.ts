@@ -53,6 +53,13 @@ const promptContextSchema = z
     tasks: z.array(
       z.looseObject({
         id: z.string(),
+        untrustedColumn: z
+          .looseObject({
+            trust: trustMarkerSchema,
+            name: z.string(),
+            description: z.string(),
+          })
+          .optional(),
         columnId: z.string(),
         state: z.enum(['todo', 'doing', 'waiting', 'done']),
         availability: z.enum([
