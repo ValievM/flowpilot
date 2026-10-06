@@ -192,6 +192,13 @@ const columnDeleteSchema = z
     kind: z.literal('column.delete'),
     id: z.string().min(1),
     targetColumnId: z.string().min(1).optional(),
+    waiting: z
+      .object({
+        reason: z.string().trim().min(1),
+        until: dateValueSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 const settingCommandSchema = z
