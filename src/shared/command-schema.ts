@@ -176,11 +176,38 @@ const subtaskCompleteSchema = z
     completed: z.boolean(),
   })
   .strict();
+const subtaskRenameSchema = z
+  .object({
+    kind: z.literal('subtask.rename'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+    // Mirrors SUBTASK_TITLE_MAX_LENGTH in src/domain/subtasks.ts.
+    title: z.string().trim().min(1).max(200),
+  })
+  .strict();
+const subtaskRemoveSchema = z
+  .object({
+    kind: z.literal('subtask.remove'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+  })
+  .strict();
+const subtaskMoveSchema = z
+  .object({
+    kind: z.literal('subtask.move'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+    position: z.number().int().min(0),
+  })
+  .strict();
 const commentAddSchema = z
   .object({
     kind: z.literal('comment.add'),
     taskId: z.string().min(1),
-    comment: z.object({ id: z.string().min(1), text: z.string() }).strict(),
+    // The creation time is stamped by the main-process clock, never accepted.
+    comment: z
+      .object({ id: z.string().min(1), text: z.string().min(1).max(5000) })
+      .strict(),
   })
   .strict();
 const attachmentAddSchema = z
@@ -243,6 +270,9 @@ export const commandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   attachmentAddSchema,
   attachmentRemoveSchema,
@@ -259,6 +289,9 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   columnCreateSchema,
   columnRenameSchema,

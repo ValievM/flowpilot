@@ -1,6 +1,11 @@
-import type { Task } from '../domain';
+import type { SubtaskDraft, Task, TaskCommentDraft } from '../domain';
 import type { AiTaskChanges, AiPlannedCommand } from '../shared/ai-commands';
 import type { AiSnapshot } from './ai-proposal-validation';
+
+type DiffTask = Omit<Task, 'subtasks' | 'comments'> & {
+  subtasks: readonly (Task['subtasks'][number] | SubtaskDraft)[];
+  comments: readonly (Task['comments'][number] | TaskCommentDraft)[];
+};
 
 export interface AiFieldChange {
   readonly commandIndex: number;
@@ -11,7 +16,7 @@ export interface AiFieldChange {
 }
 
 interface DiffState {
-  readonly tasks: Map<string, Task>;
+  readonly tasks: Map<string, DiffTask>;
   readonly columns: AiSnapshot['columns'];
   readonly changes: AiFieldChange[];
 }
@@ -150,7 +155,7 @@ function appendTaskUpdates(
     state.tasks.set(command.id, applyTaskChanges(task, command.changes));
 }
 
-function applyTaskChanges(task: Task, changes: AiTaskChanges): Task {
+function applyTaskChanges(task: DiffTask, changes: AiTaskChanges): DiffTask {
   const {
     description: previousDescription,
     day: previousDay,

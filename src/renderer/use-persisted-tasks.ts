@@ -40,7 +40,8 @@ interface PersistenceControls {
 }
 
 function taskFromIpc(task: IpcSnapshot['tasks'][number]): Task {
-  const { day, time, deadline, rolledOverFrom, status, ...rest } = task;
+  const { day, time, deadline, rolledOverFrom, status, comments, ...rest } =
+    task;
   const parsedStatus: Task['status'] =
     status.kind === 'waiting'
       ? {
@@ -53,6 +54,10 @@ function taskFromIpc(task: IpcSnapshot['tasks'][number]): Task {
       : status;
   return {
     ...rest,
+    comments: comments.map(({ createdAt, ...comment }) => ({
+      ...comment,
+      createdAt: createdAt === null ? null : Temporal.Instant.from(createdAt),
+    })),
     ...(day ? { day: Temporal.PlainDate.from(day) } : {}),
     ...(time ? { time: Temporal.PlainTime.from(time) } : {}),
     ...(deadline ? { deadline: Temporal.PlainDate.from(deadline) } : {}),

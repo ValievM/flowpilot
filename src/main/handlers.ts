@@ -123,8 +123,15 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
   return {
     ...snapshot,
     tasks: snapshot.tasks.map((task) => {
-      const { day, time, deadline, rolledOverFrom, status, ...taskFields } =
-        task;
+      const {
+        day,
+        time,
+        deadline,
+        rolledOverFrom,
+        status,
+        comments,
+        ...taskFields
+      } = task;
       const serializedStatus: IpcSnapshot['tasks'][number]['status'] =
         status.kind === 'waiting'
           ? status.until
@@ -137,6 +144,10 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
           : status;
       return {
         ...taskFields,
+        comments: comments.map(({ createdAt, ...comment }) => ({
+          ...comment,
+          createdAt: createdAt?.toString() ?? null,
+        })),
         status: serializedStatus,
         ...(day ? { day: day.toString() } : {}),
         ...(time ? { time: time.toString() } : {}),

@@ -46,7 +46,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
@@ -67,12 +67,29 @@ describe('database migrations', () => {
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
     database.exec(`
+      CREATE TABLE tasks (
+        id TEXT PRIMARY KEY
+      );
+      INSERT INTO tasks(id) VALUES('legacy-task');
+      CREATE TABLE comments (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        UNIQUE(task_id, position)
+      );
       CREATE TABLE applied_operations (
         operation_id TEXT PRIMARY KEY,
         proposal_id TEXT NOT NULL UNIQUE,
         revision INTEGER NOT NULL
       );
     `);
+    database
+      .prepare(
+        'INSERT INTO comments(id,task_id,text,created_at,position) VALUES(?,?,?,?,?)',
+      )
+      .run('legacy-comment', 'legacy-task', 'kept', '2024-01-01T00:00:00Z', 0);
     database
       .prepare(
         'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
@@ -82,7 +99,7 @@ describe('database migrations', () => {
 
     migrate(database, path);
 
-    expect(database.pragma('user_version')).toEqual([{ user_version: 9 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
     expect(
       database
         .prepare(
@@ -94,6 +111,17 @@ describe('database migrations', () => {
       proposal_id: 'existing-proposal',
       revision: 4,
       rejected_commands_json: null,
+    });
+    expect(
+      database
+        .prepare('SELECT id,task_id,text,created_at,position FROM comments')
+        .get(),
+    ).toEqual({
+      id: 'legacy-comment',
+      task_id: 'legacy-task',
+      text: 'kept',
+      created_at: '2024-01-01T00:00:00Z',
+      position: 0,
     });
     database.close();
   });

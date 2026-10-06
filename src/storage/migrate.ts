@@ -9,6 +9,7 @@ import legacyTombstoneGenerations from './migrations/0006_legacy_tombstone_gener
 import restoreHistory from './migrations/0007_restore_history.sql?raw';
 import aiApplication from './migrations/0008_ai_application.sql?raw';
 import rejectedAiCommands from './migrations/0009_rejected_ai_commands.sql?raw';
+import commentCreatedAtNullable from './migrations/0013_comment_created_at_nullable.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -20,7 +21,9 @@ const MIGRATIONS = [
   { version: 7, sql: restoreHistory },
   { version: 8, sql: aiApplication },
   { version: 9, sql: rejectedAiCommands },
-] as const;
+  // 0010-0012 are reserved for in-flight issues #40, #19 and #56.
+  { version: 13, sql: commentCreatedAtNullable },
+];
 export class ForeignDatabaseError extends Error {
   constructor() {
     super('Foreign database schema is not supported');

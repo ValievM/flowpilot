@@ -93,7 +93,8 @@ const comment = z
     id: z.string().min(1),
     task_id: z.string().min(1),
     text: z.string(),
-    created_at: z.string(),
+    // Legacy packages exported before the field carry no key: read as null.
+    created_at: z.string().nullable().default(null),
     position: z.number().int(),
   })
   .strict();

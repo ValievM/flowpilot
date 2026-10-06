@@ -106,6 +106,7 @@ const promptContext = context([
         id: 'fictional-risky-subtask',
         title: 'Prepare tables',
         completed: false,
+        position: 0,
       },
     ],
   }),

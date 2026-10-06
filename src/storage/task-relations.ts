@@ -1,7 +1,16 @@
 import type Database from 'better-sqlite3';
-import type { TaskComment, TaskStatus, Subtask } from '../domain';
+import type {
+  SubtaskDraft,
+  Task,
+  TaskCommentDraft,
+  TaskStatus,
+} from '../domain';
+import { loadTask, type TaskRow } from './snapshot-tasks';
 import type { StorageCommand } from './types';
 import { dateText } from './sql-values';
+
+type SubtaskEditResult =
+  { ok: true; task: Task } | { ok: false; error: string };
 
 export function moveTask(
   database: Database.Database,
@@ -32,14 +41,43 @@ export function moveTask(
 export function addSubtask(
   database: Database.Database,
   taskId: string,
-  subtask: Subtask,
+  subtask: SubtaskDraft,
   now: string,
 ): void {
+  if (database.prepare('SELECT 1 FROM subtasks WHERE id = ?').get(subtask.id))
+    throw new Error('duplicate-subtask-id');
   database
     .prepare(
       'INSERT INTO subtasks(id, task_id, title, completed, position) VALUES (?, ?, ?, ?, COALESCE((SELECT MAX(position) + 1 FROM subtasks WHERE task_id = ?), 0))',
     )
     .run(subtask.id, taskId, subtask.title, Number(subtask.completed), taskId);
+  touchTask(database, taskId, now);
+}
+
+export function editSubtasks(
+  database: Database.Database,
+  taskId: string,
+  now: string,
+  edit: (task: Task) => SubtaskEditResult,
+): void {
+  const row = database
+    .prepare('SELECT * FROM tasks WHERE id = ?')
+    .get(taskId) as TaskRow | undefined;
+  if (!row) throw new Error('task not found');
+  const result = edit(loadTask(database, row));
+  if (!result.ok) throw new Error(result.error);
+  database.prepare('DELETE FROM subtasks WHERE task_id = ?').run(taskId);
+  const insert = database.prepare(
+    'INSERT INTO subtasks(id,task_id,title,completed,position) VALUES(?,?,?,?,?)',
+  );
+  for (const subtask of result.task.subtasks)
+    insert.run(
+      subtask.id,
+      taskId,
+      subtask.title,
+      Number(subtask.completed),
+      subtask.position,
+    );
   touchTask(database, taskId, now);
 }
 
@@ -58,7 +96,7 @@ export function completeSubtask(
 export function addComment(
   database: Database.Database,
   taskId: string,
-  comment: TaskComment,
+  comment: TaskCommentDraft,
   now: string,
 ): void {
   assertTask(database, taskId);
