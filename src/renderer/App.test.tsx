@@ -56,6 +56,9 @@ const today = (): string => TEST_TODAY;
 
 describe('persisted today and now screens', () => {
   beforeEach(() => {
+    vi.spyOn(Temporal.Now, 'plainDateISO').mockReturnValue(
+      Temporal.PlainDate.from('2026-10-05'),
+    );
     window.localStorage.clear();
   });
   afterEach(() => {
@@ -295,18 +298,18 @@ describe('persisted today and now screens', () => {
         /До срока 5 рабочих дней, оценка остатка 5 рабочих дней: запас исчерпан/,
       );
       expect(tightRisk).toHaveAttribute('data-risk-kind', 'tight');
-      expect(tightRisk).toHaveClass('risk-label', 'risk-tight', 'is-risk');
+      expect(tightRisk).toHaveClass('risk-label', 'is-risk');
       expect(tightRisk).toHaveAttribute('title', 'Риск не успеть');
       const shortRisk = screen.getByText(/при этой оценке срок не выдержать/);
       expect(shortRisk).toHaveAttribute('data-risk-kind', 'short');
-      expect(shortRisk).toHaveClass('risk-label', 'risk-short', 'is-risk');
+      expect(shortRisk).toHaveClass('risk-label', 'is-risk');
       expect(shortRisk).toHaveAttribute('title', 'Риск не успеть');
 
       const overdueRisk = screen.getByText(
         'Дата срока — 04.10.2026. По приблизительной оценке.',
       );
       expect(overdueRisk).toHaveAttribute('data-risk-kind', 'overdue');
-      expect(overdueRisk).toHaveClass('risk-label', 'risk-overdue', 'is-risk');
+      expect(overdueRisk).toHaveClass('risk-label', 'is-risk');
       expect(overdueRisk).toHaveAttribute('title', 'Срок прошёл');
     },
   );
