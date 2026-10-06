@@ -38,17 +38,21 @@ export function useBoardSnapshot(): BoardSnapshotState {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
+  const latestLoad = React.useRef(0);
   const setters = { setSnapshot, setLoading, setError, setNotice };
-  const load = React.useCallback(
-    () =>
-      loadBoardSnapshot({
-        setSnapshot,
-        setLoading,
-        setError,
-        setNotice,
-      }),
+  const loadCurrent = React.useCallback(
+    (isCurrent?: () => boolean, showLoading = true) => {
+      const loadId = latestLoad.current + 1;
+      latestLoad.current = loadId;
+      return loadBoardSnapshot(
+        { setSnapshot, setLoading, setError, setNotice },
+        () => loadId === latestLoad.current && (isCurrent?.() ?? true),
+        showLoading,
+      );
+    },
     [],
   );
+  const load = React.useCallback(() => loadCurrent(), [loadCurrent]);
   const retry = (): void => {
     void load();
   };
@@ -65,7 +69,7 @@ export function useBoardSnapshot(): BoardSnapshotState {
       ...setters,
       snapshot,
       commands,
-      load: () => loadBoardSnapshot(setters, isCurrent, false),
+      load: () => loadCurrent(isCurrent, false),
       ...(isCurrent !== undefined ? { isCurrent } : {}),
     });
   return { snapshot, loading, error, notice, load, retry, apply };
@@ -83,7 +87,7 @@ async function loadBoardSnapshot(
       setMessageIfCurrent(setters.setError, isCurrent, SNAPSHOT_LOAD_ERROR);
       return false;
     }
-    setters.setSnapshot(result.value);
+    if (isCurrent?.() ?? true) setters.setSnapshot(result.value);
     setMessageIfCurrent(setters.setError, isCurrent, '');
     return true;
   } catch {
