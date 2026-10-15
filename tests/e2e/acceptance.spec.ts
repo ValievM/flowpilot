@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type {
+  BrowserContext,
+  ElectronApplication,
+  Page,
+} from '@playwright/test';
 import type { CommandsApplyRequest } from '../../src/shared/contracts';
 import {
   createSmokeProfile,
@@ -18,11 +22,20 @@ let app: ElectronApplication | undefined;
 let page: Page;
 let profilePath: string;
 const profiles: string[] = [];
+const externalRequests: string[] = [];
 
-async function launch(now: string): Promise<void> {
+async function launch(
+  now: string,
+  beforeWindowLoad?: (context: BrowserContext) => Promise<void>,
+): Promise<void> {
   profilePath = createSmokeProfile();
   profiles.push(profilePath);
-  ({ app, page } = await launchSmokeApp(profilePath, now));
+  ({ app, page } = await launchSmokeApp(
+    profilePath,
+    now,
+    true,
+    beforeWindowLoad,
+  ));
 }
 
 async function seed(tasks: readonly SeedTask[]): Promise<void> {
@@ -47,9 +60,25 @@ async function openView(name: string): Promise<void> {
     .click();
 }
 
-test.beforeEach(async () => {
+test.beforeEach(async ({ browserName }, testInfo) => {
+  expect(browserName).toBe('chromium');
   profiles.length = 0;
-  await launch(TEST_NOW);
+  externalRequests.length = 0;
+  const monitorStartupRequests = async (context: BrowserContext) => {
+    await context.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        externalRequests.push(url.href);
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+  };
+  await launch(
+    TEST_NOW,
+    testInfo.title.startsWith('AC-01') ? monitorStartupRequests : undefined,
+  );
 });
 
 test.afterEach(async () => {
@@ -58,16 +87,6 @@ test.afterEach(async () => {
 });
 
 test('AC-01 release-1: today is in Сейчас, future/done/waiting are excluded and external requests are zero', async () => {
-  const externalRequests: string[] = [];
-  await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
-    if (url.protocol === 'http:' || url.protocol === 'https:') {
-      externalRequests.push(url.href);
-      await route.abort();
-      return;
-    }
-    await route.continue();
-  });
   await seed([
     {
       id: 'ac01-today',

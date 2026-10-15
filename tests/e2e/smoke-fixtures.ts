@@ -1,5 +1,9 @@
 import { _electron as electron, expect } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type {
+  BrowserContext,
+  ElectronApplication,
+  Page,
+} from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -45,6 +49,7 @@ export async function launchSmokeApp(
   profilePath: string,
   now: string,
   verifyDate = true,
+  beforeWindowLoad?: (context: BrowserContext) => Promise<void>,
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     args: [
@@ -60,6 +65,7 @@ export async function launchSmokeApp(
       FLOWPILOT_TEST_PROFILE: profilePath,
     },
   });
+  if (beforeWindowLoad) await beforeWindowLoad(app.context());
   const page = await app.firstWindow();
   await app.evaluate(({ BrowserWindow }, { width, height }) => {
     BrowserWindow.getAllWindows()[0]?.setContentSize(width, height);
