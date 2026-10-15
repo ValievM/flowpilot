@@ -33,19 +33,30 @@ export function referencedOutcomesForCreatedSeries(
   database: Database.Database,
   records: readonly UndoEntity[],
 ): EntitySnapshot[] {
+  const createdOutcomeIds = new Set(
+    records
+      .filter(
+        ({ ref, before }) =>
+          ref.kind === 'series_outcome' && before.state === null,
+      )
+      .map(({ ref }) => ref.id),
+  );
   const references: EntitySnapshot[] = [];
   for (const { ref, before } of records) {
     if (ref.kind !== 'series' || before.state !== null) continue;
     const rows = database
       .prepare('SELECT series_id,date FROM series_outcomes WHERE series_id=?')
       .all(ref.id) as { series_id: string; date: string }[];
-    for (const row of rows)
+    for (const row of rows) {
+      const id = `${row.series_id}:${row.date}`;
+      if (createdOutcomeIds.has(id)) continue;
       references.push({
         kind: 'series_outcome',
-        id: `${row.series_id}:${row.date}`,
+        id,
         state: null,
         version: null,
       });
+    }
   }
   return references;
 }

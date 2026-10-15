@@ -56,7 +56,12 @@ const outcomeSchema = z.discriminatedUnion('kind', [
 
 export const seriesCreateSchema = z
   .object({ kind: z.literal('series.create'), series: seriesSchema })
-  .strict();
+  .strict()
+  .refine(
+    ({ series }) =>
+      !series.endsOn ||
+      Temporal.PlainDate.compare(series.endsOn, series.startsOn) >= 0,
+  );
 export const seriesUpdateSchema = z
   .object({
     kind: z.literal('series.update'),

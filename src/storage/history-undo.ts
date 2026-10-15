@@ -151,12 +151,24 @@ function restoreUndoRecords(
   records: readonly UndoRecord[],
 ): void {
   records
+    .filter(
+      ({ ref, before }) =>
+        ref.kind === 'series_outcome' && before.state === null,
+    )
+    .forEach(({ before }) => {
+      restoreEntity(database, before);
+    });
+  records
     .filter(({ ref, before }) => ref.kind === 'task' && before.state === null)
     .forEach(({ before }) => {
       restoreEntity(database, before);
     });
   records
-    .filter(({ ref }) => ref.kind !== 'task')
+    .filter(
+      ({ ref, before }) =>
+        ref.kind !== 'task' &&
+        !(ref.kind === 'series_outcome' && before.state === null),
+    )
     .forEach(({ before }) => {
       restoreEntity(database, before);
     });

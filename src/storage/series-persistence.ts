@@ -93,6 +93,10 @@ function createSeries(
   series: Series,
   now: string,
 ): void {
+  assertDateRange(
+    series.startsOn.toString(),
+    series.endsOn?.toString() ?? null,
+  );
   database
     .prepare(
       'INSERT INTO series(id,title,description,weekdays_json,time,starts_on,ends_on,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,?,?)',
@@ -120,6 +124,7 @@ function updateSeries(
     SeriesRow | undefined;
   if (!row) throw new Error('Series not found');
   const next = updatedSeriesFields(row, changes);
+  assertDateRange(next.startsOn, next.endsOn);
   database
     .prepare(
       'UPDATE series SET title=?,description=?,weekdays_json=?,time=?,starts_on=?,ends_on=?,version=version+1,updated_at=? WHERE id=?',
@@ -166,12 +171,21 @@ function stopSeries(
   endDate: string,
   now: string,
 ): void {
-  const result = database
+  const row = database
+    .prepare('SELECT starts_on FROM series WHERE id=?')
+    .get(id) as { starts_on: string } | undefined;
+  if (!row) throw new Error('Series not found');
+  assertDateRange(row.starts_on, endDate);
+  database
     .prepare(
       'UPDATE series SET ends_on=?,version=version+1,updated_at=? WHERE id=?',
     )
     .run(endDate, now, id);
-  if (result.changes !== 1) throw new Error('Series not found');
+}
+
+function assertDateRange(startsOn: string, endsOn: string | null): void {
+  if (endsOn && Temporal.PlainDate.compare(endsOn, startsOn) < 0)
+    throw new Error('Series end date must not precede its start date');
 }
 
 function recordOutcome(

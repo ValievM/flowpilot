@@ -293,4 +293,96 @@ describe('series and outcome persistence', () => {
     expect(repository.load().series).toEqual([]);
     repository.close();
   });
+
+  it('undoes a batch that creates a series and an outcome together', () => {
+    const { repository } = openRepository();
+    const result = repository.apply(
+      [
+        { kind: 'series.create', series },
+        {
+          kind: 'series.recordOutcome',
+          seriesId: series.id,
+          outcome: { kind: 'done', date: series.startsOn },
+        },
+      ],
+      0,
+    );
+    expect(result.ok).toBe(true);
+    const creation = repository.history(10).entries[0];
+    if (!creation) throw new Error('Expected batch creation history entry');
+
+    expect(repository.undo(creation.id)).toMatchObject({ ok: true });
+    expect(repository.load().series).toEqual([]);
+    expect(repository.load().outcomes).toEqual([]);
+    repository.close();
+  });
+
+  it('rejects a series whose end precedes its start on create, update, or stop', () => {
+    const { repository } = openRepository();
+    const earlierDate = Temporal.PlainDate.from('2026-10-05');
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.create',
+            series: { ...series, endsOn: earlierDate },
+          },
+        ],
+        0,
+      ),
+    ).toMatchObject({ ok: false, error: { kind: 'InvalidCommand' } });
+
+    repository.apply([{ kind: 'series.create', series }], 0);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.update',
+            id: series.id,
+            changes: { endsOn: earlierDate },
+          },
+        ],
+        1,
+      ),
+    ).toMatchObject({ ok: false, error: { kind: 'InvalidCommand' } });
+    expect(
+      repository.apply(
+        [{ kind: 'series.stop', id: series.id, endDate: earlierDate }],
+        1,
+      ),
+    ).toMatchObject({ ok: false, error: { kind: 'InvalidCommand' } });
+    expect(repository.load().series).toEqual([series]);
+    repository.close();
+  });
+
+  it('rejects an update that moves the start beyond the existing end', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [
+        {
+          kind: 'series.create',
+          series: {
+            ...series,
+            endsOn: Temporal.PlainDate.from('2026-10-08'),
+          },
+        },
+      ],
+      0,
+    );
+
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.update',
+            id: series.id,
+            changes: { startsOn: Temporal.PlainDate.from('2026-10-09') },
+          },
+        ],
+        1,
+      ),
+    ).toMatchObject({ ok: false, error: { kind: 'InvalidCommand' } });
+    expect(repository.load().series[0]?.startsOn.toString()).toBe('2026-10-06');
+    repository.close();
+  });
 });
