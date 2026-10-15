@@ -1,5 +1,18 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
+import {
+  disciplineCreateSchema,
+  disciplineDeleteSchema,
+  disciplineRenameSchema,
+  ruleActivateSchema,
+  ruleBindSchema,
+  ruleDeactivateSchema,
+  ruleImportSchema,
+  taskClassifySchema,
+  taskTypeCreateSchema,
+  taskTypeDeleteSchema,
+  taskTypeRenameSchema,
+} from './storage-command-schemas';
 
 const dateValueSchema = z.union([
   z.iso.date().transform((value) => Temporal.PlainDate.from(value)),
@@ -85,6 +98,7 @@ const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
   theme: themeChoice,
+  aiMode: z.enum(['auto', 'confirm']),
 };
 const genericSettingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
@@ -228,6 +242,13 @@ const settingCommandSchema =
 const genericSettingCommandSchema = settingCommandFields.superRefine(
   validateGenericSettingValue,
 );
+const aiRankCommandSchema = z
+  .object({
+    kind: z.literal('task.setAiRank'),
+    taskId: z.string().min(1),
+    rank: z.number().int().min(0),
+  })
+  .strict();
 
 export const commandSchema = z.discriminatedUnion('kind', [
   taskCreateSchema,
@@ -242,6 +263,18 @@ export const commandSchema = z.discriminatedUnion('kind', [
   columnRenameSchema,
   columnDeleteSchema,
   settingCommandSchema,
+  aiRankCommandSchema,
+  taskClassifySchema,
+  taskTypeCreateSchema,
+  taskTypeRenameSchema,
+  taskTypeDeleteSchema,
+  disciplineCreateSchema,
+  disciplineRenameSchema,
+  disciplineDeleteSchema,
+  ruleImportSchema,
+  ruleActivateSchema,
+  ruleDeactivateSchema,
+  ruleBindSchema,
 ]);
 
 export const ipcCommandSchema = z.discriminatedUnion('kind', [

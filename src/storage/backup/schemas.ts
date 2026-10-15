@@ -36,6 +36,8 @@ const task = z
     title: z.string().refine((value) => value.trim().length > 0),
     description: z.string().nullable(),
     column_id: z.string().min(1),
+    type_id: z.string().min(1).nullable().default(null),
+    discipline_id: z.string().min(1).nullable().default(null),
     day: plainDate.nullable(),
     time: plainTime.nullable(),
     deadline: plainDate.nullable(),
@@ -46,6 +48,7 @@ const task = z
     waiting_until: plainDate.nullable(),
     rolled_over_from: plainDate.nullable(),
     position: z.number().int(),
+    ai_rank: z.number().int().min(0).nullable().default(null),
     version: z.number().int().min(1),
     created_at: z.string(),
     updated_at: z.string(),
@@ -124,6 +127,36 @@ const setting = z
     version: z.number().int().min(1),
   })
   .strict();
+const catalogItem = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().trim().min(1),
+    color: z.enum(['study', 'health', 'personal', 'none']).nullable(),
+  })
+  .strict();
+
+const ruleDocument = z
+  .object({
+    id: z.string().min(1),
+    document_json: z.string(),
+    active_document_json: z.string().nullable().default(null),
+    active_version: z.number().int().min(1).nullable().default(null),
+    status: z.enum(['draft', 'active']),
+    version: z.number().int().min(1),
+    validation_errors_json: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+
+const ruleVersion = z
+  .object({
+    rule_id: z.string().min(1),
+    version: z.number().int().min(1),
+    document_json: z.string(),
+    accepted_at: z.string(),
+  })
+  .strict();
+const emptyRules = z.array(ruleDocument).default([]);
 
 export const backupDataSchema = z
   .object({
@@ -133,6 +166,10 @@ export const backupDataSchema = z
     comments: z.array(comment),
     attachments: z.array(attachment),
     settings: z.array(setting),
+    task_types: z.array(catalogItem).default([]),
+    disciplines: z.array(catalogItem).default([]),
+    rules: emptyRules,
+    rule_versions: z.array(ruleVersion).default([]),
     revision: z.number().int().nonnegative(),
   })
   .strict();

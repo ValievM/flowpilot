@@ -7,6 +7,9 @@ import entityVersions from './migrations/0004_entity_versions.sql?raw';
 import columnGenerations from './migrations/0005_column_generations.sql?raw';
 import legacyTombstoneGenerations from './migrations/0006_legacy_tombstone_generations.sql?raw';
 import restoreHistory from './migrations/0007_restore_history.sql?raw';
+import aiApplication from './migrations/0008_ai_application.sql?raw';
+import rejectedAiCommands from './migrations/0009_rejected_ai_commands.sql?raw';
+import rulesStorage from './migrations/0010_rules_storage.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -16,6 +19,9 @@ const MIGRATIONS = [
   { version: 5, sql: columnGenerations },
   { version: 6, sql: legacyTombstoneGenerations },
   { version: 7, sql: restoreHistory },
+  { version: 8, sql: aiApplication },
+  { version: 9, sql: rejectedAiCommands },
+  { version: 10, sql: rulesStorage },
 ] as const;
 export class ForeignDatabaseError extends Error {
   constructor() {

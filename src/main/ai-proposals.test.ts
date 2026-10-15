@@ -37,7 +37,9 @@ const snapshot: AiSnapshot = {
   ],
   taskTypes: [{ id: 'type-1', name: 'Type' }],
   disciplines: [{ id: 'discipline-1', name: 'Discipline' }],
+  savedRuleIds: [],
   rules: [],
+  currentRuleDocuments: [],
 };
 const proposal = (
   commands: unknown[],
@@ -67,11 +69,8 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(1);
-    expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
-      { index: 1, kind: 'task.classify', reason: 'not-persisted-yet' },
-    ]);
+    expect(result.validCommands).toHaveLength(3);
+    expect(result.rejectedCommands).toEqual([]);
   });
   it('keeps valid commands and rejects hallucinated task identifiers by name', () => {
     const result = validateProposal(
@@ -86,11 +85,12 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+      { kind: 'task.classify', taskId: 'task-1', typeId: 'type-1' },
+    ]);
     expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
       { index: 1, kind: 'comment.add', reason: 'task-not-found' },
-      { index: 2, kind: 'task.classify', reason: 'not-persisted-yet' },
     ]);
   });
 
@@ -115,10 +115,11 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 0 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.classify', reason: 'invalid-command' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
     ]);
     expect(
       aiCommandSchema.safeParse({ kind: 'task.delete', taskId: 'task-1' })
@@ -140,7 +141,7 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.rejectedCommands[0]?.reason).toBe('not-persisted-yet');
+    expect(result.rejectedCommands[0]?.reason).toBe('type-not-found');
   });
 
   it('requires an explicit reason when moving into waiting', () => {
@@ -183,10 +184,11 @@ describe('AI proposal contract', () => {
       ]),
       snapshot,
     );
-    expect(result.validCommands).toHaveLength(0);
+    expect(result.validCommands).toEqual([
+      { kind: 'task.setAiRank', taskId: 'task-1', rank: 2 },
+    ]);
     expect(result.rejectedCommands).toEqual([
       { index: 0, kind: 'task.create', reason: 'not-persisted-yet' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
     ]);
   });
 
@@ -251,6 +253,54 @@ describe('AI proposal contract', () => {
       snapshot,
     );
     expect(rejected.rejectedCommands[0]?.reason).toBe('type-not-found');
+  });
+  it('activates a rule imported earlier in the same proposal', () => {
+    const documentJson = JSON.stringify({
+      schema_version: 'v1',
+      id: 'rule-1',
+      title: 'Priority',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'important', kind: 'priority', level: 'high', reason: 'Reason' },
+      ],
+    });
+    const result = validateProposal(
+      proposal([
+        { kind: 'rule.import', documentJson },
+        { kind: 'rule.activate', ruleId: 'rule-1' },
+      ]),
+      snapshot,
+    );
+    expect(result.rejectedCommands).toEqual([]);
+    expect(result.validCommands).toEqual([
+      { kind: 'rule.import', documentJson },
+      { kind: 'rule.activate', ruleId: 'rule-1' },
+    ]);
+  });
+  it('rejects activation of rules that are unknown or invalid imports', () => {
+    const invalidJson = JSON.stringify({
+      schema_version: 'v1',
+      id: 'broken-rule',
+      title: 'Priority',
+      scope: { task_type_ids: ['missing'] },
+      rules: [
+        { id: 'important', kind: 'priority', level: 'high', reason: 'Reason' },
+      ],
+    });
+    const result = validateProposal(
+      proposal([
+        { kind: 'rule.import', documentJson: invalidJson },
+        { kind: 'rule.activate', ruleId: 'broken-rule' },
+        { kind: 'rule.activate', ruleId: 'never-seen' },
+      ]),
+      snapshot,
+    );
+    expect(result.validCommands).toEqual([]);
+    expect(result.rejectedCommands).toEqual([
+      { index: 0, kind: 'rule.import', reason: 'type-not-found' },
+      { index: 1, kind: 'rule.activate', reason: 'rule-not-found' },
+      { index: 2, kind: 'rule.activate', reason: 'rule-not-found' },
+    ]);
   });
 
   it('preserves command order and marks translated batches as AI sourced', () => {

@@ -174,17 +174,12 @@ function restoreUndoRecords(
       restoreEntity(database, before);
     });
   records
-    .filter(({ ref }) => ref.kind === 'column')
+    .filter(({ ref }) => ref.kind !== 'task')
     .forEach(({ before }) => {
       restoreEntity(database, before);
     });
   records
     .filter(({ ref, before }) => ref.kind === 'task' && before.state !== null)
-    .forEach(({ before }) => {
-      restoreEntity(database, before);
-    });
-  records
-    .filter(({ ref }) => ref.kind === 'setting')
     .forEach(({ before }) => {
       restoreEntity(database, before);
     });
@@ -278,15 +273,25 @@ function attachmentIds(state: string | null): string[] {
 }
 
 function entityKind(kind: string): EntitySnapshot['kind'] {
-  if (kind === 'task' || kind === 'column' || kind === 'setting') return kind;
+  if (
+    kind === 'task' ||
+    kind === 'column' ||
+    kind === 'setting' ||
+    kind === 'taskType' ||
+    kind === 'discipline' ||
+    kind === 'rule'
+  )
+    return kind;
   throw new Error('Unknown history entity');
 }
 
 function versionFromState(kind: string, state: string | null): number | null {
   if (!state) return null;
   const parsed = JSON.parse(state) as
-    { task: { version: number } } | { version: number };
-  return 'task' in parsed ? parsed.task.version : parsed.version;
+    | { task: { version: number } }
+    | { version?: number; row?: { version?: number } };
+  if ('task' in parsed) return parsed.task.version;
+  return parsed.row?.version ?? parsed.version ?? 1;
 }
 
 function readRevision(database: Database.Database): number {

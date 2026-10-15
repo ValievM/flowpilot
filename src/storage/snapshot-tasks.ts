@@ -9,6 +9,8 @@ import type {
 } from '../domain';
 
 export type TaskRow = {
+  type_id: string | null;
+  discipline_id: string | null;
   id: string;
   title: string;
   description: string | null;
@@ -22,6 +24,7 @@ export type TaskRow = {
   waiting_reason: string | null;
   waiting_until: string | null;
   rolled_over_from: string | null;
+  ai_rank: number | null;
   position: number;
 };
 
@@ -39,7 +42,24 @@ export function loadTask(database: Database.Database, row: TaskRow): Task {
     status: statusFromRow(row),
     columnId: row.column_id,
     addedOrder: row.position,
+    ...optionalTaskFields(row),
+    subtasks: relations.subtasks,
+    comments: relations.comments,
+    attachments: relations.attachments,
+  };
+}
+function optionalTaskFields(row: TaskRow): Partial<Task> {
+  return {
+    ...(row.type_id !== null ? { typeId: row.type_id } : {}),
+    ...(row.discipline_id !== null ? { disciplineId: row.discipline_id } : {}),
     ...(row.description !== null ? { description: row.description } : {}),
+    ...(row.ai_rank !== null ? { aiRank: row.ai_rank } : {}),
+    ...scheduledTaskFields(row),
+  };
+}
+
+function scheduledTaskFields(row: TaskRow): Partial<Task> {
+  return {
     ...(row.day ? { day: Temporal.PlainDate.from(row.day) } : {}),
     ...(row.time ? { time: Temporal.PlainTime.from(row.time) } : {}),
     ...(row.deadline
@@ -51,9 +71,6 @@ export function loadTask(database: Database.Database, row: TaskRow): Task {
     ...(row.rolled_over_from
       ? { rolledOverFrom: Temporal.PlainDate.from(row.rolled_over_from) }
       : {}),
-    subtasks: relations.subtasks,
-    comments: relations.comments,
-    attachments: relations.attachments,
   };
 }
 

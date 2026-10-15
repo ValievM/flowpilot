@@ -11,33 +11,62 @@ export function insertTask(
   now: string,
 ): void {
   assertStatusMatchesColumn(database, task.columnId, task.status.kind);
-  const status = task.status;
-  database
-    .prepare(
-      `INSERT INTO tasks(id,title,description,column_id,day,time,deadline,estimate_unit,estimate_value,status_kind,waiting_reason,waiting_until,rolled_over_from,position,created_at,updated_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    )
-    .run(
-      task.id,
-      task.title,
-      task.description ?? null,
-      task.columnId,
-      dateText(task.day),
-      timeText(task.time),
-      dateText(task.deadline),
-      task.estimate?.unit ?? null,
-      task.estimate?.value ?? null,
-      status.kind,
-      status.kind === 'waiting' ? status.reason : null,
-      status.kind === 'waiting' ? dateText(status.until) : null,
-      dateText(task.rolledOverFrom),
-      task.addedOrder,
-      now,
-      now,
-    );
+  insertTaskRow(database, task, now);
   insertTaskSubtasks(database, task);
   insertTaskComments(database, task, now);
   insertTaskAttachments(database, task);
+}
+
+function insertTaskRow(
+  database: Database.Database,
+  task: Task,
+  now: string,
+): void {
+  database
+    .prepare(
+      `INSERT INTO tasks(id,title,description,column_id,type_id,discipline_id,day,time,deadline,estimate_unit,estimate_value,status_kind,waiting_reason,waiting_until,rolled_over_from,position,ai_rank,created_at,updated_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    .run(...taskInsertValues(task, now));
+}
+
+function taskInsertValues(task: Task, now: string): (string | number | null)[] {
+  return [
+    ...taskIdentityValues(task),
+    ...taskScheduleValues(task),
+    ...taskStatusValues(task.status),
+    dateText(task.rolledOverFrom),
+    task.addedOrder,
+    task.aiRank ?? null,
+    now,
+    now,
+  ];
+}
+
+function taskIdentityValues(task: Task): (string | null)[] {
+  return [
+    task.id,
+    task.title,
+    task.description ?? null,
+    task.columnId,
+    task.typeId ?? null,
+    task.disciplineId ?? null,
+  ];
+}
+
+function taskScheduleValues(task: Task): (string | number | null)[] {
+  return [
+    dateText(task.day),
+    timeText(task.time),
+    dateText(task.deadline),
+    task.estimate?.unit ?? null,
+    task.estimate?.value ?? null,
+  ];
+}
+
+function taskStatusValues(status: TaskStatus): (string | null)[] {
+  if (status.kind !== 'waiting') return [status.kind, null, null];
+  return [status.kind, status.reason, dateText(status.until)];
 }
 
 export function updateTask(
@@ -61,6 +90,19 @@ export function updateTask(
       `UPDATE tasks SET ${entries.join(', ')}, version = version + 1, updated_at = @now WHERE id = @id`,
     )
     .run({ ...values, now, id });
+}
+export function setTaskAiRank(
+  database: Database.Database,
+  taskId: string,
+  rank: number,
+  now: string,
+): void {
+  const result = database
+    .prepare(
+      'UPDATE tasks SET ai_rank = ?, version = version + 1, updated_at = ? WHERE id = ?',
+    )
+    .run(rank, now, taskId);
+  if (result.changes === 0) throw new Error('task not found');
 }
 
 function insertTaskSubtasks(database: Database.Database, task: Task): void {

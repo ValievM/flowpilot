@@ -1,14 +1,12 @@
 import type Database from 'better-sqlite3';
 import { executeColumnCommand } from './column-commands';
-import {
-  affectedEntities,
-  snapshotEntity,
-  type EntitySnapshot,
-} from './history-entities';
+import { snapshotEntity, type EntitySnapshot } from './history-entities';
+import { affectedEntities } from './affected-entities';
 import { writeHistory } from './history-log';
 import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
-import type { ApplyResult, StorageCommand } from './types';
+import { executeRulesCommand } from './rules-commands';
+import type { ApplyResult, RejectedAiCommand, StorageCommand } from './types';
 
 type AttachmentFiles = {
   insert(record: AttachmentRecord): void;
@@ -23,6 +21,8 @@ type ApplyOptions = {
   attachmentFiles: AttachmentFiles;
   preparedAttachments: ReadonlyMap<number, AttachmentRecord>;
   source: 'user' | 'ai';
+  proposalId?: string;
+  rejectedCommands?: readonly RejectedAiCommand[] | undefined;
 };
 type CommandCapture = { index: number; options: ApplyOptions };
 type ChangeSet = Map<string, { before: EntitySnapshot; after: EntitySnapshot }>;
@@ -39,8 +39,12 @@ export function applyCommands(
         throw new Error('Unable to move attachment to trash');
       trashed.push(command.attachmentId);
     }
-    const revision = applyTransaction(database, options);
-    return { ok: true, value: { revision } };
+    const applied = applyTransaction(database, options);
+    if (applied.replayed) {
+      trashed.forEach((id) => options.attachmentFiles.restoreFromTrash(id));
+      discardPrepared(options);
+    }
+    return { ok: true, value: { revision: applied.revision } };
   } catch (error) {
     trashed.forEach((id) => options.attachmentFiles.restoreFromTrash(id));
     discardPrepared(options);
@@ -51,8 +55,12 @@ export function applyCommands(
 function applyTransaction(
   database: Database.Database,
   options: ApplyOptions,
-): number {
+): { revision: number; replayed: boolean } {
   const transaction = database.transaction(() => {
+    const previous = options.proposalId
+      ? readAppliedProposal(database, options.proposalId)
+      : undefined;
+    if (previous !== undefined) return { revision: previous, replayed: true };
     assertRevision(database, options.expectedRevision);
     const changes: ChangeSet = new Map();
     options.commands.forEach((command, index) => {
@@ -69,9 +77,44 @@ function applyTransaction(
       occurredAt: options.now,
       source: options.source,
     });
-    return revision;
+    if (options.proposalId)
+      recordAppliedProposal(
+        database,
+        options.proposalId,
+        revision,
+        options.rejectedCommands,
+      );
+    return { revision, replayed: false };
   });
   return transaction();
+}
+
+function readAppliedProposal(
+  database: Database.Database,
+  proposalId: string,
+): number | undefined {
+  const row = database
+    .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
+    .get(proposalId) as { revision?: number } | undefined;
+  return row?.revision;
+}
+
+function recordAppliedProposal(
+  database: Database.Database,
+  proposalId: string,
+  revision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
+): void {
+  database
+    .prepare(
+      'INSERT INTO applied_operations(operation_id,proposal_id,revision,rejected_commands_json) VALUES(?,?,?,?)',
+    )
+    .run(
+      proposalId,
+      proposalId,
+      revision,
+      JSON.stringify(rejectedCommands ?? []),
+    );
 }
 
 function captureAndExecute(
@@ -113,6 +156,7 @@ function executeCommand(
     removeAttachment(database, command.attachmentId, options.now);
     return;
   }
+  if (executeRulesCommand(database, command, options.now)) return;
   if (isColumnCommand(command)) executeColumnCommand(database, command);
   else executeTaskCommand(database, command, options.now);
 }

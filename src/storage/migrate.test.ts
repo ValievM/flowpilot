@@ -46,7 +46,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 7 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 10 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
@@ -59,6 +59,43 @@ describe('database migrations', () => {
         )
         .get(),
     ).toEqual({ name: 'change_log' });
+    database.close();
+  });
+  it('preserves legacy applied operations while adding replay details', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-storage-v8-'));
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const database = new Database(path);
+    database.exec(initialSchema);
+    database.exec(`
+      CREATE TABLE applied_operations (
+        operation_id TEXT PRIMARY KEY,
+        proposal_id TEXT NOT NULL UNIQUE,
+        revision INTEGER NOT NULL
+      );
+    `);
+    database
+      .prepare(
+        'INSERT INTO applied_operations(operation_id,proposal_id,revision) VALUES(?,?,?)',
+      )
+      .run('existing-operation', 'existing-proposal', 4);
+    database.pragma('user_version = 8');
+
+    migrate(database, path);
+
+    expect(database.pragma('user_version')).toEqual([{ user_version: 10 }]);
+    expect(
+      database
+        .prepare(
+          'SELECT operation_id,proposal_id,revision,rejected_commands_json FROM applied_operations',
+        )
+        .get(),
+    ).toEqual({
+      operation_id: 'existing-operation',
+      proposal_id: 'existing-proposal',
+      revision: 4,
+      rejected_commands_json: null,
+    });
     database.close();
   });
   it('preserves generations for deleted columns when upgrading version four', () => {

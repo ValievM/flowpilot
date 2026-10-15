@@ -61,14 +61,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         onStart={props.onStart}
       />
     );
-  if (props.view === 'board')
-    return (
-      <BoardScreen
-        tasks={props.tasks.map((task) =>
-          taskSummaryData(task, props.today, props.workdays),
-        )}
-      />
-    );
+  if (props.view === 'board') return <BoardScreen today={props.today} />;
   if (props.view === 'all')
     return (
       <section className="simple-screen">

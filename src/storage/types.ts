@@ -1,3 +1,9 @@
+import type {
+  Discipline,
+  RuleDiagnostic,
+  RulesDocument,
+  TaskType,
+} from '../domain';
 import type { Temporal } from 'temporal-polyfill';
 import type {
   Task,
@@ -30,8 +36,26 @@ export interface Clock {
 export interface Snapshot {
   readonly columns: readonly TaskColumn[];
   readonly tasks: readonly Task[];
+  readonly taskTypes: readonly TaskType[];
+  readonly disciplines: readonly Discipline[];
+  readonly rules: readonly StoredRule[];
   readonly settings: Readonly<Record<string, unknown>>;
   readonly revision: number;
+}
+export type AiMode = 'auto' | 'confirm';
+export interface StoredRule {
+  readonly id: string;
+  readonly documentJson: string;
+  readonly document: RulesDocument | null;
+  readonly activeDocument: RulesDocument | null;
+  readonly status: 'draft' | 'active';
+  readonly version: number;
+  readonly errors: readonly unknown[];
+  readonly diagnostics: readonly RuleDiagnostic[];
+  readonly versions: readonly {
+    readonly version: number;
+    readonly documentJson: string;
+  }[];
 }
 
 type TaskUpdateChanges = Partial<
@@ -73,6 +97,7 @@ export type StorageCommand =
   | { kind: 'comment.add'; taskId: string; comment: TaskComment }
   | { kind: 'attachment.add'; taskId: string; sourcePath: string }
   | { kind: 'attachment.remove'; attachmentId: string }
+  | { kind: 'task.setAiRank'; taskId: string; rank: number }
   | { kind: 'column.create'; column: TaskColumn }
   | { kind: 'column.rename'; id: string; name: string; description: string }
   | {
@@ -81,7 +106,50 @@ export type StorageCommand =
       targetColumnId?: string;
       waiting?: WaitingDetails;
     }
-  | { kind: 'setting.set'; key: string; value: unknown };
+  | { kind: 'setting.set'; key: string; value: unknown }
+  | {
+      kind: 'task.classify';
+      taskId: string;
+      typeId?: string | null | undefined;
+      disciplineId?: string | null | undefined;
+    }
+  | { kind: 'taskType.create'; taskType: TaskType }
+  | {
+      kind: 'taskType.rename';
+      id: string;
+      name: string;
+      color?: TaskType['color'];
+    }
+  | { kind: 'taskType.delete'; id: string; targetId?: string }
+  | { kind: 'discipline.create'; discipline: Discipline }
+  | {
+      kind: 'discipline.rename';
+      id: string;
+      name: string;
+      color?: Discipline['color'];
+    }
+  | { kind: 'discipline.delete'; id: string; targetId?: string }
+  | { kind: 'rule.import'; documentJson: string }
+  | { kind: 'rule.activate'; ruleId: string }
+  | { kind: 'rule.deactivate'; ruleId: string }
+  | { kind: 'rule.bind'; ruleId: string; scope: RulesDocument['scope'] };
+
+export interface RejectedAiCommand {
+  readonly index: number;
+  readonly kind: string;
+  readonly reason: string;
+}
+
+export interface AppliedOperation {
+  readonly revision: number;
+  readonly rejectedCommands: readonly RejectedAiCommand[];
+}
+
+export interface ApplyOptions {
+  readonly source?: 'user' | 'ai';
+  readonly proposalId?: string;
+  readonly rejectedCommands?: readonly RejectedAiCommand[];
+}
 
 export type HistoryPage = {
   readonly entries: readonly HistoryEntry[];

@@ -5,6 +5,7 @@ import {
   type AiCommand,
   type AiCommandBatch,
   type AiPlannedCommand,
+  type AiTaskChanges,
   type AiTaskCreation,
   type Proposal,
 } from '../shared/ai-commands';
@@ -90,6 +91,58 @@ export function validateProposal(
     recordCommandIds(command, state);
   });
   return { validCommands, rejectedCommands };
+}
+
+export function cloneAiCommands(
+  commands: readonly AiCommand[],
+): readonly AiCommand[] {
+  // Mutable records are copied; Temporal values are immutable.
+  return commands.map(cloneAiCommand);
+}
+
+function cloneAiCommand(command: AiCommand): AiCommand {
+  switch (command.kind) {
+    case 'task.create':
+      return { ...command, task: cloneTaskCreation(command.task) };
+    case 'task.update':
+      return { ...command, changes: cloneTaskChanges(command.changes) };
+    case 'task.move':
+      return cloneTaskMove(command);
+    case 'subtask.add':
+      return { ...command, subtask: { ...command.subtask } };
+    case 'comment.add':
+      return { ...command, comment: { ...command.comment } };
+    case 'task.classify':
+    case 'rule.import':
+    case 'rule.activate':
+    case 'task.setAiRank':
+      return { ...command };
+  }
+}
+
+function cloneTaskMove(
+  command: Extract<AiCommand, { kind: 'task.move' }>,
+): Extract<AiCommand, { kind: 'task.move' }> {
+  return {
+    ...command,
+    ...(command.status ? { status: { ...command.status } } : {}),
+  };
+}
+
+function cloneTaskCreation(task: AiTaskCreation): AiTaskCreation {
+  return {
+    ...task,
+    ...(task.estimate ? { estimate: { ...task.estimate } } : {}),
+    subtasks: task.subtasks.map((subtask) => ({ ...subtask })),
+    ...(task.comment ? { comment: { ...task.comment } } : {}),
+  };
+}
+
+function cloneTaskChanges(changes: AiTaskChanges): AiTaskChanges {
+  return {
+    ...changes,
+    ...(changes.estimate ? { estimate: { ...changes.estimate } } : {}),
+  };
 }
 
 function commandKind(command: unknown): string {

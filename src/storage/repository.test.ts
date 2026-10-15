@@ -30,7 +30,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 7 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 10 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);
@@ -108,7 +108,10 @@ describe('Repository', () => {
     const snapshot = repository.load();
     expect(snapshot.revision).toBe(0);
     expect(snapshot.columns.map(({ id }) => id)).not.toContain('custom');
-    expect(snapshot.settings).toEqual({ workdays: [1, 2, 3, 4, 5] });
+    expect(snapshot.settings).toEqual({
+      aiMode: 'auto',
+      workdays: [1, 2, 3, 4, 5],
+    });
     repository.close();
   });
 

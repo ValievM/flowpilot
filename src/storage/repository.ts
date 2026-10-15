@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { z } from 'zod';
 import { dirname } from 'node:path';
 import {
   AttachmentStore,
@@ -10,11 +11,16 @@ import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
+import { readRuleSnapshot } from './rules-snapshot';
 import type { TaskColumn } from '../domain';
 import type {
+  AiMode,
+  AppliedOperation,
+  ApplyOptions,
   ApplyResult,
   Clock,
   HistoryPage,
+  RejectedAiCommand,
   Snapshot,
   StorageCommand,
   UndoResult,
@@ -27,6 +33,15 @@ type ColumnRow = {
   state: TaskColumn['state'];
   built_in: number;
 };
+const rejectedAiCommandsSchema = z.array(
+  z
+    .object({
+      index: z.number().int(),
+      kind: z.string(),
+      reason: z.string(),
+    })
+    .strict(),
+);
 
 export class Repository {
   private readonly profilePath: string;
@@ -67,6 +82,7 @@ export class Repository {
       .all() as TaskRow[];
     const tasks = taskRows.map((row) => loadTask(this.database, row));
     const settings = readSettings(this.database);
+    const rules = readRuleSnapshot(this.database);
     const revision = readRevision(this.database);
     return {
       columns: columns.map(({ built_in, ...column }) => ({
@@ -74,25 +90,36 @@ export class Repository {
         builtIn: built_in === 1,
       })),
       tasks,
+      taskTypes: rules.taskTypes,
+      disciplines: rules.disciplines,
+      rules: rules.rules,
       settings,
       revision,
     };
+  }
+  getAiMode(): AiMode {
+    return readSettings(this.database).aiMode === 'confirm'
+      ? 'confirm'
+      : 'auto';
   }
 
   apply(
     commands: readonly StorageCommand[],
     expectedRevision: number,
-    options: { source?: 'user' | 'ai' } = {},
+    options: ApplyOptions = {},
   ): ApplyResult {
-    if (commands.length === 0) {
-      const actual = readRevision(this.database);
-      if (actual !== expectedRevision)
-        return {
-          ok: false,
-          error: { kind: 'StaleRevision', expected: expectedRevision, actual },
-        };
-      return { ok: true, value: { revision: actual } };
-    }
+    const previous = options.proposalId
+      ? this.appliedProposal(options.proposalId)
+      : undefined;
+    if (previous !== undefined)
+      return { ok: true, value: { revision: previous } };
+    if (commands.length === 0)
+      return applyEmptyCommands(
+        this.database,
+        options.proposalId,
+        expectedRevision,
+        options.rejectedCommands,
+      );
     const invalid = commands.find(
       (command) => !commandSchema.safeParse(command).success,
     );
@@ -114,6 +141,10 @@ export class Repository {
       attachmentFiles: this.attachments,
       preparedAttachments: prepared,
       source: options.source ?? 'user',
+      ...(options.proposalId !== undefined
+        ? { proposalId: options.proposalId }
+        : {}),
+      rejectedCommands: options.rejectedCommands,
     });
   }
 
@@ -148,6 +179,27 @@ export class Repository {
     return { ok: true, value: prepared };
   }
 
+  appliedProposal(proposalId: string): number | undefined {
+    return this.appliedOperation(proposalId)?.revision;
+  }
+
+  appliedOperation(proposalId: string): AppliedOperation | undefined {
+    const row = this.database
+      .prepare(
+        'SELECT revision,rejected_commands_json FROM applied_operations WHERE proposal_id = ?',
+      )
+      .get(proposalId) as
+      { revision: number; rejected_commands_json: string | null } | undefined;
+    if (!row) return undefined;
+    const rejectedCommands =
+      row.rejected_commands_json === null
+        ? []
+        : rejectedAiCommandsSchema.parse(
+            JSON.parse(row.rejected_commands_json) as unknown,
+          );
+    return { revision: row.revision, rejectedCommands };
+  }
+
   history(limit: number, before?: string): HistoryPage {
     return { entries: readHistory(this.database, limit, before) };
   }
@@ -178,9 +230,72 @@ function readSettings(
   const rows = database
     .prepare('SELECT key,value_json FROM settings')
     .all() as { key: string; value_json: string }[];
-  return Object.fromEntries(
-    rows.map(({ key, value_json }) => [key, JSON.parse(value_json) as unknown]),
-  );
+  return {
+    aiMode: 'auto',
+    ...Object.fromEntries(
+      rows.map(({ key, value_json }) => [
+        key,
+        JSON.parse(value_json) as unknown,
+      ]),
+    ),
+  };
+}
+function applyEmptyCommands(
+  database: Database.Database,
+  proposalId: string | undefined,
+  expectedRevision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
+): ApplyResult {
+  if (proposalId !== undefined)
+    return applyEmptyProposal(
+      database,
+      proposalId,
+      expectedRevision,
+      rejectedCommands,
+    );
+  const actual = readRevision(database);
+  if (actual !== expectedRevision)
+    return {
+      ok: false,
+      error: { kind: 'StaleRevision', expected: expectedRevision, actual },
+    };
+  return { ok: true, value: { revision: actual } };
+}
+
+function applyEmptyProposal(
+  database: Database.Database,
+  proposalId: string,
+  expectedRevision: number,
+  rejectedCommands?: readonly RejectedAiCommand[],
+): ApplyResult {
+  return database.transaction(() => {
+    const previous = database
+      .prepare('SELECT revision FROM applied_operations WHERE proposal_id = ?')
+      .get(proposalId) as { revision: number } | undefined;
+    if (previous)
+      return { ok: true as const, value: { revision: previous.revision } };
+    const actual = readRevision(database);
+    if (actual !== expectedRevision)
+      return {
+        ok: false as const,
+        error: {
+          kind: 'StaleRevision' as const,
+          expected: expectedRevision,
+          actual,
+        },
+      };
+    database
+      .prepare(
+        'INSERT INTO applied_operations(operation_id,proposal_id,revision,rejected_commands_json) VALUES(?,?,?,?)',
+      )
+      .run(
+        proposalId,
+        proposalId,
+        actual,
+        JSON.stringify(rejectedCommands ?? []),
+      );
+    return { ok: true as const, value: { revision: actual } };
+  })();
 }
 
 function readRevision(database: Database.Database): number {

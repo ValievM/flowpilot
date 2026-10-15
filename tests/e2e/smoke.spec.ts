@@ -1,40 +1,27 @@
 import { _electron as electron, expect, test } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
-import { Temporal } from 'temporal-polyfill';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-const DEFAULT_TEST_NOW = '2026-10-05T12:00:00Z';
-const SNAPSHOT_NOW = '2026-10-05T12:00:00Z';
-const TEST_NOW = process.env.FLOWPILOT_TEST_NOW ?? DEFAULT_TEST_NOW;
-function localDateAt(instant: string): Temporal.PlainDate {
-  return Temporal.Instant.from(instant)
-    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
-    .toPlainDate();
-}
-
-function todayLabelAt(instant: string): string {
-  const date = localDateAt(instant);
-  return `Сегодня, ${date.toLocaleString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-  })}`;
-}
-
-const TODAY_DATE = localDateAt(TEST_NOW);
-const TODAY = TODAY_DATE.toString();
-const SNAPSHOT_DATE = localDateAt(SNAPSHOT_NOW);
-const SNAPSHOT_DAY = SNAPSHOT_DATE.toString();
-const SNAPSHOT_DEADLINE = SNAPSHOT_DATE.add({ days: 4 }).toString();
-const SNAPSHOT_WINDOW = {
-  width: 1280,
-  height: 800,
-  deviceScaleFactor: 1,
-} as const;
+import { Temporal } from 'temporal-polyfill';
+import {
+  SNAPSHOT_WINDOW,
+  TODAY,
+  localDateAt,
+  todayLabelAt,
+} from './smoke-fixtures';
+import type { ElectronApplication, Page } from '@playwright/test';
+import {
+  createSmokeProfile,
+  launchSmokeApp,
+  removeSmokeProfile,
+  SNAPSHOT_DAY,
+  SNAPSHOT_DEADLINE,
+  SNAPSHOT_NOW_INSTANT,
+  TEST_NOW,
+} from './smoke-fixtures';
 
 let app: ElectronApplication | undefined;
-// Playwright initializes the renderer page in beforeEach before each test body.
-let page!: Page;
+let page: Page;
 let profilePath: string;
 async function startApp(now: string, verifyDate = true): Promise<void> {
   app = await electron.launch({
@@ -66,19 +53,16 @@ async function startApp(now: string, verifyDate = true): Promise<void> {
   }
 }
 test.beforeEach(async () => {
-  const { title } = test.info();
-  profilePath = mkdtempSync(path.join(tmpdir(), 'flowpilot-e2e-'));
-  const fixtureNow = title.startsWith('matches ') ? SNAPSHOT_NOW : TEST_NOW;
-  await startApp(
-    fixtureNow,
-    title !==
-      'uses shifted main time for the Today header and Сейчас availability',
-  );
+  profilePath = createSmokeProfile();
+  const now = test.info().title.startsWith('matches ')
+    ? SNAPSHOT_NOW_INSTANT
+    : TEST_NOW;
+  ({ app, page } = await launchSmokeApp(profilePath, now));
 });
 
 test.afterEach(async () => {
   if (app) await app.close();
-  rmSync(profilePath, { recursive: true, force: true });
+  removeSmokeProfile(profilePath);
 });
 
 test('keeps the E2E window hidden without exposing Node globals', async () => {
@@ -631,7 +615,6 @@ for (const width of [760, 600]) {
     expect(workspace.y).toBeLessThan(800);
   });
 }
-
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {

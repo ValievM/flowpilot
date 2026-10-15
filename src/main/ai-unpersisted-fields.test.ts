@@ -5,6 +5,7 @@ import type { AiSnapshot } from './ai-proposals';
 const snapshot: AiSnapshot = {
   revision: 4,
   ruleVersions: {},
+  savedRuleIds: [],
   tasks: [
     {
       id: 'task-1',
@@ -23,6 +24,7 @@ const snapshot: AiSnapshot = {
   taskTypes: [{ id: 'type-1', name: 'Type' }],
   disciplines: [{ id: 'discipline-1', name: 'Discipline' }],
   rules: [],
+  currentRuleDocuments: [],
 };
 
 const proposal = {
@@ -87,20 +89,22 @@ const disciplineIdOnlyProposal = {
 
 const proposalWithOtherUnpersistedCommands = {
   ...proposal,
-  commands: [proposal.commands[0], proposal.commands[1], proposal.commands[3]],
+  commands: [proposal.commands[0], proposal.commands[2], proposal.commands[3]],
 };
 
-describe('AI commands for fields not persisted yet', () => {
-  it('rejects unpersisted fields individually while preserving other commands', () => {
+describe('AI task classification persistence', () => {
+  it('persists explicit classification while rejecting type fields on task creation', () => {
     const result = validateProposal(
       proposalWithOtherUnpersistedCommands,
       snapshot,
     );
 
-    expect(result.validCommands).toEqual([proposal.commands[3]]);
+    expect(result.validCommands).toEqual([
+      proposal.commands[0],
+      proposal.commands[3],
+    ]);
     expect(result.rejectedCommands).toEqual([
-      { index: 0, kind: 'task.classify', reason: 'not-persisted-yet' },
-      { index: 1, kind: 'task.setAiRank', reason: 'not-persisted-yet' },
+      { index: 1, kind: 'task.create', reason: 'not-persisted-yet' },
     ]);
   });
 

@@ -57,54 +57,100 @@ describe('review regressions', () => {
     repository.close();
   });
 
-  it('moves ordinary tasks into waiting columns with a reason', () => {
-    const repository = openRepository();
-    const task = {
-      id: 'task-1',
-      title: 'Task',
-      status: { kind: 'todo' as const },
-      columnId: 'custom',
-      subtasks: [],
-      comments: [],
-      attachments: [],
-      addedOrder: 1,
-    };
-    repository.apply(
-      [
-        {
-          kind: 'column.create',
-          column: {
+  it.each([undefined, '2026-10-08'])(
+    'persists waiting reason and optional deadline when deleting a column %#',
+    (until) => {
+      const repository = openRepository();
+      addCustomTask(repository);
+      const waiting = {
+        reason: 'Жду ответа',
+        ...(until ? { until: Temporal.PlainDate.from(until) } : {}),
+      };
+      const result = repository.apply(
+        [
+          {
+            kind: 'column.delete',
             id: 'custom',
-            name: 'Custom',
-            description: '',
-            state: 'todo',
-            builtIn: false,
+            targetColumnId: 'waiting',
+            waiting,
           },
-        },
-      ],
-      0,
-    );
-    repository.apply([{ kind: 'task.create', task }], 1);
-    const result = repository.apply(
-      [
-        {
-          kind: 'column.delete',
-          id: 'custom',
-          targetColumnId: 'waiting',
-          waiting: { reason: 'Ждёт ответа' },
-        },
-      ],
-      2,
-    );
+        ],
+        2,
+      );
 
-    expect(result.ok).toBe(true);
-    const movedTask = repository.load().tasks[0];
-    expect(movedTask).toBeDefined();
-    if (!movedTask) throw new Error('task was not moved');
-    expect(movedTask.columnId).toBe('waiting');
-    expect(movedTask.status.kind).toBe('waiting');
-    if (movedTask.status.kind === 'waiting')
-      expect(movedTask.status.reason).toBe('Ждёт ответа');
+      expect(result).toEqual({ ok: true, value: { revision: 3 } });
+      const updated = repository.load();
+      expect(updated.columns.some(({ id }) => id === 'custom')).toBe(false);
+      const movedTask = updated.tasks[0];
+      expect(movedTask).toBeDefined();
+      if (!movedTask) throw new Error('task was not moved');
+      expect(movedTask.columnId).toBe('waiting');
+      expect(movedTask.status).toEqual({
+        kind: 'waiting',
+        reason: waiting.reason,
+        ...(until ? { until: Temporal.PlainDate.from(until) } : {}),
+      });
+      repository.close();
+    },
+  );
+
+  it('rejects deleting into waiting without a reason before mutation', () => {
+    const repository = openRepository();
+    addCustomTask(repository);
+    const before = repository.load();
+
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'column.delete',
+            id: 'custom',
+            targetColumnId: 'waiting',
+          },
+        ],
+        2,
+      ),
+    ).toEqual({
+      ok: false,
+      error: { kind: 'InvalidCommand', message: 'waiting-reason-required' },
+    });
+    expect(repository.load()).toEqual(before);
     repository.close();
   });
 });
+
+function addCustomTask(repository: Repository): void {
+  repository.apply(
+    [
+      {
+        kind: 'column.create',
+        column: {
+          id: 'custom',
+          name: 'Custom',
+          description: '',
+          state: 'todo',
+          builtIn: false,
+        },
+      },
+    ],
+    0,
+  );
+  repository.apply(
+    [
+      {
+        kind: 'task.create',
+        task: {
+          id: 'task-1',
+          title: 'Task',
+          status: { kind: 'todo' },
+          columnId: 'custom',
+          subtasks: [],
+          comments: [],
+          attachments: [],
+          addedOrder: 1,
+        },
+      },
+    ],
+    1,
+  );
+}
