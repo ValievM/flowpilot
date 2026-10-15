@@ -7,11 +7,12 @@ import { Repository } from '../storage';
 import type { Clock } from '../storage';
 import {
   activateRule,
+  bindRule,
+  deactivateRule,
   exportRuleFile,
   importRuleFile,
   listRules,
 } from './rules-handlers';
-
 const directories: string[] = [];
 const clock: Clock = {
   now: () => Temporal.Instant.from('2026-10-05T12:00:00Z'),
@@ -218,6 +219,56 @@ describe('rules file handlers', () => {
     );
     expect(result).toEqual({ ok: false, error: { kind: 'ValidationFailed' } });
     expect(opened).toBe(false);
+    repository.close();
+  });
+
+  it('deactivates and binds an existing rule through storage', () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [{ kind: 'taskType.create', taskType: { id: 'study', name: 'Учёба' } }],
+      0,
+    );
+    repository.apply([{ kind: 'rule.import', documentJson: validRule }], 1);
+    repository.apply([{ kind: 'rule.activate', ruleId: 'rule-a' }], 2);
+    const deactivated = deactivateRule({ id: 'rule-a' }, { repository });
+    expect(deactivated).toMatchObject({
+      ok: true,
+      value: { id: 'rule-a', status: 'draft', activeDocument: null },
+    });
+    const bound = bindRule(
+      { id: 'rule-a', scope: { task_type_ids: ['study'] } },
+      { repository },
+    );
+    expect(bound).toMatchObject({
+      ok: true,
+      value: {
+        id: 'rule-a',
+        document: { scope: { task_type_ids: ['study'] } },
+      },
+    });
+    expect(repository.load().rules[0]).toMatchObject({
+      status: 'draft',
+      document: { scope: { task_type_ids: ['study'] } },
+    });
+    repository.close();
+  });
+
+  it('returns NotFound for missing rules in every rule command', () => {
+    const { repository } = openRepository();
+    const results = [
+      activateRule({ id: 'missing' }, { repository }),
+      deactivateRule({ id: 'missing' }, { repository }),
+      bindRule(
+        { id: 'missing', scope: { task_type_ids: ['study'] } },
+        { repository },
+      ),
+    ];
+    expect(results).toEqual([
+      { ok: false, error: { kind: 'NotFound' } },
+      { ok: false, error: { kind: 'NotFound' } },
+      { ok: false, error: { kind: 'NotFound' } },
+    ]);
+    expect(repository.load().rules).toEqual([]);
     repository.close();
   });
 

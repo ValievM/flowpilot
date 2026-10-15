@@ -1,6 +1,11 @@
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
-import { lintRules, parseRulesJson, validateRulesDocument } from '../domain';
+import {
+  canActivate,
+  lintRules,
+  parseRulesJson,
+  validateRulesDocument,
+} from '../domain';
 import type {
   RuleDiagnostic,
   RulesDocument,
@@ -233,6 +238,23 @@ export function bindRule(
   );
 }
 
+function isActivationConflict(
+  documentJson: string,
+  snapshot: Snapshot,
+): boolean {
+  const parsedJson = parseRulesJson(documentJson);
+  if (!parsedJson.ok) return false;
+  const validated = validateRulesDocument(parsedJson.value);
+  if (!validated.ok) return false;
+  return !canActivate(
+    validated.document,
+    snapshot.rules.flatMap(({ activeDocument }) =>
+      activeDocument ? [activeDocument] : [],
+    ),
+    { taskTypes: snapshot.taskTypes, disciplines: snapshot.disciplines },
+  );
+}
+
 function applyRuleCommand(
   command: StorageCommand,
   id: string,
@@ -240,14 +262,19 @@ function applyRuleCommand(
 ): RuleResult<StoredRule> {
   try {
     const before = repository.load();
+    const existing = before.rules.find((rule) => rule.id === id);
+    if (!existing) return { ok: false, error: { kind: 'NotFound' } };
+    if (
+      command.kind === 'rule.activate' &&
+      isActivationConflict(existing.documentJson, before)
+    )
+      return { ok: false, error: { kind: 'RuleConflict' } };
     const applied = repository.apply([command], before.revision);
     if (!applied.ok) {
-      if (applied.error.kind === 'StaleRevision')
-        return { ok: false, error: { kind: 'RuleConflict' } };
       return {
         ok: false,
         error:
-          applied.error.message === 'Rule cannot be activated'
+          applied.error.kind === 'StaleRevision'
             ? { kind: 'RuleConflict' }
             : { kind: 'ValidationFailed' },
       };
