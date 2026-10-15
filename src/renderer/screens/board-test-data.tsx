@@ -1,11 +1,8 @@
 import { Temporal } from 'temporal-polyfill';
 import { render } from '@testing-library/react';
 import { vi, type Mock } from 'vitest';
-import type {
-  CommandsApplyRequest,
-  FlowPilotApi,
-  IpcSnapshot,
-} from '../../shared/contracts';
+import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { BoardScreen } from './board-screen';
 
 export const columns: IpcSnapshot['columns'] = [
@@ -149,6 +146,29 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       reply: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
     },
     snapshot: { load: loadMock },
+    history: {
+      list: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
+      undo: vi.fn(() => Promise.resolve({ ok: true as const, value: current })),
+    },
+    attachments: {
+      add: vi.fn(() => Promise.resolve({ ok: true as const, value: current })),
+      open: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+      remove: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: current }),
+      ),
+    },
+    backup: {
+      export: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+      verify: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { packageToken: 'test-token', problems: [] as const },
+        }),
+      ),
+      restore: vi.fn(() =>
+        Promise.resolve({ ok: true as const, value: current }),
+      ),
+    },
     commands: { apply: applyMock },
     settings: {
       get: vi.fn(() => Promise.resolve({ ok: true as const, value: {} })),

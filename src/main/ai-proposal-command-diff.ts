@@ -1,4 +1,4 @@
-import type { Task } from '../domain';
+import type { DiffTask } from './ai-proposal-diff-types';
 import { parseRulesJson, validateRulesDocument } from '../domain';
 import type { AiPlannedCommand } from '../shared/ai-commands';
 import type { AiFieldChange, DiffState } from './ai-proposal-diff-types';
@@ -29,9 +29,9 @@ export function appendClassificationDiff(
 }
 
 function applyClassification(
-  task: Task,
+  task: DiffTask,
   command: Extract<AiPlannedCommand, { kind: 'task.classify' }>,
-): Task {
+): DiffTask {
   const {
     typeId: previousTypeId,
     disciplineId: previousDisciplineId,

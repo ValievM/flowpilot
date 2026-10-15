@@ -123,8 +123,15 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
   return {
     ...snapshot,
     tasks: snapshot.tasks.map((task) => {
-      const { day, time, deadline, rolledOverFrom, status, ...taskFields } =
-        task;
+      const {
+        day,
+        time,
+        deadline,
+        rolledOverFrom,
+        status,
+        comments,
+        ...taskFields
+      } = task;
       const serializedStatus: IpcSnapshot['tasks'][number]['status'] =
         status.kind === 'waiting'
           ? status.until
@@ -137,6 +144,10 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
           : status;
       return {
         ...taskFields,
+        comments: comments.map(({ createdAt, ...comment }) => ({
+          ...comment,
+          createdAt: createdAt?.toString() ?? null,
+        })),
         status: serializedStatus,
         ...(day ? { day: day.toString() } : {}),
         ...(time ? { time: time.toString() } : {}),
@@ -171,6 +182,21 @@ function serializeOutcome(
     newTime: outcome.newTime.toString(),
   };
 }
-function mapApplyError(kind: 'StaleRevision' | 'InvalidCommand'): ErrorCode {
-  return kind === 'StaleRevision' ? 'StaleRevision' : 'ValidationFailed';
+function mapApplyError(
+  kind:
+    | 'StaleRevision'
+    | 'InvalidCommand'
+    | 'FileNotFound'
+    | 'TooLarge'
+    | 'NotReadable',
+): ErrorCode {
+  switch (kind) {
+    case 'StaleRevision':
+    case 'FileNotFound':
+    case 'TooLarge':
+    case 'NotReadable':
+      return kind;
+    case 'InvalidCommand':
+      return 'ValidationFailed';
+  }
 }

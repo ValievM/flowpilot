@@ -134,3 +134,126 @@ test('shows neutral unknown and danger risk colors on Board and All in Electron'
     expect(colors.tight).toBe(colors.expected.danger);
   }
 });
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} all tasks snapshot at ${width.toString()}px`, async () => {
+      const created = await page.evaluate(
+        (today) =>
+          window.flowpilot.commands.apply({
+            expectedRevision: 0,
+            commands: [
+              {
+                kind: 'task.create',
+                task: {
+                  id: 'today-task',
+                  title: 'Курсовая: собрать рабочий прототип',
+                  description: '',
+                  status: { kind: 'todo' },
+                  columnId: 'todo',
+                  day: today,
+                  deadline: '2026-10-09',
+                  estimate: { unit: 'workdays', value: 5 },
+                  subtasks: [],
+                  comments: [],
+                  attachments: [],
+                  addedOrder: 0,
+                },
+              },
+              {
+                kind: 'task.create',
+                task: {
+                  id: 'waiting-task',
+                  title: 'Уточнить тему доклада',
+                  description: '',
+                  status: {
+                    kind: 'waiting',
+                    reason: 'Жду ответа преподавателя',
+                  },
+                  columnId: 'waiting',
+                  day: today,
+                  deadline: '2026-10-12',
+                  subtasks: [],
+                  comments: [],
+                  attachments: [],
+                  addedOrder: 1,
+                },
+              },
+              {
+                kind: 'task.create',
+                task: {
+                  id: 'done-task',
+                  title: 'Отправить конспект семинара',
+                  description: '',
+                  status: { kind: 'done' },
+                  columnId: 'done',
+                  day: today,
+                  subtasks: [],
+                  comments: [],
+                  attachments: [],
+                  addedOrder: 2,
+                },
+              },
+              {
+                kind: 'task.create',
+                task: {
+                  id: 'tomorrow-task',
+                  title: 'Подготовить презентацию доклада',
+                  description: '',
+                  status: { kind: 'todo' },
+                  columnId: 'todo',
+                  day: '2026-10-06',
+                  deadline: '2026-10-16',
+                  subtasks: [],
+                  comments: [],
+                  attachments: [],
+                  addedOrder: 3,
+                },
+              },
+              {
+                kind: 'task.create',
+                task: {
+                  id: 'undated-task',
+                  title:
+                    'Разобрать длинные заметки по алгоритмам без назначенного дня',
+                  description: '',
+                  status: { kind: 'todo' },
+                  columnId: 'todo',
+                  subtasks: [],
+                  comments: [],
+                  attachments: [],
+                  addedOrder: 4,
+                },
+              },
+            ],
+          }),
+        TODAY,
+      );
+      expect(created).toMatchObject({ ok: true });
+      await page.reload();
+      await page.setViewportSize({ width, height: 800 });
+      await page.getByRole('button', { name: 'Настройки' }).click();
+      await page.getByRole('combobox', { name: 'Тема' }).selectOption(theme);
+      await page.getByRole('button', { name: 'Все задачи' }).click();
+      await expect(
+        page.getByRole('heading', { name: 'Все задачи' }),
+      ).toBeVisible();
+      expect(await page.evaluate(() => window.innerWidth)).toBe(width);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+      await page.evaluate(() => {
+        window.getSelection()?.removeAllRanges();
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      await expect(page).toHaveScreenshot(
+        `all-tasks-${theme}-${width.toString()}.png`,
+        { fullPage: true, maxDiffPixelRatio: 0.00001 },
+      );
+    });
+  }
+}

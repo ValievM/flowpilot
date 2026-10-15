@@ -20,11 +20,12 @@ export type SeriesChanges = {
 import type {
   Outcome,
   Series,
+  SubtaskDraft,
   Task,
   TaskColumn,
+  TaskCommentDraft,
+  TaskCreationDraft,
   TaskStatus,
-  Subtask,
-  TaskComment,
   WaitingDetails,
 } from '../domain';
 export type HistoryEntry = {
@@ -100,17 +101,30 @@ type TaskUpdateChanges = Partial<
 };
 
 export type StorageCommand =
-  | { kind: 'task.create'; task: Task }
+  | { kind: 'task.create'; task: TaskCreationDraft }
   | { kind: 'task.update'; id: string; changes: TaskUpdateChanges }
   | { kind: 'task.move'; id: string; columnId: string; status?: TaskStatus }
-  | { kind: 'subtask.add'; taskId: string; subtask: Subtask }
+  | { kind: 'subtask.add'; taskId: string; subtask: SubtaskDraft }
   | {
       kind: 'subtask.complete';
       taskId: string;
       subtaskId: string;
       completed: boolean;
     }
-  | { kind: 'comment.add'; taskId: string; comment: TaskComment }
+  | {
+      kind: 'subtask.rename';
+      taskId: string;
+      subtaskId: string;
+      title: string;
+    }
+  | { kind: 'subtask.remove'; taskId: string; subtaskId: string }
+  | {
+      kind: 'subtask.move';
+      taskId: string;
+      subtaskId: string;
+      position: number;
+    }
+  | { kind: 'comment.add'; taskId: string; comment: TaskCommentDraft }
   | { kind: 'attachment.add'; taskId: string; sourcePath: string }
   | { kind: 'attachment.remove'; attachmentId: string }
   | { kind: 'task.setAiRank'; taskId: string; rank: number }
@@ -189,7 +203,10 @@ export type ApplyResult =
       ok: false;
       error:
         | { kind: 'StaleRevision'; expected: number; actual: number }
-        | { kind: 'InvalidCommand'; message: string };
+        | { kind: 'InvalidCommand'; message: string }
+        | { kind: 'FileNotFound' }
+        | { kind: 'TooLarge' }
+        | { kind: 'NotReadable' };
     };
 
 export type UndoResult =

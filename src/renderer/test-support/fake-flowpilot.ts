@@ -1,11 +1,15 @@
 import type { Temporal } from 'temporal-polyfill';
 import type {
   CommandsApplyRequest,
-  FlowPilotApi,
   IpcSnapshot,
   SettingsSetRequest,
 } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { Result } from '../../shared/ipc-result';
+import {
+  createFakeAppApi,
+  createFakeHistoryFileApi,
+} from './fake-history-file-api';
 
 type TestTask = IpcSnapshot['tasks'][number];
 type Command = CommandsApplyRequest['commands'][number];
@@ -83,8 +87,14 @@ function createdTask(
     status: serializedStatus(task.status),
     columnId: task.columnId,
     addedOrder: task.addedOrder,
-    subtasks: task.subtasks,
-    comments: task.comments,
+    subtasks: task.subtasks.map((subtask, position) => ({
+      ...subtask,
+      position,
+    })),
+    comments: task.comments.map((comment) => ({
+      ...comment,
+      createdAt: null,
+    })),
     attachments: [],
     ...(task.day ? { day: task.day.toString() } : {}),
     ...(task.time ? { time: task.time.toString() } : {}),
@@ -238,6 +248,7 @@ function fakeApiFor(
       get: () => Promise.resolve({ ok: true, value: state.current.settings }),
       set: (request) => apiSetSetting(state, request),
     },
+    ...createFakeHistoryFileApi(() => state.current),
     ai: {
       scenario: () =>
         Promise.resolve({
@@ -252,17 +263,7 @@ function fakeApiFor(
       prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),
       reply: () => Promise.resolve({ ok: false, error: 'NotFound' }),
     },
-    app: {
-      info: () =>
-        Promise.resolve({
-          ok: true,
-          value: {
-            name: 'FlowPilot',
-            version: 'test',
-            now: clock() ?? '2026-10-05T12:00:00Z',
-          },
-        }),
-    },
+    app: createFakeAppApi(clock),
   };
 }
 

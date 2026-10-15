@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { Task, TaskStatus } from '../domain';
+import type { TaskCreationDraft, TaskStatus } from '../domain';
 import type { StorageCommand } from './types';
 import { dateText, timeText } from './sql-values';
 
@@ -7,7 +7,7 @@ type TaskChanges = Extract<StorageCommand, { kind: 'task.update' }>['changes'];
 
 export function insertTask(
   database: Database.Database,
-  task: Task,
+  task: TaskCreationDraft,
   now: string,
 ): void {
   assertStatusMatchesColumn(database, task.columnId, task.status.kind);
@@ -19,7 +19,7 @@ export function insertTask(
 
 function insertTaskRow(
   database: Database.Database,
-  task: Task,
+  task: TaskCreationDraft,
   now: string,
 ): void {
   database
@@ -30,7 +30,10 @@ function insertTaskRow(
     .run(...taskInsertValues(task, now));
 }
 
-function taskInsertValues(task: Task, now: string): (string | number | null)[] {
+function taskInsertValues(
+  task: TaskCreationDraft,
+  now: string,
+): (string | number | null)[] {
   return [
     ...taskIdentityValues(task),
     ...taskScheduleValues(task),
@@ -43,7 +46,7 @@ function taskInsertValues(task: Task, now: string): (string | number | null)[] {
   ];
 }
 
-function taskIdentityValues(task: Task): (string | null)[] {
+function taskIdentityValues(task: TaskCreationDraft): (string | null)[] {
   return [
     task.id,
     task.title,
@@ -54,7 +57,9 @@ function taskIdentityValues(task: Task): (string | null)[] {
   ];
 }
 
-function taskScheduleValues(task: Task): (string | number | null)[] {
+function taskScheduleValues(
+  task: TaskCreationDraft,
+): (string | number | null)[] {
   return [
     dateText(task.day),
     timeText(task.time),
@@ -105,7 +110,10 @@ export function setTaskAiRank(
   if (result.changes === 0) throw new Error('task not found');
 }
 
-function insertTaskSubtasks(database: Database.Database, task: Task): void {
+function insertTaskSubtasks(
+  database: Database.Database,
+  task: TaskCreationDraft,
+): void {
   task.subtasks.forEach((subtask, position) =>
     database
       .prepare(
@@ -123,7 +131,7 @@ function insertTaskSubtasks(database: Database.Database, task: Task): void {
 
 function insertTaskComments(
   database: Database.Database,
-  task: Task,
+  task: TaskCreationDraft,
   now: string,
 ): void {
   task.comments.forEach((comment, position) =>
@@ -135,7 +143,10 @@ function insertTaskComments(
   );
 }
 
-function insertTaskAttachments(database: Database.Database, task: Task): void {
+function insertTaskAttachments(
+  database: Database.Database,
+  task: TaskCreationDraft,
+): void {
   task.attachments.forEach((attachment, position) =>
     database
       .prepare(

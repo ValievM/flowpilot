@@ -845,4 +845,134 @@ describe('persisted today and now screens', () => {
       columnId: 'doing',
     });
   });
+
+  it('shows every status and the matching counts in the all-tasks view', async () => {
+    renderApp([
+      { id: 'today-task', day: today(), addedOrder: 1 },
+      {
+        id: 'waiting-task',
+        day: today(),
+        status: { kind: 'waiting', reason: 'Жду ответ' },
+        addedOrder: 2,
+      },
+      {
+        id: 'done-task',
+        day: today(),
+        status: { kind: 'done' },
+        addedOrder: 3,
+      },
+      { id: 'tomorrow-task', day: '2026-10-06', addedOrder: 4 },
+      { id: 'undated-task', addedOrder: 5 },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Все задачи' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Все 5' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText('Ожидание')).toBeVisible();
+    expect(screen.getByText('Готово')).toBeVisible();
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('filters today and later in domain order, retaining undated work for later', async () => {
+    renderApp([
+      { id: 'today-task', day: today(), addedOrder: 1 },
+      {
+        id: 'tomorrow-task',
+        day: '2026-10-06',
+        deadline: '2026-10-08',
+        addedOrder: 2,
+      },
+      { id: 'undated-task', addedOrder: 3 },
+      {
+        id: 'waiting-task',
+        day: '2026-10-07',
+        status: { kind: 'waiting', reason: 'Жду ответ' },
+        addedOrder: 4,
+      },
+      {
+        id: 'done-task',
+        day: '2026-10-08',
+        status: { kind: 'done' },
+        addedOrder: 5,
+      },
+      {
+        id: 'urgent-later-task',
+        day: '2026-10-07',
+        deadline: '2026-10-06',
+        addedOrder: 6,
+      },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня 1' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText('today-task')).toBeVisible();
+    expect(screen.queryByText('tomorrow-task')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Позже 3' }));
+    const laterRows = screen.getAllByRole('listitem');
+    expect(laterRows).toHaveLength(3);
+    expect(
+      laterRows.map(
+        (row) =>
+          within(row).getByRole('button', { name: /Открыть задачу:/ })
+            .textContent,
+      ),
+    ).toEqual(['urgent-later-task', 'tomorrow-task', 'undated-task']);
+    expect(screen.queryByText('waiting-task')).not.toBeInTheDocument();
+    expect(screen.queryByText('done-task')).not.toBeInTheDocument();
+  });
+
+  it('switches filters with arrow keys and opens a task with Enter', async () => {
+    renderApp([{ id: 'open-me', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    const allFilter = screen.getByRole('button', { name: 'Все 1' });
+    allFilter.focus();
+    fireEvent.keyDown(allFilter, { key: 'ArrowRight' });
+    expect(screen.getByRole('button', { name: 'Сегодня 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Все 1' }));
+    const task = screen.getByRole('button', {
+      name: 'Открыть задачу: open-me',
+    });
+    task.focus();
+    fireEvent.keyDown(task, { key: 'Enter' });
+    expect(
+      await screen.findByRole('complementary', {
+        name: 'Карточка задачи: open-me',
+      }),
+    ).toBeVisible();
+  });
+
+  it('explains empty filters and shows deadline risk without truncating long titles', async () => {
+    renderApp([
+      {
+        id: 'Длинное название задачи, которое должно переноситься при узкой ширине окна',
+        day: today(),
+        deadline: '2026-10-05',
+        estimate: { unit: 'workdays', value: 3 },
+      },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    expect(screen.getByText(/Риск не успеть/)).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: /Длинное название задачи, которое должно переноситься/,
+      }),
+    ).toHaveClass('task-title-button');
+    fireEvent.click(screen.getByRole('button', { name: 'Позже 0' }));
+    expect(
+      screen.getByText(/Нет будущих и нераспределённых задач/),
+    ).toBeVisible();
+  });
 });

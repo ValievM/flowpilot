@@ -26,6 +26,14 @@ test.afterEach(async () => {
   if (app) await app.close();
   removeSmokeProfile(profilePath);
 });
+
+test('exposes an array from the history preload API', async () => {
+  const result = await page.evaluate(() => window.flowpilot.history.list());
+
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(Array.isArray(result.value)).toBe(true);
+});
+
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {

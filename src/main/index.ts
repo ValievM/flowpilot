@@ -1,4 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+} from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
@@ -66,11 +73,29 @@ if (!app.requestSingleInstanceLock()) {
         aiUseCases,
         manualProvider,
         onAppearanceReady: () => windowStartupGate?.ready(),
+        onRepositoryReplaced: (next) => {
+          repository = next;
+        },
+        dialogs: {
+          pickFile: async () => {
+            const choice = await dialog.showOpenDialog({
+              properties: ['openFile'],
+            });
+            return choice.canceled ? undefined : choice.filePaths[0];
+          },
+          pickFolder: async () => {
+            const choice = await dialog.showOpenDialog({
+              properties: ['openDirectory'],
+            });
+            return choice.canceled ? undefined : choice.filePaths[0];
+          },
+        },
+        shell: { open: (filePath) => shell.openPath(filePath) },
+        profilePath: path.join(runtime.profilePath, 'flowpilot.db'),
+        clock: runtime.clock,
       });
       createWindow();
-      app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
-      });
+      app.on('activate', activateWindow);
     })
     .catch((error: unknown) => {
       reportStartupFailure(error, {
@@ -94,6 +119,10 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+function activateWindow(): void {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+}
 
 function createWindow(): void {
   windowStartupGate?.stop();

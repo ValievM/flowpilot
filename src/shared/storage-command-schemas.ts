@@ -73,3 +73,47 @@ export const ruleBindSchema = z
       .strict(),
   })
   .strict();
+export const attachmentAddSchema = z
+  .object({
+    kind: z.literal('attachment.add'),
+    taskId: z.string().min(1),
+    sourcePath: z.string().min(1),
+  })
+  .strict();
+export const attachmentRemoveSchema = z
+  .object({
+    kind: z.literal('attachment.remove'),
+    attachmentId: z.string().min(1),
+  })
+  .strict();
+export const taskSetAiRankSchema = z
+  .object({
+    kind: z.literal('task.setAiRank'),
+    taskId: z.string().min(1),
+    rank: z.number().int().min(0),
+  })
+  .strict();
+export const subtaskRenameSchema = z
+  .object({
+    kind: z.literal('subtask.rename'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+    // Mirrors SUBTASK_TITLE_MAX_LENGTH in src/domain/subtasks.ts.
+    title: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export const subtaskRemoveSchema = z
+  .object({
+    kind: z.literal('subtask.remove'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+  })
+  .strict();
+export const subtaskMoveSchema = z
+  .object({
+    kind: z.literal('subtask.move'),
+    taskId: z.string().min(1),
+    subtaskId: z.string().min(1),
+    position: z.number().int().min(0),
+  })
+  .strict();

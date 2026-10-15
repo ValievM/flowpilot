@@ -4,9 +4,8 @@ import {
   settingFields,
   validateGenericSettingValue,
 } from './command-schema';
-import type { Series, Task, TaskStatus } from '../domain';
-import type { Snapshot } from '../storage';
-import type { Result } from './ipc-result';
+import type { Series, Task, TaskComment, TaskStatus } from '../domain';
+import type { HistoryEntry, Snapshot } from '../storage';
 import type {
   AiCommand,
   AiTaskChanges,
@@ -54,15 +53,19 @@ export type AiIpcProposal = Omit<Proposal, 'commands'> & {
 type IpcTaskStatus =
   | Exclude<TaskStatus, { kind: 'waiting' }>
   | { kind: 'waiting'; reason: string; until?: string };
+type SerializedTaskComment = Omit<TaskComment, 'createdAt'> & {
+  readonly createdAt: string | null;
+};
 type SerializedTask = Omit<
   Task,
-  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status'
+  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status' | 'comments'
 > & {
   readonly day?: string;
   readonly time?: string;
   readonly deadline?: string;
   readonly rolledOverFrom?: string;
   readonly status: IpcTaskStatus;
+  readonly comments: readonly SerializedTaskComment[];
 };
 type SerializedSeries = Omit<Series, 'startsOn' | 'endsOn' | 'time'> & {
   readonly startsOn: string;
@@ -107,7 +110,66 @@ export const ipcChannels = {
   aiScenario: 'ai.scenario',
   appearanceInitialize: 'appearance.initialize',
   appearanceReady: 'appearance.ready',
+  historyList: 'history.list',
+  historyUndo: 'history.undo',
+  attachmentsAdd: 'attachments.add',
+  attachmentsOpen: 'attachments.open',
+  attachmentsRemove: 'attachments.remove',
+  backupExport: 'backup.export',
+  backupVerify: 'backup.verify',
+  backupRestore: 'backup.restore',
 } as const;
+export const historyListRequestSchema = z
+  .object({
+    limit: z.number().int().positive(),
+    before: z.string().min(1).optional(),
+  })
+  .strict();
+export const historyUndoRequestSchema = z
+  .object({ entryId: z.string().min(1).optional() })
+  .strict();
+export const attachmentAddRequestSchema = z
+  .object({ taskId: z.string().min(1) })
+  .strict();
+export const attachmentOpenRequestSchema = z
+  .object({ attachmentId: z.string().min(1) })
+  .strict();
+export const attachmentRemoveRequestSchema = attachmentOpenRequestSchema;
+export const backupExportRequestSchema = z.object({}).strict();
+export const backupVerifyRequestSchema = z.object({}).strict();
+export const backupRestoreRequestSchema = z
+  .object({ packageToken: z.string().min(1) })
+  .strict();
+export type IpcHistoryEntry = HistoryEntry;
+export type BackupVerifyResult =
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly packageToken: string;
+        readonly problems: readonly [];
+      };
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'PackageInvalid';
+      readonly problems: readonly {
+        readonly path: string;
+        readonly message: string;
+      }[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'ValidationFailed' | 'Cancelled';
+    };
+export type HistoryListRequest = z.infer<typeof historyListRequestSchema>;
+export type HistoryUndoRequest = z.infer<typeof historyUndoRequestSchema>;
+export type AttachmentAddRequest = z.infer<typeof attachmentAddRequestSchema>;
+export type AttachmentOpenRequest = z.infer<typeof attachmentOpenRequestSchema>;
+export type AttachmentRemoveRequest = z.infer<
+  typeof attachmentRemoveRequestSchema
+>;
+export type BackupRestoreRequest = z.infer<typeof backupRestoreRequestSchema>;
+
 export const appearanceThemeRequestSchema = z
   .object({ theme: z.enum(['system', 'light', 'dark']) })
   .strict();
@@ -203,34 +265,3 @@ export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
 export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
-
-export type FlowPilotApi = {
-  appearance: {
-    initialize(
-      request: AppearanceInitializeRequest,
-    ): Promise<Result<ThemeChoice>>;
-    ready(): Promise<void>;
-    setTheme(request: ThemeChoiceRequest): Promise<Result<null>>;
-  };
-  snapshot: { load(): Promise<Result<IpcSnapshot>> };
-  commands: {
-    apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
-  };
-  settings: {
-    get(): Promise<Result<Readonly<Record<string, unknown>>>>;
-    set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
-  };
-  ai: {
-    run(request: AiIpcRequest): Promise<AiIpcResult>;
-    scenario(request: AiScenarioRequest): Promise<AiScenarioResult>;
-    cancel(request: { operationId: string }): Promise<AiCancelResult>;
-    prompt(request: { operationId: string }): Promise<Result<string>>;
-    reply(request: {
-      operationId: string;
-      text: string;
-    }): Promise<AiManualReplyResult>;
-  };
-  app: {
-    info(): Promise<Result<AppInfo>>;
-  };
-};

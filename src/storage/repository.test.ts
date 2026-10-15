@@ -30,7 +30,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 12 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);
@@ -67,7 +67,21 @@ describe('Repository', () => {
     });
     repository.close();
     const reopened = new Repository(path, clock);
-    expect(reopened.load().tasks).toEqual([task]);
+    expect(reopened.load().tasks).toEqual([
+      {
+        ...task,
+        subtasks: [
+          { id: 'sub-1', title: 'Outline', completed: true, position: 0 },
+        ],
+        comments: [
+          {
+            id: 'comment-1',
+            text: 'Initial note',
+            createdAt: Temporal.Instant.from('2026-10-05T12:00:00Z'),
+          },
+        ],
+      },
+    ]);
     reopened.close();
   });
 

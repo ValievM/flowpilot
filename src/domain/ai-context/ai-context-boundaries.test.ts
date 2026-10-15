@@ -50,6 +50,7 @@ describe('AI context boundary regressions', () => {
               {
                 id: 'relative',
                 text: 'My Documents/secret report then continue',
+                createdAt: null,
               },
             ],
           }),

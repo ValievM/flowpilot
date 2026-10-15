@@ -40,7 +40,14 @@ function task(): Task {
     description: 'Короткое описание',
     status: { kind: 'todo' },
     columnId: 'todo',
-    subtasks: [{ id: 'sub-1', title: 'Собрать материалы', completed: false }],
+    subtasks: [
+      {
+        id: 'sub-1',
+        title: 'Собрать материалы',
+        completed: false,
+        position: 0,
+      },
+    ],
     comments: [],
     attachments: [],
     addedOrder: 1,
@@ -391,14 +398,17 @@ describe('task detail card', () => {
     }
   });
 
-  it('exposes task fields and omits unsupported attachment actions', () => {
+  it('shows the attachment section and accessible add action', () => {
     renderCard();
     expect(screen.getByLabelText('Описание')).toBeInTheDocument();
     expect(screen.getByLabelText('Колонка')).toBeInTheDocument();
     expect(screen.getByLabelText('День')).toBeInTheDocument();
     expect(screen.getByLabelText('Время')).toBeInTheDocument();
     expect(screen.getByLabelText('Срок')).toBeInTheDocument();
-    expect(screen.queryByText('Вложения')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Файлы' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Добавить файл' }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Закрыть карточку задачи' }),
     ).toBeInTheDocument();

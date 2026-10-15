@@ -1,6 +1,6 @@
 import React from 'react';
 import { Temporal } from 'temporal-polyfill';
-import type { FlowPilotApi } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 
 export interface ClockState {
   readonly today: Temporal.PlainDate;

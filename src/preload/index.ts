@@ -1,10 +1,15 @@
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   ipcChannels,
   type AppInfo,
   type AppearanceInitializeRequest,
+  type AttachmentAddRequest,
+  type AttachmentOpenRequest,
+  type AttachmentRemoveRequest,
+  type BackupVerifyResult,
   type CommandsApplyRequest,
-  type FlowPilotApi,
+  type IpcHistoryEntry,
   type IpcSnapshot,
   type SettingsSetRequest,
   type ThemeChoice,
@@ -52,6 +57,43 @@ const api: FlowPilotApi = Object.freeze({
       ipcRenderer.invoke(ipcChannels.settingsSet, request) as Promise<
         Result<IpcSnapshot>
       >,
+  },
+  history: {
+    list: (limit = 50, before?: string) =>
+      ipcRenderer.invoke(ipcChannels.historyList, { limit, before }) as Promise<
+        Result<readonly IpcHistoryEntry[]>
+      >,
+    undo: (entryId?: string) =>
+      ipcRenderer.invoke(ipcChannels.historyUndo, { entryId }) as Promise<
+        Result<IpcSnapshot>
+      >,
+  },
+  attachments: {
+    add: (request: AttachmentAddRequest) =>
+      ipcRenderer.invoke(ipcChannels.attachmentsAdd, request) as Promise<
+        Result<IpcSnapshot>
+      >,
+    open: (request: AttachmentOpenRequest) =>
+      ipcRenderer.invoke(ipcChannels.attachmentsOpen, request) as Promise<
+        Result<null>
+      >,
+    remove: (request: AttachmentRemoveRequest) =>
+      ipcRenderer.invoke(ipcChannels.attachmentsRemove, request) as Promise<
+        Result<IpcSnapshot>
+      >,
+  },
+  backup: {
+    export: () =>
+      ipcRenderer.invoke(ipcChannels.backupExport, {}) as Promise<Result<null>>,
+    verify: () =>
+      ipcRenderer.invoke(
+        ipcChannels.backupVerify,
+        {},
+      ) as Promise<BackupVerifyResult>,
+    restore: (packageToken: string) =>
+      ipcRenderer.invoke(ipcChannels.backupRestore, {
+        packageToken,
+      }) as Promise<Result<IpcSnapshot>>,
   },
   ai: {
     scenario: (request: AiScenarioRequest) =>

@@ -71,6 +71,38 @@ describe('Repository history and undo', () => {
     expect(reopened.history(10).entries).toHaveLength(2);
     reopened.close();
   });
+  it('repeated undo without an id undoes the newest remaining change then reports empty history', () => {
+    const { repository } = openRepository();
+    repository.apply([{ kind: 'task.create', task: task('task-a', 'A') }], 0);
+    repository.apply([{ kind: 'task.create', task: task('task-b', 'B') }], 1);
+
+    expect(repository.undo()).toMatchObject({ ok: true });
+    expect(repository.load().tasks.map(({ id }) => id)).toEqual(['task-a']);
+    expect(repository.undo()).toMatchObject({ ok: true });
+    expect(repository.load().tasks).toEqual([]);
+    const historyBeforeFinalUndo = repository.history(10).entries;
+
+    expect(repository.undo()).toEqual({
+      ok: false,
+      error: { kind: 'NotUndoable' },
+    });
+    expect(repository.load().tasks).toEqual([]);
+    expect(repository.history(10).entries).toEqual(historyBeforeFinalUndo);
+    repository.close();
+  });
+  it('skips an undone change when selecting the newest change without an id', () => {
+    const { repository } = openRepository();
+    repository.apply([{ kind: 'task.create', task: task('task-a', 'A') }], 0);
+    repository.apply([{ kind: 'task.create', task: task('task-b', 'B') }], 1);
+    expect(repository.undo()).toMatchObject({ ok: true });
+    repository.apply([{ kind: 'task.create', task: task('task-c', 'C') }], 3);
+
+    expect(repository.undo()).toMatchObject({ ok: true });
+    expect(repository.load().tasks.map(({ id }) => id)).toEqual(['task-a']);
+    expect(repository.undo()).toMatchObject({ ok: true });
+    expect(repository.load().tasks).toEqual([]);
+    repository.close();
+  });
   it('returns NotFound for an empty undo entry id without undoing latest', () => {
     const { repository } = openRepository();
     repository.apply(
