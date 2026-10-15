@@ -116,6 +116,86 @@ describe('task detail card', () => {
       ]);
     });
   });
+
+  it('rejects an empty title without saving and restores the previous title', () => {
+    const { applySpy } = renderCard();
+    const title = screen.getByLabelText('Название');
+
+    fireEvent.change(title, { target: { value: '   ' } });
+    fireEvent.blur(title);
+
+    expect(applySpy).not.toHaveBeenCalled();
+    expect(title).toHaveValue('Подготовить проект');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Название не может быть пустым.',
+    );
+  });
+
+  it('rejects invalid estimates and clears a valid estimate with an empty value', async () => {
+    const initialTask = {
+      ...task(),
+      estimate: { unit: 'workdays' as const, value: 4 },
+    };
+    const { applySpy } = renderCard(
+      () => Promise.resolve('saved'),
+      initialTask,
+    );
+    const estimate = screen.getByLabelText('Остаток, рабочие дни');
+
+    for (const value of ['0', '-1', 'текст']) {
+      fireEvent.change(estimate, { target: { value } });
+      fireEvent.blur(estimate);
+      expect(estimate).toHaveValue('4');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Укажите целое число рабочих дней от 1.',
+      );
+      expect(applySpy).not.toHaveBeenCalled();
+    }
+
+    fireEvent.change(estimate, { target: { value: '' } });
+    fireEvent.blur(estimate);
+    await waitFor(() => {
+      expect(applySpy).toHaveBeenCalledWith([
+        {
+          kind: 'task.update',
+          id: 'task-1',
+          changes: { estimate: null },
+        },
+      ]);
+    });
+  });
+
+  it('saves waiting only after a non-empty reason is entered', async () => {
+    const { applySpy } = renderCard();
+    fireEvent.change(screen.getByLabelText('Колонка'), {
+      target: { value: 'waiting' },
+    });
+    const reason = screen.getByLabelText('Причина ожидания');
+    const save = screen.getByRole('button', { name: 'Сохранить ожидание' });
+
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(applySpy).not.toHaveBeenCalled();
+
+    fireEvent.change(reason, { target: { value: '   ' } });
+    expect(save).toBeDisabled();
+    expect(applySpy).not.toHaveBeenCalled();
+
+    fireEvent.change(reason, { target: { value: 'Жду ответ' } });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await waitFor(() => {
+      expect(applySpy).toHaveBeenCalledWith([
+        {
+          kind: 'task.move',
+          id: 'task-1',
+          columnId: 'waiting',
+          status: { kind: 'waiting', reason: 'Жду ответ' },
+        },
+      ]);
+    });
+  });
+
   it('recalculates visible deadline risk through the deadline, estimate, and day fields', async () => {
     let currentTask = task();
     let updateTaskView: (nextTask: Task) => void = () => {};
