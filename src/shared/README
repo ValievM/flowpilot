@@ -13,6 +13,17 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
   `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
 - `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
   where `now` is the ISO timestamp from the main-process clock.
+- `catalog.list()` (`catalog.list`): empty strict request; returns task types and
+  disciplines. Catalog mutations use the validated `commands.apply()` channel.
+- `rules.list()` (`rules.list`): empty strict request; returns rule documents,
+  status, validation errors, diagnostics, and accepted versions.
+- `rules.importFile()` (`rules.importFile`): empty strict request; main opens a
+  JSON file dialog, checks the 1 MiB limit before reading, validates the file,
+  and returns a draft or path-specific `RuleInvalid` errors.
+- `rules.exportFile({ id })` (`rules.exportFile`): main opens a save dialog and
+  writes only the accepted rule version. `rules.activate`, `rules.deactivate`,
+  and `rules.bind` accept strict rule-id/scope requests and return the updated
+  rule. Cancellation and activation conflicts are explicit result errors.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
 `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and

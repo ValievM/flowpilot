@@ -70,10 +70,44 @@ export type IpcSnapshot = Omit<
 > & {
   readonly tasks: readonly SerializedTask[];
 };
+export type IpcCatalog = Pick<Snapshot, 'taskTypes' | 'disciplines'>;
+export type IpcStoredRule = Snapshot['rules'][number];
+
+export type IpcRuleIssue = {
+  readonly path: string;
+  readonly code: string;
+  readonly reason: string;
+  readonly suggestion: string;
+};
+export type IpcRuleResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | {
+      readonly ok: false;
+      readonly error:
+        | {
+            readonly kind:
+              | 'ValidationFailed'
+              | 'Cancelled'
+              | 'NotFound'
+              | 'RuleConflict'
+              | 'InternalError';
+          }
+        | {
+            readonly kind: 'RuleInvalid';
+            readonly errors: readonly IpcRuleIssue[];
+          };
+    };
 
 export const ipcChannels = {
   snapshotLoad: 'snapshot.load',
   commandsApply: 'commands.apply',
+  catalogList: 'catalog.list',
+  rulesList: 'rules.list',
+  rulesImportFile: 'rules.importFile',
+  rulesExportFile: 'rules.exportFile',
+  rulesActivate: 'rules.activate',
+  rulesDeactivate: 'rules.deactivate',
+  rulesBind: 'rules.bind',
   settingsGet: 'settings.get',
   settingsSet: 'settings.set',
   appInfo: 'app.info',
@@ -128,6 +162,22 @@ export type AiCancelResult =
   | { readonly ok: true; readonly value: null }
   | { readonly ok: false; readonly error: 'ValidationFailed' };
 
+export const catalogListRequestSchema = z.object({}).strict();
+export const rulesListRequestSchema = z.object({}).strict();
+export const rulesImportFileRequestSchema = z.object({}).strict();
+export const ruleIdRequestSchema = z.object({ id: z.string().min(1) }).strict();
+export const ruleBindRequestSchema = z
+  .object({
+    id: z.string().min(1),
+    scope: z
+      .object({
+        task_type_ids: z.array(z.string().min(1)),
+        discipline_ids: z.array(z.string().min(1)).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const snapshotLoadRequestSchema = z.object({}).strict();
 export const commandsApplyRequestSchema = z
   .object({
@@ -156,6 +206,8 @@ export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
 export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
+export type RuleIdRequest = z.infer<typeof ruleIdRequestSchema>;
+export type RuleBindRequest = z.infer<typeof ruleBindRequestSchema>;
 
 export type FlowPilotApi = {
   appearance: {
@@ -168,6 +220,23 @@ export type FlowPilotApi = {
   snapshot: { load(): Promise<Result<IpcSnapshot>> };
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
+  };
+  catalog: {
+    list(): Promise<Result<Pick<Snapshot, 'taskTypes' | 'disciplines'>>>;
+  };
+  rules: {
+    list(): Promise<Result<Snapshot['rules']>>;
+    importFile(): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
+    exportFile(request: RuleIdRequest): Promise<IpcRuleResult<null>>;
+    activate(
+      request: RuleIdRequest,
+    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
+    deactivate(
+      request: RuleIdRequest,
+    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
+    bind(
+      request: RuleBindRequest,
+    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
   };
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;

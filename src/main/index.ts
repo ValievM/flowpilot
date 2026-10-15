@@ -55,6 +55,21 @@ if (!app.requestSingleInstanceLock()) {
       );
       registerIpcHandlers(ipcMain, {
         repository,
+        ruleDialogs: {
+          openRulesFile: async () => {
+            const choice = await dialog.showOpenDialog({
+              properties: ['openFile'],
+              filters: [{ name: 'JSON', extensions: ['json'] }],
+            });
+            return choice.canceled ? undefined : choice.filePaths[0];
+          },
+          saveRulesFile: async () => {
+            const choice = await dialog.showSaveDialog({
+              filters: [{ name: 'JSON', extensions: ['json'] }],
+            });
+            return choice.canceled ? undefined : choice.filePath;
+          },
+        },
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),

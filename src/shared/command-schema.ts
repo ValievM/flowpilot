@@ -288,4 +288,10 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   columnRenameSchema,
   columnDeleteSchema,
   genericSettingCommandSchema,
+  taskTypeCreateSchema,
+  taskTypeRenameSchema,
+  taskTypeDeleteSchema,
+  disciplineCreateSchema,
+  disciplineRenameSchema,
+  disciplineDeleteSchema,
 ]);

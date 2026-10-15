@@ -14,4 +14,5 @@ export type {
   Snapshot,
   StorageCommand,
   UndoResult,
+  StoredRule,
 } from './types';

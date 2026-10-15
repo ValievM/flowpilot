@@ -138,6 +138,47 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       reply: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
     },
     snapshot: { load: loadMock },
+    catalog: {
+      list: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: { taskTypes: [], disciplines: [] },
+        }),
+      ),
+    },
+    rules: {
+      list: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
+      importFile: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'Cancelled' as const },
+        }),
+      ),
+      exportFile: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'NotFound' as const },
+        }),
+      ),
+      activate: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'NotFound' as const },
+        }),
+      ),
+      deactivate: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'NotFound' as const },
+        }),
+      ),
+      bind: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'NotFound' as const },
+        }),
+      ),
+    },
     commands: { apply: applyMock },
     settings: {
       get: vi.fn(() => Promise.resolve({ ok: true as const, value: {} })),

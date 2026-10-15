@@ -33,7 +33,9 @@ describe('preload bridge', () => {
       'ai',
       'app',
       'appearance',
+      'catalog',
       'commands',
+      'rules',
       'settings',
       'snapshot',
     ]);

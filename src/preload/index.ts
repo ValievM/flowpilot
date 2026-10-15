@@ -6,6 +6,11 @@ import {
   type CommandsApplyRequest,
   type FlowPilotApi,
   type IpcSnapshot,
+  type IpcCatalog,
+  type IpcStoredRule,
+  type IpcRuleResult,
+  type RuleIdRequest,
+  type RuleBindRequest,
   type SettingsSetRequest,
   type ThemeChoice,
   type ThemeChoiceRequest,
@@ -39,6 +44,38 @@ const api: FlowPilotApi = Object.freeze({
     apply: (request: CommandsApplyRequest) =>
       ipcRenderer.invoke(ipcChannels.commandsApply, request) as Promise<
         Result<IpcSnapshot>
+      >,
+  },
+  catalog: {
+    list: () =>
+      ipcRenderer.invoke(ipcChannels.catalogList, {}) as Promise<
+        Result<IpcCatalog>
+      >,
+  },
+  rules: {
+    list: () =>
+      ipcRenderer.invoke(ipcChannels.rulesList, {}) as Promise<
+        Result<readonly IpcStoredRule[]>
+      >,
+    importFile: () =>
+      ipcRenderer.invoke(ipcChannels.rulesImportFile, {}) as Promise<
+        IpcRuleResult<IpcStoredRule>
+      >,
+    exportFile: (request: RuleIdRequest) =>
+      ipcRenderer.invoke(ipcChannels.rulesExportFile, request) as Promise<
+        IpcRuleResult<null>
+      >,
+    activate: (request: RuleIdRequest) =>
+      ipcRenderer.invoke(ipcChannels.rulesActivate, request) as Promise<
+        IpcRuleResult<IpcStoredRule>
+      >,
+    deactivate: (request: RuleIdRequest) =>
+      ipcRenderer.invoke(ipcChannels.rulesDeactivate, request) as Promise<
+        IpcRuleResult<IpcStoredRule>
+      >,
+    bind: (request: RuleBindRequest) =>
+      ipcRenderer.invoke(ipcChannels.rulesBind, request) as Promise<
+        IpcRuleResult<IpcStoredRule>
       >,
   },
   settings: {

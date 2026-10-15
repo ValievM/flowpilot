@@ -2,24 +2,15 @@ import { ipcChannels } from '../shared/contracts';
 import type { Repository } from '../storage/repository';
 import { nativeTheme, type IpcMain } from 'electron';
 import { applyAppearanceTheme, initializeAppearanceTheme } from './appearance';
-import {
-  applyCommands,
-  getAppInfo,
-  getSettings,
-  loadSnapshot,
-  setSetting,
-} from './handlers';
-import {
-  cancelAiRequest,
-  getManualPrompt,
-  runAiRequest,
-  submitManualReply,
-} from './ai/ipc';
+import { applyCommands, loadSnapshot } from './handlers';
 import type { AiRunner } from './ai/ai-runner';
 import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
+import type { RuleFileDependencies } from './rules-handlers';
+import { registerFeatureIpcHandlers } from './ipc-feature-handlers';
 
 type RegistrationDependencies = {
   readonly repository: Repository;
+  readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly appInfo: {
     getName(): string;
     getVersion(): string;
@@ -55,25 +46,5 @@ export function registerIpcHandlers(
   ipc.handle(ipcChannels.commandsApply, (_event, request: unknown) =>
     applyCommands(request, deps),
   );
-  ipc.handle(ipcChannels.settingsGet, (_event, request: unknown) =>
-    getSettings(request, deps),
-  );
-  ipc.handle(ipcChannels.settingsSet, (_event, request: unknown) =>
-    setSetting(request, deps),
-  );
-  ipc.handle(ipcChannels.appInfo, (_event, request: unknown) =>
-    getAppInfo(request, deps.appInfo),
-  );
-  ipc.handle(ipcChannels.aiRun, (_event, request: unknown) =>
-    runAiRequest(request, deps.aiRunner, deps.repository.load()),
-  );
-  ipc.handle(ipcChannels.aiCancel, (_event, request: unknown) =>
-    cancelAiRequest(request, deps.aiRunner),
-  );
-  ipc.handle(ipcChannels.aiPrompt, (_event, request: unknown) =>
-    getManualPrompt(request, deps.manualProvider),
-  );
-  ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
-    submitManualReply(request, deps.manualProvider),
-  );
+  registerFeatureIpcHandlers(ipc, deps);
 }
