@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { findUndoEntry, type UndoLogRow } from './history-undo-selection';
 import {
   restoreEntity,
   snapshotEntity,
@@ -15,14 +16,6 @@ type AttachmentFiles = {
   restoreFromTrash(id: string): boolean;
   moveToTrash(id: string): boolean;
 };
-type LogRow = {
-  id: string;
-  revision: number;
-  occurred_at: string;
-  source: string;
-  batch_id: string | null;
-  undone_entry_id: string | null;
-};
 type EntityRow = {
   entity_kind: string;
   entity_id: string;
@@ -37,7 +30,7 @@ type UndoRecord = {
   after: EntitySnapshot;
 };
 type UndoPlan = {
-  entry: LogRow;
+  entry: UndoLogRow;
   records: UndoRecord[];
   attachmentChanges: { restore: string[]; trash: string[] };
 };
@@ -80,8 +73,15 @@ function createUndoPlan(
   database: Database.Database,
   entryId: string | undefined,
 ): { plan: UndoPlan } | { result: UndoResult } {
-  const entry = findEntry(database, entryId);
-  if (!entry) return { result: { ok: false, error: { kind: 'NotFound' } } };
+  const entry = findUndoEntry(database, entryId);
+
+  if (!entry)
+    return {
+      result: {
+        ok: false,
+        error: { kind: entryId === undefined ? 'NotUndoable' : 'NotFound' },
+      },
+    };
   if (entry.source === 'restore')
     return {
       result: {
@@ -177,24 +177,6 @@ function restoreUndoRecords(
     .forEach(({ before }) => {
       restoreEntity(database, before);
     });
-}
-function findEntry(
-  database: Database.Database,
-  entryId?: string,
-): LogRow | undefined {
-  const row =
-    entryId !== undefined
-      ? database
-          .prepare(
-            'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log WHERE id = ?',
-          )
-          .get(entryId)
-      : database
-          .prepare(
-            'SELECT id,revision,occurred_at,source,batch_id,undone_entry_id FROM change_log ORDER BY revision DESC LIMIT 1',
-          )
-          .get();
-  return row as LogRow | undefined;
 }
 
 function isUndone(database: Database.Database, entryId: string): boolean {
