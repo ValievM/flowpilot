@@ -223,6 +223,10 @@ test('AC-04 release-1: Waiting requires a reason, stays out of Сейчас, and
   await deleteDialog.getByLabel('Переместить карточки в').selectOption('todo');
   await expect(confirmDelete).toBeEnabled();
   await confirmDelete.click();
+  const todoColumn = page.getByRole('region', { name: 'Сделать' });
+  await expect(
+    todoColumn.getByRole('article', { name: 'Задача: Перенос при удалении' }),
+  ).toHaveCount(1);
   await openView('Сейчас');
   await expect(
     page.getByRole('heading', { name: 'Ответ преподавателя' }),
