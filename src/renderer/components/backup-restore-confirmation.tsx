@@ -31,6 +31,9 @@ export function BackupRestoreConfirmation({
       ref={dialogRef}
       className="quick-dialog"
       aria-labelledby="backup-confirm-heading"
+      onCancel={(event) => {
+        if (isRestoring) event.preventDefault();
+      }}
       onClose={onClose}
     >
       <h2 id="backup-confirm-heading">Подтвердите восстановление</h2>

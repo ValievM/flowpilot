@@ -109,6 +109,7 @@ export function BackupRestorePanel({
   };
 
   const closeConfirmation = (): void => {
+    if (restoreStartedRef.current) return;
     busyRef.current = false;
     restoreStartedRef.current = false;
     restoreFocusRef.current = true;

@@ -261,6 +261,41 @@ describe('backup restore panel', () => {
     finishRestore?.({ ok: true, value: snapshotResult.value });
     await screen.findByText('Данные восстановлены.');
   });
+  it('keeps confirmation locked when Escape is pressed during restore', async () => {
+    const snapshotResult = await fakeApi().api.snapshot.load();
+    if (!snapshotResult.ok) throw new Error('Missing fake snapshot');
+    let finishRestore: ((result: Result<IpcSnapshot>) => void) | undefined;
+    const restore = vi.fn(
+      () =>
+        new Promise<Result<IpcSnapshot>>((resolve) => {
+          finishRestore = resolve;
+        }),
+    );
+    const refresh = vi.fn(() => Promise.resolve(snapshotResult.value));
+    renderPanel({ restore }, refresh);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Восстановить из папки' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Подтвердите восстановление',
+    });
+    const restoreButton = withinDialogButton(dialog, 'Восстановить данные');
+    fireEvent.click(restoreButton);
+
+    const escape = new Event('cancel', { cancelable: true });
+    dialog.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(dialog).toHaveAttribute('open');
+    expect(restoreButton).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Восстановить из папки' }),
+    );
+    expect(restore).toHaveBeenCalledOnce();
+
+    finishRestore?.({ ok: true, value: snapshotResult.value });
+    await screen.findByText('Данные восстановлены.');
+  });
 });
 
 function withinDialogButton(dialog: HTMLElement, name: string): HTMLElement {
