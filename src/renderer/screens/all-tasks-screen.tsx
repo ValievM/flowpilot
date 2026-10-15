@@ -26,6 +26,104 @@ function emptyMessage(filter: Filter): string {
   return 'Задач пока нет. Добавьте первую задачу, и она появится здесь.';
 }
 
+function TaskTitleButton({
+  task,
+  onOpenTask,
+}: {
+  readonly task: Task;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
+}): React.JSX.Element {
+  return (
+    <h2>
+      <button
+        className="task-title-button"
+        type="button"
+        aria-label={`Открыть задачу: ${task.title}`}
+        onClick={(event) => {
+          onOpenTask(task.id, event.currentTarget);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            onOpenTask(task.id, event.currentTarget);
+          }
+        }}
+      >
+        {task.title}
+      </button>
+    </h2>
+  );
+}
+
+function TaskRisk({
+  risk,
+  riskKind,
+  riskTitle,
+}: {
+  readonly risk: string;
+  readonly riskKind: string | undefined;
+  readonly riskTitle: string | undefined;
+}): React.JSX.Element {
+  return (
+    <p
+      className={`risk-label${
+        riskKind
+          ? ` risk-${riskKind}${riskKind === 'unknown' ? '' : ' is-risk'}`
+          : ''
+      }`}
+      data-risk-kind={riskKind}
+      title={riskTitle}
+    >
+      <span className="risk-icon" aria-hidden="true">
+        !
+      </span>
+      {riskTitle && <strong>{riskTitle}: </strong>}
+      {risk}
+    </p>
+  );
+}
+
+function TaskCopy({
+  task,
+  today,
+  workdays,
+  onOpenTask,
+}: {
+  readonly task: Task;
+  readonly today: TemporalTypes.PlainDate;
+  readonly workdays: ReadonlySet<number>;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
+}): React.JSX.Element {
+  const summary = taskSummaryData(task, today, workdays);
+  const metadata = [
+    ...(task.disciplineId ? [task.disciplineId] : []),
+    `Срок: ${summary.due}`,
+  ];
+  return (
+    <div className="task-copy">
+      <TaskTitleButton task={task} onOpenTask={onOpenTask} />
+      <div className="task-meta">
+        {metadata.map((value, itemIndex) => (
+          <React.Fragment key={value}>
+            {itemIndex > 0 && <span aria-hidden="true">·</span>}
+            <span>{value}</span>
+          </React.Fragment>
+        ))}
+      </div>
+      {task.status.kind === 'waiting' && (
+        <p className="task-meta">Причина ожидания: {task.status.reason}</p>
+      )}
+      {summary.risk && (
+        <TaskRisk
+          risk={summary.risk}
+          riskKind={summary.riskKind}
+          riskTitle={summary.riskTitle}
+        />
+      )}
+    </div>
+  );
+}
+
 function TaskRow({
   task,
   index,
@@ -39,12 +137,7 @@ function TaskRow({
   readonly workdays: ReadonlySet<number>;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
-  const summary = taskSummaryData(task, today, workdays);
   const state = task.status.kind;
-  const metadata = [
-    ...(task.disciplineId ? [task.disciplineId] : []),
-    `Срок: ${summary.due}`,
-  ];
   return (
     <li>
       <article
@@ -53,55 +146,107 @@ function TaskRow({
         <span className="task-number" aria-hidden="true">
           {String(index + 1).padStart(2, '0')}
         </span>
-        <div className="task-copy">
-          <h2>
-            <button
-              className="task-title-button"
-              type="button"
-              aria-label={`Открыть задачу: ${task.title}`}
-              onClick={(event) => {
-                onOpenTask(task.id, event.currentTarget);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  onOpenTask(task.id, event.currentTarget);
-                }
-              }}
-            >
-              {task.title}
-            </button>
-          </h2>
-          <div className="task-meta">
-            {metadata.map((value, itemIndex) => (
-              <React.Fragment key={value}>
-                {itemIndex > 0 && <span aria-hidden="true">·</span>}
-                <span>{value}</span>
-              </React.Fragment>
-            ))}
-          </div>
-          {state === 'waiting' && (
-            <p className="task-meta">Причина ожидания: {task.status.reason}</p>
-          )}
-          {summary.risk && (
-            <p
-              className={`risk-label${summary.riskKind ? ` risk-${summary.riskKind}${summary.riskKind === 'unknown' ? '' : ' is-risk'}` : ''}`}
-              data-risk-kind={summary.riskKind}
-              title={summary.riskTitle}
-            >
-              <span className="risk-icon" aria-hidden="true">
-                !
-              </span>
-              {summary.riskTitle && <strong>{summary.riskTitle}: </strong>}
-              {summary.risk}
-            </p>
-          )}
-        </div>
+        <TaskCopy
+          task={task}
+          today={today}
+          workdays={workdays}
+          onOpenTask={onOpenTask}
+        />
         <span className={`state-label state-${state}`}>
           {statusLabels[state]}
         </span>
       </article>
     </li>
+  );
+}
+
+function FilterButtons({
+  filter,
+  counts,
+  onChange,
+}: {
+  readonly filter: Filter;
+  readonly counts: Record<Filter, number>;
+  readonly onChange: (filter: Filter) => void;
+}): React.JSX.Element {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    const current = filters.indexOf(filter);
+    let next: number | undefined;
+    if (event.key === 'ArrowRight') next = (current + 1) % filters.length;
+    if (event.key === 'ArrowLeft')
+      next = (current + filters.length - 1) % filters.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = filters.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    const nextFilter = filters[next];
+    if (!nextFilter) return;
+    onChange(nextFilter);
+    const buttons =
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('button');
+    buttons.item(next).focus();
+  };
+
+  return (
+    <div
+      className="all-task-filters"
+      role="group"
+      aria-label="Фильтр задач"
+      onKeyDown={handleKeyDown}
+    >
+      {filters.map((item) => (
+        <button
+          key={item}
+          type="button"
+          aria-pressed={filter === item}
+          onClick={() => {
+            onChange(item);
+          }}
+        >
+          {filterLabels[item]} <span>{counts[item]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TaskList({
+  tasks,
+  filter,
+  today,
+  workdays,
+  onOpenTask,
+}: {
+  readonly tasks: readonly Task[];
+  readonly filter: Filter;
+  readonly today: TemporalTypes.PlainDate;
+  readonly workdays: ReadonlySet<number>;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
+}): React.JSX.Element {
+  return (
+    <section
+      className="all-task-list"
+      aria-label={`${filterLabels[filter]}: ${String(tasks.length)}`}
+    >
+      {tasks.length > 0 ? (
+        <ol className="task-list">
+          {tasks.map((task, index) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              index={index}
+              today={today}
+              workdays={workdays}
+              onOpenTask={onOpenTask}
+            />
+          ))}
+        </ol>
+      ) : (
+        <p className="all-tasks-empty" role="status">
+          {emptyMessage(filter)}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -123,24 +268,10 @@ export function AllTasksScreen({
     later: laterView(tasks, today),
   };
   const visibleTasks = lists[filter];
-  const handleFilterKeyDown = (
-    event: React.KeyboardEvent<HTMLDivElement>,
-  ): void => {
-    const current = filters.indexOf(filter);
-    let next: number | undefined;
-    if (event.key === 'ArrowRight') next = (current + 1) % filters.length;
-    if (event.key === 'ArrowLeft')
-      next = (current + filters.length - 1) % filters.length;
-    if (event.key === 'Home') next = 0;
-    if (event.key === 'End') next = filters.length - 1;
-    if (next === undefined) return;
-    event.preventDefault();
-    const nextFilter = filters[next];
-    if (!nextFilter) return;
-    setFilter(nextFilter);
-    const buttons =
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('button');
-    buttons.item(next).focus();
+  const counts = {
+    all: lists.all.length,
+    today: lists.today.length,
+    later: lists.later.length,
   };
   return (
     <section className="all-tasks-screen">
@@ -150,49 +281,15 @@ export function AllTasksScreen({
           <h1>Все задачи</h1>
           <p className="page-subtitle">Один список для всех дел и состояний.</p>
         </div>
-        <div
-          className="all-task-filters"
-          role="group"
-          aria-label="Фильтр задач"
-          onKeyDown={handleFilterKeyDown}
-        >
-          {filters.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={filter === item}
-              onClick={() => {
-                setFilter(item);
-              }}
-            >
-              {filterLabels[item]} <span>{lists[item].length}</span>
-            </button>
-          ))}
-        </div>
+        <FilterButtons filter={filter} counts={counts} onChange={setFilter} />
       </header>
-      <section
-        className="all-task-list"
-        aria-label={`${filterLabels[filter]}: ${String(visibleTasks.length)}`}
-      >
-        {visibleTasks.length > 0 ? (
-          <ol className="task-list">
-            {visibleTasks.map((task, index) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                index={index}
-                today={today}
-                workdays={workdays}
-                onOpenTask={onOpenTask}
-              />
-            ))}
-          </ol>
-        ) : (
-          <p className="all-tasks-empty" role="status">
-            {emptyMessage(filter)}
-          </p>
-        )}
-      </section>
+      <TaskList
+        tasks={visibleTasks}
+        filter={filter}
+        today={today}
+        workdays={workdays}
+        onOpenTask={onOpenTask}
+      />
     </section>
   );
 }
