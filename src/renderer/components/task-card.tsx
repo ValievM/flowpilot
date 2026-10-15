@@ -11,6 +11,18 @@ import { TaskCardStatusFields } from './task-card-status-fields';
 import { TaskCardTextFields } from './task-card-text-fields';
 import type { TaskUpdateChanges } from './task-card-types';
 
+function taskDraftValues(task: Task): {
+  readonly title: string;
+  readonly description: string;
+  readonly estimate: string;
+} {
+  return {
+    title: task.title,
+    description: task.description ?? '',
+    estimate: task.estimate?.value.toString() ?? '',
+  };
+}
+
 export function TaskCard({
   task,
   state,
@@ -24,11 +36,27 @@ export function TaskCard({
   readonly workdays: ReadonlySet<number>;
   readonly onClose: () => void;
 }): React.JSX.Element {
-  const [title, setTitle] = React.useState(task.title);
-  const [description, setDescription] = React.useState(task.description ?? '');
-  const [estimate, setEstimate] = React.useState(
-    task.estimate?.value.toString() ?? '',
+  const initialDraft = taskDraftValues(task);
+  const [title, setTitle] = React.useState(initialDraft.title);
+  const [description, setDescription] = React.useState(
+    initialDraft.description,
   );
+  const [estimate, setEstimate] = React.useState(initialDraft.estimate);
+  const previousTask = React.useRef(task);
+  const previousDraft = React.useRef(initialDraft);
+  React.useEffect(() => {
+    if (previousTask.current !== task) {
+      const previous = previousDraft.current;
+      const next = taskDraftValues(task);
+      setTitle(title === previous.title ? next.title : title);
+      setDescription(
+        description === previous.description ? next.description : description,
+      );
+      setEstimate(estimate === previous.estimate ? next.estimate : estimate);
+      previousTask.current = task;
+      previousDraft.current = next;
+    }
+  }, [task, title, description, estimate]);
   const [message, setMessage] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const risk = deadlineRisk(task, today, workdays);

@@ -330,6 +330,42 @@ describe('task detail card', () => {
     }
   });
 
+  it('refreshes clean fields after a stale update while keeping the edited draft', async () => {
+    const { applySpy, rerenderTask } = renderCard(() =>
+      Promise.resolve('stale'),
+    );
+    const title = screen.getByLabelText('Название');
+    fireEvent.change(title, { target: { value: 'Мой черновик' } });
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Новый комментарий' }),
+      { target: { value: 'Комментарий' } },
+    );
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Комментарии' })).getByRole(
+        'button',
+        { name: 'Добавить' },
+      ),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Данные задачи изменились. Показана актуальная карточка; повторите изменение.',
+    );
+
+    rerenderTask({
+      ...task(),
+      title: 'Внешнее название',
+      description: 'Актуальное описание',
+      estimate: { unit: 'workdays', value: 6 },
+    });
+
+    expect(title).toHaveValue('Мой черновик');
+    const description = screen.getByLabelText('Описание');
+    const estimate = screen.getByLabelText('Остаток, рабочие дни');
+    expect(description).toHaveValue('Актуальное описание');
+    expect(estimate).toHaveValue('6');
+    fireEvent.blur(description);
+    expect(applySpy).toHaveBeenCalledTimes(1);
+  });
+
   it('announces a stale update and keeps the comment command payload', async () => {
     const { applySpy } = renderCard(() => Promise.resolve('stale'));
     fireEvent.change(
