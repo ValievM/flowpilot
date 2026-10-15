@@ -203,7 +203,7 @@ test('AC-09 release-1: risk interface matches table rows 2, 4, 10, and 12', asyn
   );
 });
 
-test('AC-12 release-1: persisted cards remain after restarting the same profile; undo is not present', async () => {
+test('AC-12 release-1: persisted cards remain after restarting the same profile; history controls are available', async () => {
   await seed([
     {
       id: 'ac12-persisted',
@@ -223,5 +223,6 @@ test('AC-12 release-1: persisted cards remain after restarting the same profile;
   await expect(
     page.getByRole('heading', { name: 'Сохранённая карточка', level: 3 }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: /отменить/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Отменить' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'История' })).toBeVisible();
 });
