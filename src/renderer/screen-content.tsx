@@ -1,12 +1,11 @@
 import React from 'react';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
-import { TaskSummary } from './components/task-summary';
+import { AllTasksScreen } from './screens/all-tasks-screen';
 import { BoardScreen } from './screens/board-screen';
 import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
-import { taskSummaryData } from './task-summary-data';
 import type { MotionChoice } from './use-reduced-motion';
 import type { ThemeChoice } from '../shared/contracts';
 import type { View } from './types';
@@ -67,28 +66,12 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
     return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')
     return (
-      <section className="simple-screen">
-        <p className="eyebrow">ЛИЧНОЕ / ВСЕ ЗАДАЧИ</p>
-        <h1>Все задачи</h1>
-        <div className="all-task-list">
-          {props.tasks.map((task) => (
-            <div className="task-summary-entry" key={task.id}>
-              <TaskSummary
-                task={taskSummaryData(task, props.today, props.workdays)}
-              />
-              <button
-                className="button"
-                type="button"
-                onClick={(event) => {
-                  props.onOpenTask(task.id, event.currentTarget);
-                }}
-              >
-                Открыть задачу
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+      <AllTasksScreen
+        tasks={props.tasks}
+        today={props.today}
+        workdays={props.workdays}
+        onOpenTask={props.onOpenTask}
+      />
     );
   return (
     <SettingsScreen
