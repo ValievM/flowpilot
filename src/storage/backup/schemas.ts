@@ -171,7 +171,21 @@ const backupSeries = z
     created_at: z.string(),
     updated_at: z.string(),
   })
-  .strict();
+  .strict()
+  .superRefine((series, context) => {
+    if (
+      series.ends_on !== null &&
+      Temporal.PlainDate.compare(
+        Temporal.PlainDate.from(series.ends_on),
+        Temporal.PlainDate.from(series.starts_on),
+      ) < 0
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['ends_on'],
+        message: 'Дата окончания серии раньше даты начала',
+      });
+  });
 const backupOutcome = z
   .object({
     series_id: z.string().min(1),

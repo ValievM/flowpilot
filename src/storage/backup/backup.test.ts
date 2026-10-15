@@ -234,6 +234,53 @@ describe('backup package', () => {
     expect(current.load()).toEqual(expected);
     current.close();
   });
+  it('rejects a backup with an inverted series range without replacing the profile', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.create',
+            series: {
+              id: 'series-1',
+              title: 'Серия',
+              weekdays: [1],
+              startsOn: Temporal.PlainDate.from('2026-10-06'),
+            },
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    const expected = repository.load();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const data = z
+      .object({
+        series: z.array(
+          z
+            .object({
+              starts_on: z.string(),
+              ends_on: z.string().nullable(),
+            })
+            .loose(),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'data.json')));
+    const series = data.series[0];
+    if (!series) throw new Error('missing exported series');
+    series.ends_on = '2026-10-05';
+    save(join(packageDir, 'data.json'), data);
+    updateDataHash(packageDir);
+
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
+    const current = new Repository(profile, clock);
+    expect(current.load()).toEqual(expected);
+    current.close();
+  });
 
   it('rejects modified attachment bytes by checksum', () => {
     const { root, profile, repository } = setup();
