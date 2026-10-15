@@ -4,10 +4,15 @@ import type {
   FlowPilotApi,
   IpcSnapshot,
 } from '../../shared/contracts';
+import { BackupRestoreFeedback } from './backup-restore-feedback';
+import { BackupExportControl } from './backup-export-control';
 import { BackupRestoreConfirmation } from './backup-restore-confirmation';
 
 interface BackupRestorePanelProps {
-  readonly backup: Pick<FlowPilotApi['backup'], 'verify' | 'restore'>;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
   readonly onRestored: () => Promise<IpcSnapshot | undefined>;
 }
 
@@ -30,6 +35,7 @@ export function BackupRestorePanel({
   const busyRef = React.useRef(false);
   const restoreStartedRef = React.useRef(false);
   const restoreFocusRef = React.useRef(false);
+  const [exporting, setExporting] = React.useState(false);
 
   React.useEffect(() => {
     if (phase === 'idle' && restoreFocusRef.current) {
@@ -85,7 +91,13 @@ export function BackupRestorePanel({
         setError('Не удалось восстановить данные. Данные не изменены.');
         return;
       }
-      await onRestored();
+      const snapshot = await onRestored();
+      if (!snapshot) {
+        setError(
+          'Восстановление завершено, но не удалось загрузить актуальные данные.',
+        );
+        return;
+      }
       setNotice('Данные восстановлены.');
     } catch {
       setError('Не удалось восстановить данные. Данные не изменены.');
@@ -114,35 +126,27 @@ export function BackupRestorePanel({
         Восстановление заменит текущие данные только после проверки резервной
         копии и вашего подтверждения.
       </p>
+      <BackupExportControl
+        backup={backup}
+        disabled={phase !== 'idle'}
+        onExportingChange={setExporting}
+      />
       <button
         ref={triggerRef}
         className="button"
         type="button"
-        disabled={phase !== 'idle'}
+        disabled={phase !== 'idle' || exporting}
         onClick={() => void handleVerify()}
       >
         {phase === 'verifying'
           ? 'Проверяем резервную копию…'
           : 'Восстановить из папки'}
       </button>
-      {problems.length > 0 && (
-        <div role="alert">
-          <p>Резервная копия содержит проблемы. Текущие данные не изменены:</p>
-          <ul>
-            {problems.map((problem) => (
-              <li key={`${problem.path}-${problem.message}`}>
-                <strong>{problem.path}:</strong> {problem.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {error && (
-        <p className="settings-error" role="alert">
-          {error}
-        </p>
-      )}
-      {notice && <p role="status">{notice}</p>}
+      <BackupRestoreFeedback
+        problems={problems}
+        error={error}
+        notice={notice}
+      />
       <BackupRestoreConfirmation
         isOpen={phase === 'confirming' || phase === 'restoring'}
         isRestoring={phase === 'restoring'}

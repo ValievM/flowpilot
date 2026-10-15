@@ -29,7 +29,10 @@ interface SettingsScreenProps {
   readonly onMotionChoiceChange: (choice: MotionChoice) => void;
   readonly loading: boolean;
   readonly saveError: string | undefined;
-  readonly backup: Pick<FlowPilotApi['backup'], 'verify' | 'restore'>;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
 }
 

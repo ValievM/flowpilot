@@ -43,7 +43,9 @@ const validPackage: BackupVerifyResult = {
 
 function renderPanel(
   overrides: Partial<FlowPilotApi['backup']> = {},
-  refresh = vi.fn(() => Promise.resolve(undefined)),
+  refresh: () => Promise<IpcSnapshot | undefined> = vi.fn(() =>
+    Promise.resolve(undefined),
+  ),
 ) {
   const backup: FlowPilotApi['backup'] = {
     ...fakeApi().api.backup,
@@ -56,6 +58,47 @@ function renderPanel(
 }
 
 describe('backup restore panel', () => {
+  it('shows the export destination and time after a successful export', async () => {
+    const exportBackup = vi.fn(() =>
+      Promise.resolve({
+        ok: true as const,
+        value: {
+          folderPath: '/backups/FlowPilot',
+          exportedAt: '2026-10-15T12:00:00.000Z',
+        },
+      }),
+    );
+    renderPanel({ export: exportBackup });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Экспортировать' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '/backups/FlowPilot',
+    );
+    expect(screen.getByRole('status').textContent).toMatch(/15\.10\.2026/);
+  });
+
+  it('explains an occupied destination and keeps dialog cancellation silent', async () => {
+    const exportBackup = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false as const,
+        error: 'AlreadyExists' as const,
+      })
+      .mockResolvedValueOnce({
+        ok: false as const,
+        error: 'Cancelled' as const,
+      });
+    renderPanel({ export: exportBackup });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Экспортировать' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Папка уже существует',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Экспортировать' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
   it('shows verification problems and does not offer restore', async () => {
     const invalidPackage: BackupVerifyResult = {
       ok: false,
@@ -113,7 +156,9 @@ describe('backup restore panel', () => {
     const restore = vi.fn((token: string) =>
       fakeApi().api.backup.restore(token),
     );
-    const refresh = vi.fn(() => Promise.resolve(undefined));
+    const snapshot = await fakeApi().api.snapshot.load();
+    if (!snapshot.ok) throw new Error('Missing fake snapshot');
+    const refresh = vi.fn(() => Promise.resolve(snapshot.value));
     renderPanel({ restore }, refresh);
 
     fireEvent.click(
@@ -129,6 +174,23 @@ describe('backup restore panel', () => {
     });
     expect(refresh).toHaveBeenCalledOnce();
     expect(await screen.findByText('Данные восстановлены.')).toBeTruthy();
+  });
+  it('distinguishes a completed restore from a failed snapshot refresh', async () => {
+    const refresh = vi.fn(() => Promise.resolve(undefined));
+    renderPanel({}, refresh);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Восстановить из папки' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Подтвердите восстановление',
+    });
+    fireEvent.click(withinDialogButton(dialog, 'Восстановить данные'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'не удалось загрузить актуальные данные',
+    );
+    expect(screen.queryByText('Данные восстановлены.')).toBeNull();
   });
 
   it('reports restore errors without claiming data changed', async () => {
@@ -181,7 +243,8 @@ describe('backup restore panel', () => {
           finishRestore = resolve;
         }),
     );
-    renderPanel({ restore });
+    const refresh = vi.fn(() => Promise.resolve(snapshotResult.value));
+    renderPanel({ restore }, refresh);
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Восстановить из папки' }),

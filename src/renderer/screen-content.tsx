@@ -31,7 +31,10 @@ export interface ScreenProps {
     workdays: ReadonlySet<number>,
   ) => Promise<boolean>;
   readonly saveError: string | undefined;
-  readonly backup: Pick<FlowPilotApi['backup'], 'verify' | 'restore'>;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
   readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
