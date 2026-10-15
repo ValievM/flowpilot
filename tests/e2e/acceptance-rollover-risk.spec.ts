@@ -122,14 +122,6 @@ test('AC-09 release-1: risk interface matches table rows 2, 4, 10, and 12', asyn
       expected: /Риск не успеть.*До срока 5 рабочих дней.*запас исчерпан/i,
     },
     {
-      title: 'Срок короче оценки',
-      day: '2026-10-08',
-      deadline: '2026-10-09',
-      estimate: { unit: 'workdays' as const, value: 4 },
-      expected:
-        /Риск не успеть.*Осталось 2 рабочих дня.*оценка остатка 4 рабочих дня/i,
-    },
-    {
       title: 'Неизвестный объём',
       day: '2026-10-05',
       deadline: '2026-10-09',
@@ -159,6 +151,33 @@ test('AC-09 release-1: risk interface matches table rows 2, 4, 10, and 12', asyn
     const task = page.getByRole('article').filter({ hasText: scenario.title });
     await expect(task.locator('.risk-label')).toContainText(scenario.expected);
   }
+
+  if (app) await app.close();
+  await launch('2026-10-08T12:00:00Z');
+  await seed([
+    {
+      id: 'ac09-shorter-than-estimate',
+      title: 'Срок короче оценки',
+      description: '',
+      status: { kind: 'todo' },
+      columnId: 'todo',
+      day: '2026-10-08',
+      deadline: '2026-10-09',
+      estimate: { unit: 'workdays', value: 4 },
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      addedOrder: 0,
+    },
+  ]);
+  await page.reload();
+  await openView('Все задачи');
+  const todayTask = page
+    .getByRole('article')
+    .filter({ hasText: 'Срок короче оценки' });
+  await expect(todayTask.locator('.risk-label')).toContainText(
+    /Риск не успеть.*Осталось 2 рабочих дня.*оценка остатка 4 рабочих дня/i,
+  );
 
   if (app) await app.close();
   await launch('2026-10-09T12:00:00Z');
