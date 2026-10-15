@@ -8,7 +8,7 @@ import { AiUseCases } from './usecases';
 import { emptyReferences, seedTask, setup } from '../ai-proposal-test-support';
 import { createAiUseCases } from './usecases/startup';
 import type { Series } from '../../domain';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const now = Temporal.Instant.from('2026-10-06T12:00:00Z').toZonedDateTimeISO(
   'Europe/Moscow',
@@ -119,6 +119,32 @@ describe('explicit AI use cases', () => {
         ],
       },
     });
+  });
+
+  it('uses the system timezone when deriving today for AI context', async () => {
+    const timezone = vi
+      .spyOn(Temporal.Now, 'timeZoneId')
+      .mockReturnValue('America/Los_Angeles');
+    try {
+      const { repository } = setup();
+      const provider = new FakeAiProvider([
+        {
+          scenario: 'success',
+          reply: { action: null, reason: 'Нет доступных дел.' },
+        },
+      ]);
+      const useCases = createAiUseCases(repository, new AiRunner(provider), {
+        now: () => Temporal.Instant.from('2026-10-06T00:30:00Z'),
+      });
+
+      await useCases.whatNow();
+
+      expect(provider.calls[0]?.context).toMatchObject({
+        context: { today: '2026-10-05' },
+      });
+    } finally {
+      timezone.mockRestore();
+    }
   });
 
   it('uses configured workdays when calculating deadline risk in AI context', async () => {

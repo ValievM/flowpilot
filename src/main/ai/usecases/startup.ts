@@ -1,3 +1,4 @@
+import { Temporal } from 'temporal-polyfill';
 import { buildContext } from '../../../domain';
 import { createAiReferenceIndex } from '../../../shared/ai-reference-index';
 import { AiProposalApplication } from '../../ai-proposal-application';
@@ -28,7 +29,7 @@ export function createAiUseCases(
       getReferenceData(repository.load()),
     ),
     getContext: (snapshot) => {
-      const now = clock.now().toZonedDateTimeISO('UTC');
+      const now = clock.now().toZonedDateTimeISO(Temporal.Now.timeZoneId());
       const configuredWorkdays = snapshot.settings.workdays;
       return buildContext({
         today: now.toPlainDate(),
