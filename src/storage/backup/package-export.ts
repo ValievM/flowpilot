@@ -30,7 +30,7 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 10;
 const APP_VERSION = '0.1.0';
 
 export function exportTo(
@@ -250,6 +250,10 @@ function readProfile(path: string): BackupData {
       comments: query('comments'),
       attachments: query('attachments'),
       settings: query('settings'),
+      task_types: query('task_types'),
+      disciplines: query('disciplines'),
+      rules: query('rule_documents'),
+      rule_versions: query('rule_versions'),
       revision: metadata.revision,
     });
   } finally {

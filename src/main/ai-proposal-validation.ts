@@ -11,11 +11,13 @@ import { type AiCommand, type AiTaskCreation } from '../shared/ai-commands';
 export interface AiSnapshot {
   readonly revision: number;
   readonly ruleVersions: Readonly<Record<string, string>>;
+  readonly savedRuleIds: readonly string[];
   readonly tasks: readonly Task[];
   readonly columns: readonly TaskColumn[];
   readonly taskTypes: readonly TaskType[];
   readonly disciplines: readonly Discipline[];
   readonly rules: readonly RulesDocument[];
+  readonly currentRuleDocuments: readonly RulesDocument[];
 }
 
 interface CommandValidationState {
@@ -23,6 +25,7 @@ interface CommandValidationState {
   readonly taskIds: Set<string>;
   readonly subtaskIds: Set<string>;
   readonly commentIds: Set<string>;
+  readonly ruleIds: Set<string>;
 }
 
 export function createValidationState(
@@ -37,6 +40,7 @@ export function createValidationState(
     commentIds: new Set(
       snapshot.tasks.flatMap((task) => task.comments.map(({ id }) => id)),
     ),
+    ruleIds: new Set(snapshot.savedRuleIds),
   };
 }
 
@@ -44,7 +48,6 @@ export function validateCommand(
   command: AiCommand,
   state: CommandValidationState,
 ): string | undefined {
-  if (command.kind === 'task.classify') return 'not-persisted-yet';
   const taskId = taskIdFor(command);
   return taskId !== undefined && !state.taskIds.has(taskId)
     ? 'task-not-found'
@@ -67,6 +70,11 @@ export function recordCommandIds(
     case 'comment.add':
       state.commentIds.add(command.comment.id);
       return;
+    case 'rule.import': {
+      const document = parsedRuleDocument(command.documentJson);
+      if (document) state.ruleIds.add(document.id);
+      return;
+    }
     default:
       return;
   }
@@ -102,7 +110,7 @@ function validateCommandKind(
     case 'rule.import':
       return validateRuleImport(command.documentJson, snapshot);
     case 'rule.activate':
-      return validateRuleActivation(command.ruleId, snapshot.rules);
+      return validateRuleActivation(command.ruleId, state.ruleIds);
   }
 }
 
@@ -115,11 +123,9 @@ function validateNestedId(
 }
 function validateRuleActivation(
   ruleId: string,
-  rules: readonly RulesDocument[],
+  ruleIds: ReadonlySet<string>,
 ): string | undefined {
-  return rules.some((rule) => rule.id === ruleId)
-    ? undefined
-    : 'rule-not-found';
+  return ruleIds.has(ruleId) ? undefined : 'rule-not-found';
 }
 
 function taskIdFor(command: AiCommand): string | undefined {
@@ -232,11 +238,8 @@ function validateRuleImport(
   documentJson: string,
   snapshot: AiSnapshot,
 ): string | undefined {
-  const parsed = parseRulesJson(documentJson);
-  if (!parsed.ok) return 'invalid-rule-document';
-  const validated = validateRulesDocument(parsed.value);
-  if (!validated.ok) return 'invalid-rule-document';
-  const document = validated.document;
+  const document = parsedRuleDocument(documentJson);
+  if (!document) return 'invalid-rule-document';
   if (
     document.scope.task_type_ids.some(
       (id) => !snapshot.taskTypes.some((type) => type.id === id),
@@ -250,4 +253,11 @@ function validateRuleImport(
   )
     return 'discipline-not-found';
   return undefined;
+}
+
+function parsedRuleDocument(documentJson: string): RulesDocument | undefined {
+  const parsed = parseRulesJson(documentJson);
+  if (!parsed.ok) return undefined;
+  const validated = validateRulesDocument(parsed.value);
+  return validated.ok ? validated.document : undefined;
 }

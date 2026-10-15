@@ -64,7 +64,10 @@ type SerializedTask = Omit<
   readonly rolledOverFrom?: string;
   readonly status: IpcTaskStatus;
 };
-export type IpcSnapshot = Omit<Snapshot, 'tasks'> & {
+export type IpcSnapshot = Omit<
+  Snapshot,
+  'tasks' | 'taskTypes' | 'disciplines' | 'rules'
+> & {
   readonly tasks: readonly SerializedTask[];
 };
 
