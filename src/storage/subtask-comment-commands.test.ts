@@ -270,13 +270,20 @@ describe('subtask.move', () => {
   });
 
   it('does not change task or history when moving to the current position', () => {
-    const repository = openRepository();
+    const directory = mkdtempSync(join(tmpdir(), 'flowpilot-subtasks-'));
+    directories.push(directory);
+    const path = join(directory, 'tasks.sqlite');
+    const repository = new Repository(path, controllableClock());
     createTaskWithSubtasks(repository, [
       { id: 'sub-1', title: 'Один', completed: false },
       { id: 'sub-2', title: 'Два', completed: false },
     ]);
     const before = repository.load();
     const historyBefore = repository.history(10);
+    const database = new Database(path);
+    const taskMetadataBefore = database
+      .prepare('SELECT version, updated_at FROM tasks WHERE id = ?')
+      .get('task-1');
 
     expect(
       repository.apply(
@@ -293,6 +300,12 @@ describe('subtask.move', () => {
     ).toEqual({ ok: true, value: { revision: 1 } });
     expect(repository.load()).toEqual(before);
     expect(repository.history(10)).toEqual(historyBefore);
+    expect(
+      database
+        .prepare('SELECT version, updated_at FROM tasks WHERE id = ?')
+        .get('task-1'),
+    ).toEqual(taskMetadataBefore);
+    database.close();
     repository.close();
   });
 
