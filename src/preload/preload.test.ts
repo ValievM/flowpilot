@@ -39,6 +39,15 @@ describe('preload bridge', () => {
       'settings',
       'snapshot',
     ]);
+    expect(Object.keys(api.catalog).sort()).toEqual(['list']);
+    expect(Object.keys(api.rules).sort()).toEqual([
+      'activate',
+      'bind',
+      'deactivate',
+      'exportFile',
+      'importFile',
+      'list',
+    ]);
   });
 
   it('routes public generic theme writes through the validated settings channel', async () => {
