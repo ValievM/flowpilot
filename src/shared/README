@@ -25,9 +25,14 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
   and `rules.bind` accept strict rule-id/scope requests and return the updated
   rule. Cancellation and activation conflicts are explicit result errors.
 
-Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
+Every reply is a discriminated result: success is `{ ok: true, value }`. The
+standard `Result<T>` failure is `{ ok: false, error: ErrorCode }`; its codes are
 `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
-`InternalError`. Schemas reject unknown fields. Settings writes use the same
+`InternalError`. The rule API (`catalog.list` and every `rules.*` method) uses
+`IpcRuleResult<T>` instead: failures have an `error` object with `kind` equal to
+`ValidationFailed`, `Cancelled`, `NotFound`, `RuleConflict`, or `InternalError`,
+or `{ kind: 'RuleInvalid', errors }`, where each error has `path`, `code`,
+`reason`, and `suggestion` strings. Schemas reject unknown fields. Settings writes use the same
 expected-revision transaction as commands. No filesystem paths cross the
 bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
 `IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
