@@ -6,6 +6,8 @@ import { AiRunner } from './ai-runner';
 import { FakeAiProvider } from './fake-ai-provider';
 import { AiUseCases } from './usecases';
 import { emptyReferences, seedTask, setup } from '../ai-proposal-test-support';
+import { createAiUseCases } from './usecases/startup';
+import type { Series } from '../../domain';
 import { describe, expect, it } from 'vitest';
 
 const now = Temporal.Instant.from('2026-10-06T12:00:00Z').toZonedDateTimeISO(
@@ -83,6 +85,42 @@ describe('explicit AI use cases', () => {
     });
     expect(repository.load()).toEqual(before);
   });
+
+  it('includes missed recurring instances in the what-now provider context', async () => {
+    const { repository } = setup();
+    const series: Series = {
+      id: 'training',
+      title: 'Тренировка',
+      weekdays: [1],
+      time: Temporal.PlainTime.from('18:00'),
+      startsOn: Temporal.PlainDate.from('2026-10-05'),
+    };
+    repository.apply([{ kind: 'series.create', series }], 0);
+    const provider = new FakeAiProvider([
+      {
+        scenario: 'success',
+        reply: { action: null, reason: 'Нет доступных дел.' },
+      },
+    ]);
+    const useCases = createAiUseCases(repository, new AiRunner(provider), {
+      now: () => now.toInstant(),
+    });
+
+    await useCases.whatNow();
+
+    expect(provider.calls[0]?.context).toMatchObject({
+      context: {
+        missedRepeats: [
+          {
+            seriesId: 'training',
+            count: 1,
+            dates: ['2026-10-05'],
+          },
+        ],
+      },
+    });
+  });
+
   it('rejects a what-now answer that references another task', async () => {
     const { repository, application } = setup();
     seedTask(repository);
