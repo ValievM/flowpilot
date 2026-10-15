@@ -116,7 +116,7 @@ describe('task detail card', () => {
       ]);
     });
   });
-  it('recalculates visible deadline risk through the deadline and estimate fields', async () => {
+  it('recalculates visible deadline risk through the deadline, estimate, and day fields', async () => {
     let currentTask = task();
     let updateTaskView: (nextTask: Task) => void = () => {};
     const card = renderCard((commands) => {
@@ -126,6 +126,12 @@ describe('task detail card', () => {
           currentTask = {
             ...currentTask,
             deadline: Temporal.PlainDate.from(command.changes.deadline),
+          };
+        }
+        if (command.changes.day) {
+          currentTask = {
+            ...currentTask,
+            day: Temporal.PlainDate.from(command.changes.day),
           };
         }
         if (command.changes.estimate) {
@@ -149,24 +155,37 @@ describe('task detail card', () => {
     });
 
     const estimate = screen.getByLabelText('Остаток, рабочие дни');
-    fireEvent.change(estimate, { target: { value: '4' } });
+    fireEvent.change(estimate, { target: { value: '3' } });
     fireEvent.blur(estimate);
-    await waitFor(() => {
-      expect(screen.getByText(/^Риск не успеть/)).toBeVisible();
-      expect(
-        screen.getByText(
-          'До срока 4 рабочих дня, оценка остатка 4 рабочих дня: запас исчерпан, начинать нужно сейчас. По приблизительной оценке.',
-        ),
-      ).toBeVisible();
-      expect(document.querySelector('.risk-label')).toHaveClass('is-risk');
-    });
-
-    fireEvent.change(deadline, { target: { value: '2026-10-12' } });
     await waitFor(() => {
       expect(screen.queryByText(/^Риск не успеть/)).not.toBeInTheDocument();
       expect(document.querySelector('.risk-label')).toBeNull();
     });
-    expect(applySpy).toHaveBeenCalledTimes(3);
+
+    fireEvent.change(screen.getByLabelText('Дата задачи'), {
+      target: { value: '2026-10-07' },
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/^Риск не успеть/)).toBeVisible();
+      expect(
+        screen.getByText(/^До срока 3 рабочих дня, оценка остатка 3/),
+      ).toBeVisible();
+      expect(document.querySelector('.risk-label')).toHaveClass('is-risk');
+    });
+    expect(applySpy).toHaveBeenLastCalledWith([
+      {
+        kind: 'task.update',
+        id: 'task-1',
+        changes: { day: '2026-10-07' },
+      },
+    ]);
+
+    fireEvent.change(deadline, { target: { value: '2026-10-13' } });
+    await waitFor(() => {
+      expect(screen.queryByText(/^Риск не успеть/)).not.toBeInTheDocument();
+      expect(document.querySelector('.risk-label')).toBeNull();
+    });
+    expect(applySpy).toHaveBeenCalledTimes(4);
   });
 
   it('cancels pending waiting details when choosing another column', async () => {
