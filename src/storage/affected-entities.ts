@@ -13,6 +13,19 @@ export function affectedEntities(
   if (columnEntities) return columnEntities;
   const catalogEntitiesForCommand = affectedCatalogEntities(database, command);
   if (catalogEntitiesForCommand) return catalogEntitiesForCommand;
+  return affectedOtherEntities(database, command) ?? [];
+}
+function affectedOtherEntities(
+  database: Database.Database,
+  command: StorageCommand,
+): EntityRef[] | undefined {
+  if (
+    command.kind === 'series.create' ||
+    command.kind === 'series.update' ||
+    command.kind === 'series.stop' ||
+    command.kind === 'series.recordOutcome'
+  )
+    return affectedSeriesEntity(command);
   if (
     command.kind === 'rule.import' ||
     command.kind === 'rule.activate' ||
@@ -22,7 +35,21 @@ export function affectedEntities(
     return ruleEntities(database, command);
   if (command.kind === 'setting.set')
     return [{ kind: 'setting', id: command.key }];
-  return [];
+  return undefined;
+}
+function affectedSeriesEntity(
+  command: Extract<StorageCommand, { kind: `series.${string}` }>,
+): EntityRef[] {
+  if (command.kind === 'series.create')
+    return [{ kind: 'series', id: command.series.id }];
+  if (command.kind === 'series.update' || command.kind === 'series.stop')
+    return [{ kind: 'series', id: command.id }];
+  return [
+    {
+      kind: 'series_outcome',
+      id: `${command.seriesId}:${command.outcome.date.toString()}`,
+    },
+  ];
 }
 
 function affectedTaskEntities(

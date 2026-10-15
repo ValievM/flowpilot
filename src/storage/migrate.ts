@@ -10,7 +10,8 @@ import restoreHistory from './migrations/0007_restore_history.sql?raw';
 import aiApplication from './migrations/0008_ai_application.sql?raw';
 import rejectedAiCommands from './migrations/0009_rejected_ai_commands.sql?raw';
 import rulesStorage from './migrations/0010_rules_storage.sql?raw';
-import commentCreatedAtNullable from './migrations/0011_comment_created_at_nullable.sql?raw';
+import seriesStorage from './migrations/0011_series_storage.sql?raw';
+import commentCreatedAtNullable from './migrations/0012_comment_created_at_nullable.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -23,7 +24,8 @@ const MIGRATIONS = [
   { version: 8, sql: aiApplication },
   { version: 9, sql: rejectedAiCommands },
   { version: 10, sql: rulesStorage },
-  { version: 11, sql: commentCreatedAtNullable },
+  { version: 11, sql: seriesStorage },
+  { version: 12, sql: commentCreatedAtNullable },
 ] as const;
 export class ForeignDatabaseError extends Error {
   constructor() {

@@ -3,6 +3,7 @@ import { executeColumnCommand } from './column-commands';
 import { snapshotEntity, type EntitySnapshot } from './history-entities';
 import { affectedEntities } from './affected-entities';
 import { writeHistory } from './history-log';
+import { executeSeriesCommand } from './series-persistence';
 import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
 import { executeRulesCommand } from './rules-commands';
@@ -171,6 +172,10 @@ function executeCommand(
     return;
   }
   if (executeRulesCommand(database, command, options.now)) return;
+  if (isSeriesCommand(command)) {
+    executeSeriesCommand(database, command, options.now);
+    return;
+  }
   if (isColumnCommand(command)) executeColumnCommand(database, command);
   else executeTaskCommand(database, command, options.now);
 }
@@ -241,6 +246,11 @@ function isColumnCommand(
   { kind: 'column.create' | 'column.rename' | 'column.delete' | 'setting.set' }
 > {
   return command.kind.startsWith('column.') || command.kind === 'setting.set';
+}
+function isSeriesCommand(
+  command: StorageCommand,
+): command is Extract<StorageCommand, { kind: `series.${string}` }> {
+  return command.kind.startsWith('series.');
 }
 
 function errorMessage(error: unknown): string {

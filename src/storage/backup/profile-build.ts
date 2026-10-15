@@ -57,6 +57,8 @@ function populateDatabase(
       insertRows(db, 'settings', data.settings);
       insertRows(db, 'rule_documents', data.rules);
       insertRows(db, 'rule_versions', data.rule_versions);
+      insertRows(db, 'series', data.series ?? []);
+      insertRows(db, 'series_outcomes', data.outcomes ?? []);
       db.prepare('UPDATE metadata SET revision = ? WHERE singleton = 1').run(
         data.revision + 1,
       );
@@ -72,6 +74,8 @@ function clearProfileRows(db: Database.Database): void {
   for (const table of [
     'rule_versions',
     'rule_documents',
+    'series_outcomes',
+    'series',
     'subtasks',
     'comments',
     'attachments',

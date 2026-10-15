@@ -743,6 +743,45 @@ describe('persisted today and now screens', () => {
       task: { title: 'Новая задача', columnId: 'todo', day: today() },
     });
   });
+  it('opens task details from Today, Now, and Board and restores focus', async () => {
+    renderApp([{ id: 'card-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня,/ });
+
+    for (const view of ['Сегодня', 'Сейчас', 'Доска']) {
+      if (view !== 'Сегодня') {
+        fireEvent.click(screen.getByRole('button', { name: view }));
+      }
+      const trigger = await screen.findByRole('button', {
+        name: /Открыть задачу:/,
+      });
+      fireEvent.click(trigger);
+      const card = screen.getByLabelText(/^Карточка задачи:/);
+      expect(card).toBeVisible();
+      fireEvent.keyDown(card, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveFocus());
+    }
+  });
+
+  it('refreshes the task card and reports a stale revision without retrying', async () => {
+    const app = renderApp([{ id: 'card-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня,/ });
+    const open = screen.getByRole('button', { name: /Открыть задачу:/ });
+    fireEvent.click(open);
+    app.setStaleOnce();
+    const title = screen.getByLabelText('Название');
+    fireEvent.change(title, { target: { value: 'Новое название' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(
+      await within(
+        screen.getByLabelText('Карточка задачи: card-task'),
+      ).findByRole('status'),
+    ).toHaveTextContent(
+      'Данные задачи изменились. Показана актуальная карточка; повторите изменение.',
+    );
+    expect(app.calls).toHaveLength(1);
+    expect(app.snapshot().tasks[0]?.title).toBe('card-task');
+    expect(title).toHaveValue('Новое название');
+  });
 
   it('reloads once for stale revisions, then retains entered text on a retry failure', async () => {
     const stale = renderApp();

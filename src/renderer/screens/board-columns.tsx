@@ -21,6 +21,7 @@ type BoardColumnProps = {
   onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: () => void;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 };
 
 export function BoardColumns({
@@ -29,12 +30,14 @@ export function BoardColumns({
   onMove,
   onRename,
   onDelete,
+  onOpenTask,
 }: {
   snapshot: IpcSnapshot;
   today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
   onRename: (column: Column) => void;
   onDelete: (column: Column, hasTasks: boolean) => void;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   const pendingFocus = React.useRef<
     { taskId: string; columnId: string } | undefined
@@ -84,6 +87,7 @@ export function BoardColumns({
               onDelete={() => {
                 onDelete(column, tasks.length > 0);
               }}
+              onOpenTask={onOpenTask}
             />
           );
         })}
@@ -100,6 +104,7 @@ function BoardColumn({
   onMove,
   onRename,
   onDelete,
+  onOpenTask,
 }: BoardColumnProps): React.JSX.Element {
   return (
     <BoardDroppableColumn
@@ -118,6 +123,7 @@ function BoardColumn({
         columns={columns}
         snapshot={snapshot}
         today={today}
+        onOpenTask={onOpenTask}
         onMove={onMove}
       />
     </BoardDroppableColumn>
@@ -158,6 +164,7 @@ function BoardTaskList({
   snapshot,
   today,
   onMove,
+  onOpenTask,
 }: {
   column: Column;
   tasks: readonly Task[];
@@ -165,6 +172,7 @@ function BoardTaskList({
   snapshot: IpcSnapshot;
   today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   if (!tasks.length) {
     return <p className="board-column-empty">В этой колонке пока нет задач.</p>;
@@ -179,6 +187,7 @@ function BoardTaskList({
           columns={columns}
           snapshot={snapshot}
           today={today}
+          onOpenTask={onOpenTask}
           onMove={onMove}
         />
       ))}
@@ -192,6 +201,7 @@ function BoardTaskCard({
   snapshot,
   today,
   onMove,
+  onOpenTask,
 }: {
   task: Task;
   column: Column;
@@ -199,6 +209,7 @@ function BoardTaskCard({
   snapshot: IpcSnapshot;
   today: TemporalTypes.PlainDate;
   onMove: (taskId: string, column: Column) => Promise<boolean>;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   return (
     <BoardDraggableTask
@@ -207,7 +218,18 @@ function BoardTaskCard({
       label={`Задача: ${task.title}`}
     >
       <BoardRiskMark task={task} snapshot={snapshot} today={today} />
-      <h3>{task.title}</h3>
+      <h3>
+        <button
+          className="task-title-button"
+          type="button"
+          aria-label={`Открыть задачу: ${task.title}`}
+          onClick={(event) => {
+            onOpenTask(task.id, event.currentTarget);
+          }}
+        >
+          {task.title}
+        </button>
+      </h3>
       {task.deadline && (
         <p className="task-summary-meta">Срок: {task.deadline}</p>
       )}

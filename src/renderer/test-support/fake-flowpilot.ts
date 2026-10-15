@@ -273,6 +273,8 @@ export function fakeApi(
     current: {
       columns,
       tasks,
+      series: [],
+      outcomes: [],
       settings: { workdays },
       revision: 0,
     },

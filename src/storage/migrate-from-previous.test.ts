@@ -63,7 +63,7 @@ describe('upgrading databases with previous-version data', () => {
       expectMigratedData(path, previousVersion);
     },
   );
-  it('applies rules schema migration from version 9 to version 10', () => {
+  it('applies rules schema migration after version nine and reaches current schema', () => {
     const directory = makeDirectory();
     const path = join(directory, 'tasks.sqlite');
     createPreviousVersionDatabase(path, 9);
@@ -71,7 +71,7 @@ describe('upgrading databases with previous-version data', () => {
     repository.close();
     const database = new Database(path);
     try {
-      expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
+      expect(database.pragma('user_version')).toEqual([{ user_version: 12 }]);
       expect(database.prepare('PRAGMA table_info(tasks)').all()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'type_id' }),

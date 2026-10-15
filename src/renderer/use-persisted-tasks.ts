@@ -1,6 +1,6 @@
 import React from 'react';
-import { Temporal } from 'temporal-polyfill';
 import type { Task } from '../domain';
+import { parsedTasks } from './parse-ipc-tasks';
 import type {
   CommandsApplyRequest,
   FlowPilotApi,
@@ -20,6 +20,9 @@ export interface PersistedState {
   refresh(): Promise<IpcSnapshot | undefined>;
   updateWorkdays(workdays: ReadonlySet<number>): Promise<boolean>;
   apply(commands: CommandsApplyRequest['commands']): Promise<boolean>;
+  applyCard(
+    commands: CommandsApplyRequest['commands'],
+  ): Promise<'saved' | 'stale' | 'failed'>;
 }
 
 interface PersistenceControls {
@@ -37,48 +40,6 @@ interface PersistenceControls {
   >;
   readonly setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   readonly setSaved: React.Dispatch<React.SetStateAction<boolean>>;
-}
-
-function taskFromIpc(task: IpcSnapshot['tasks'][number]): Task {
-  const { day, time, deadline, rolledOverFrom, status, comments, ...rest } =
-    task;
-  const parsedStatus: Task['status'] =
-    status.kind === 'waiting'
-      ? {
-          kind: 'waiting',
-          reason: status.reason,
-          ...(status.until
-            ? { until: Temporal.PlainDate.from(status.until) }
-            : {}),
-        }
-      : status;
-  return {
-    ...rest,
-    comments: comments.map(({ createdAt, ...comment }) => ({
-      ...comment,
-      createdAt: createdAt === null ? null : Temporal.Instant.from(createdAt),
-    })),
-    ...(day ? { day: Temporal.PlainDate.from(day) } : {}),
-    ...(time ? { time: Temporal.PlainTime.from(time) } : {}),
-    ...(deadline ? { deadline: Temporal.PlainDate.from(deadline) } : {}),
-    ...(rolledOverFrom
-      ? { rolledOverFrom: Temporal.PlainDate.from(rolledOverFrom) }
-      : {}),
-    status: parsedStatus,
-  };
-}
-
-function parsedSnapshot(snapshot: IpcSnapshot) {
-  const configured = snapshot.settings.workdays;
-  const workdays = Array.isArray(configured)
-    ? configured.filter((day): day is number => typeof day === 'number')
-    : [1, 2, 3, 4, 5];
-  return {
-    tasks: snapshot.tasks.map(taskFromIpc),
-    columns: snapshot.columns,
-    revision: snapshot.revision,
-    workdays: new Set(workdays),
-  };
 }
 
 function useSnapshotRefresh(api: FlowPilotApi, controls: PersistenceControls) {
@@ -197,22 +158,51 @@ function useCommandApply(
     [api, controls, refresh, snapshot],
   );
 }
-
-interface ParsedTasks {
-  readonly tasks: readonly Task[];
-  readonly columns: IpcSnapshot['columns'];
-  readonly revision: number;
-  readonly workdays: ReadonlySet<number>;
-}
-
-function parsedTasks(snapshot: IpcSnapshot | undefined): ParsedTasks {
-  if (snapshot) return parsedSnapshot(snapshot);
-  return {
-    tasks: [],
-    columns: [],
-    revision: 0,
-    workdays: new Set([1, 2, 3, 4, 5]),
-  };
+function useTaskCardApply(
+  api: FlowPilotApi,
+  snapshot: IpcSnapshot | undefined,
+  refresh: () => Promise<IpcSnapshot | undefined>,
+  controls: PersistenceControls,
+): PersistedState['applyCard'] {
+  return React.useCallback(
+    async (commands) => {
+      if (!snapshot) return 'failed';
+      controls.setSaved(false);
+      try {
+        const result = await api.commands.apply({
+          commands,
+          expectedRevision: snapshot.revision,
+        });
+        if (!result.ok && result.error === 'StaleRevision') {
+          const fresh = await refresh();
+          if (fresh) controls.setSnapshot(fresh);
+          controls.setSaved(true);
+          controls.setCommandError(
+            'Данные задачи изменились. Показана актуальная карточка; повторите изменение.',
+          );
+          return 'stale';
+        }
+        if (!result.ok) {
+          controls.setSaved(true);
+          controls.setCommandError(
+            'Сохранение не удалось. Данные не изменены; попробуйте снова.',
+          );
+          return 'failed';
+        }
+        controls.setSnapshot(result.value);
+        controls.setSaved(true);
+        controls.setCommandError(undefined);
+        return 'saved';
+      } catch {
+        controls.setSaved(true);
+        controls.setCommandError(
+          'Сохранение не удалось. Данные не изменены; попробуйте снова.',
+        );
+        return 'failed';
+      }
+    },
+    [api, controls, refresh, snapshot],
+  );
 }
 
 export function usePersistedTasks(
@@ -245,6 +235,7 @@ export function usePersistedTasks(
   const refresh = useSnapshotRefresh(api, controls);
   const updateWorkdays = useWorkdaysUpdate(api, snapshot, controls);
   const apply = useCommandApply(api, snapshot, refresh, controls);
+  const applyCard = useTaskCardApply(api, snapshot, refresh, controls);
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -259,5 +250,6 @@ export function usePersistedTasks(
     refresh,
     updateWorkdays,
     apply,
+    applyCard,
   };
 }
