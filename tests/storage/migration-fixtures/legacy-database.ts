@@ -91,7 +91,13 @@ export const legacySnapshot: Snapshot = {
   taskTypes: [],
   disciplines: [],
   rules: [],
-  settings: { aiMode: 'auto', workdays: [1, 3, 5], dailyGoal: { minutes: 90 } },
+  series: [],
+  outcomes: [],
+  settings: {
+    aiMode: 'auto',
+    workdays: [1, 3, 5],
+    dailyGoal: { minutes: 90 },
+  },
   revision: 14,
 };
 

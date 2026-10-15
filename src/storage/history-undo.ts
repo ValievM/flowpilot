@@ -6,6 +6,10 @@ import {
 } from './history-entities';
 import { writeHistory } from './history-log';
 import type { UndoResult } from './types';
+import {
+  referencedOutcomesForCreatedSeries,
+  referencedTasksForCreatedColumns,
+} from './history-undo-references';
 
 type AttachmentFiles = {
   restoreFromTrash(id: string): boolean;
@@ -102,6 +106,7 @@ function createUndoPlan(
   const conflictingRefs = [
     ...conflictingRecords.map(({ ref }) => ref),
     ...referencedTasksForCreatedColumns(database, records),
+    ...referencedOutcomesForCreatedSeries(database, records),
   ];
   if (conflictingRefs.length)
     return {
@@ -113,29 +118,6 @@ function createUndoPlan(
   return {
     plan: { entry, records, attachmentChanges: findAttachmentChanges(records) },
   };
-}
-
-function referencedTasksForCreatedColumns(
-  database: Database.Database,
-  records: readonly UndoRecord[],
-): EntitySnapshot[] {
-  const createdTaskIds = new Set(
-    records
-      .filter(({ ref, before }) => ref.kind === 'task' && before.state === null)
-      .map(({ ref }) => ref.id),
-  );
-  const references: EntitySnapshot[] = [];
-  for (const { ref, before } of records) {
-    if (ref.kind !== 'column' || before.state !== null) continue;
-    const rows = database
-      .prepare('SELECT id FROM tasks WHERE column_id = ?')
-      .all(ref.id) as { id: string }[];
-    for (const { id } of rows) {
-      if (createdTaskIds.has(id)) continue;
-      references.push({ kind: 'task', id, state: null, version: null });
-    }
-  }
-  return references;
 }
 
 function applyUndo(
@@ -184,7 +166,6 @@ function restoreUndoRecords(
       restoreEntity(database, before);
     });
 }
-
 function findEntry(
   database: Database.Database,
   entryId?: string,
@@ -279,7 +260,9 @@ function entityKind(kind: string): EntitySnapshot['kind'] {
     kind === 'setting' ||
     kind === 'taskType' ||
     kind === 'discipline' ||
-    kind === 'rule'
+    kind === 'rule' ||
+    kind === 'series' ||
+    kind === 'series_outcome'
   )
     return kind;
   throw new Error('Unknown history entity');

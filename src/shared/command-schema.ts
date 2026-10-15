@@ -1,6 +1,12 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
 import {
+  seriesCreateSchema,
+  seriesRecordOutcomeSchema,
+  seriesStopSchema,
+  seriesUpdateSchema,
+} from './series-command-schema';
+import {
   disciplineCreateSchema,
   disciplineDeleteSchema,
   disciplineRenameSchema,
@@ -91,9 +97,7 @@ const columnSchema = z
 const nonEmptyWorkdays = z
   .array(z.number().int().min(1).max(7))
   .min(1)
-  .max(7)
   .refine((days) => new Set(days).size === days.length);
-
 const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
@@ -234,6 +238,7 @@ const columnDeleteSchema = z
       .optional(),
   })
   .strict();
+
 const settingCommandFields = z
   .object({ ...settingFields, kind: z.literal('setting.set') })
   .strict();
@@ -262,6 +267,10 @@ export const commandSchema = z.discriminatedUnion('kind', [
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
+  seriesCreateSchema,
+  seriesUpdateSchema,
+  seriesStopSchema,
+  seriesRecordOutcomeSchema,
   settingCommandSchema,
   aiRankCommandSchema,
   taskClassifySchema,
@@ -287,5 +296,9 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
+  seriesCreateSchema,
+  seriesUpdateSchema,
+  seriesStopSchema,
+  seriesRecordOutcomeSchema,
   genericSettingCommandSchema,
 ]);

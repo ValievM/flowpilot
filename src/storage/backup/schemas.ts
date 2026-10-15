@@ -158,6 +158,41 @@ const ruleVersion = z
   .strict();
 const emptyRules = z.array(ruleDocument).default([]);
 
+const backupSeries = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().trim().min(1),
+    description: z.string().nullable(),
+    weekdays_json: z.string().refine(isValidWeekdaysJson),
+    time: plainTime.nullable(),
+    starts_on: plainDate,
+    ends_on: plainDate.nullable(),
+    version: z.number().int().min(1),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .strict();
+const backupOutcome = z
+  .object({
+    series_id: z.string().min(1),
+    date: plainDate,
+    kind: z.enum(['done', 'skipped', 'dismissed', 'rescheduled']),
+    new_date: plainDate.nullable(),
+    new_time: plainTime.nullable(),
+    version: z.number().int().min(1),
+    recorded_at: z.string(),
+  })
+  .strict()
+  .superRefine((outcome, context) => {
+    const hasReschedule =
+      outcome.new_date !== null && outcome.new_time !== null;
+    if ((outcome.kind === 'rescheduled') !== hasReschedule)
+      context.addIssue({
+        code: 'custom',
+        message: 'Некорректный перенос повтора',
+      });
+  });
+
 export const backupDataSchema = z
   .object({
     columns: z.array(column),
@@ -170,9 +205,45 @@ export const backupDataSchema = z
     disciplines: z.array(catalogItem).default([]),
     rules: emptyRules,
     rule_versions: z.array(ruleVersion).default([]),
+    series: z.array(backupSeries).optional(),
+    outcomes: z.array(backupOutcome).optional(),
     revision: z.number().int().nonnegative(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, context) => {
+    const seriesIds = new Set((data.series ?? []).map(({ id }) => id));
+    const outcomeKeys = new Set<string>();
+    for (const [index, outcome] of (data.outcomes ?? []).entries()) {
+      if (!seriesIds.has(outcome.series_id))
+        context.addIssue({
+          code: 'custom',
+          path: ['outcomes', index, 'series_id'],
+          message: 'Исход ссылается на отсутствующую серию',
+        });
+      const key = `${outcome.series_id}:${outcome.date}`;
+      if (outcomeKeys.has(key))
+        context.addIssue({
+          code: 'custom',
+          path: ['outcomes', index],
+          message: 'Повторный исход для одной даты серии',
+        });
+      outcomeKeys.add(key);
+    }
+  });
+
+function isValidWeekdaysJson(value: string): boolean {
+  try {
+    const days: unknown = JSON.parse(value);
+    return (
+      Array.isArray(days) &&
+      days.length > 0 &&
+      days.every((day) => Number.isInteger(day) && day >= 1 && day <= 7) &&
+      new Set(days).size === days.length
+    );
+  } catch {
+    return false;
+  }
+}
 
 export const manifestSchema = z
   .object({

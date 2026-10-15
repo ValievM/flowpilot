@@ -95,6 +95,8 @@ describe('column undo regressions', () => {
       DROP TABLE rule_documents;
       DROP TABLE task_types;
       DROP TABLE disciplines;
+      DROP TABLE series_outcomes;
+      DROP TABLE series;
     `);
     legacyDatabase.pragma('user_version = 5');
     legacyDatabase.close();
