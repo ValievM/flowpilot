@@ -67,7 +67,7 @@ function attachedProfile(): {
 function exportPackage(root: string, profile: string): string {
   const result = exportTo(root, profile, clock);
   if (!result.ok) throw new Error(result.error);
-  return result.value;
+  return result.value.folderPath;
 }
 
 type ParentRace<T> = {
@@ -210,7 +210,10 @@ describe('backup package descriptor-relative attachment access', () => {
     if (!race.value.ok)
       throw new Error('Safe attachment export should succeed');
     expect(
-      readFileSync(join(race.value.value, 'attachments', attachmentId), 'utf8'),
+      readFileSync(
+        join(race.value.value.folderPath, 'attachments', attachmentId),
+        'utf8',
+      ),
     ).toBe('safe attachment bytes');
   });
 });

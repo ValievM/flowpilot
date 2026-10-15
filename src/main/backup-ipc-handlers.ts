@@ -4,6 +4,7 @@ import {
   backupRestoreRequestSchema,
   backupVerifyRequestSchema,
   type BackupVerifyResult,
+  type ExportInfo,
   type IpcSnapshot,
 } from '../shared/contracts';
 import type { ErrorCode, Result } from '../shared/ipc-result';
@@ -34,13 +35,16 @@ export function createBackupHandlers(deps: HistoryFileDependencies) {
 async function exportBackup(
   request: unknown,
   deps: HistoryFileDependencies,
-): Promise<Result<null>> {
+): Promise<Result<ExportInfo>> {
   if (!backupExportRequestSchema.safeParse(request).success)
     return failure('ValidationFailed');
   const parentPath = await deps.dialogs.pickFolder();
   if (!parentPath) return failure('Cancelled');
   const result = exportTo(parentPath, deps.profilePath, deps.clock);
-  return result.ok ? { ok: true, value: null } : failure('NotReadable');
+  if (result.ok) return result;
+  return failure(
+    result.kind === 'AlreadyExists' ? 'AlreadyExists' : 'NotReadable',
+  );
 }
 
 async function verifyBackup(

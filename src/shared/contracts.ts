@@ -5,8 +5,9 @@ import {
   validateGenericSettingValue,
 } from './command-schema';
 import type { Series, Task, TaskComment, TaskStatus } from '../domain';
-import type { HistoryEntry, Snapshot } from '../storage';
+import type { ExportInfo, HistoryEntry, Snapshot } from '../storage';
 import type { Result } from './ipc-result';
+export type { ExportInfo } from '../storage';
 import type {
   AiCommand,
   AiTaskChanges,
@@ -271,7 +272,7 @@ export type FlowPilotApi = {
     remove(request: AttachmentRemoveRequest): Promise<Result<IpcSnapshot>>;
   };
   backup: {
-    export(): Promise<Result<null>>;
+    export(): Promise<Result<ExportInfo>>;
     verify(): Promise<BackupVerifyResult>;
     restore(packageToken: string): Promise<Result<IpcSnapshot>>;
   };

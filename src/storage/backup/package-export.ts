@@ -19,7 +19,7 @@ import {
   type BackupData,
   type BackupManifest,
 } from './schemas';
-import type { BackupResult } from './backup-types';
+import type { ExportResult } from './backup-types';
 import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
 import {
   copyRegularFile,
@@ -37,32 +37,29 @@ export function exportTo(
   parentDir: string,
   profilePath: string,
   clock: Clock,
-): BackupResult {
+): ExportResult {
   let temporary = '';
   let ownsTemporary = false;
   try {
-    const exportedAt = clock.now();
+    const exportedAt = clock.now().toString();
     const folder = join(
       parentDir,
-      `FlowPilot-export-${exportedAt.toString().slice(0, 10)}`,
+      `FlowPilot-export-${exportedAt.slice(0, 10)}`,
     );
     temporary = `${folder}.tmp-${String(process.pid)}`;
     if (existsSync(folder))
       return {
         ok: false,
-        kind: 'OperationalFailure',
+        kind: 'AlreadyExists',
         error: 'Папка экспорта уже существует',
       };
     mkdirSync(temporary, { recursive: false });
     ownsTemporary = true;
     const data = readProfile(profilePath);
     const files = writeDataFiles(temporary, profilePath, data);
-    writeManifest(
-      temporary,
-      createManifest(exportedAt.toString(), data, files),
-    );
+    writeManifest(temporary, createManifest(exportedAt, data, files));
     renameSync(temporary, folder);
-    return { ok: true, value: folder };
+    return { ok: true, value: { folderPath: folder, exportedAt } };
   } catch (error) {
     if (ownsTemporary) rmSync(temporary, { recursive: true, force: true });
     return {
