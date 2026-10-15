@@ -11,7 +11,8 @@ export type FakeAiScenario =
 
 export interface FakeAiStep {
   readonly scenario: FakeAiScenario;
-  readonly proposal: Proposal;
+  readonly proposal?: Proposal;
+  readonly reply?: unknown;
   readonly wait?: () => Promise<void>;
 }
 
@@ -36,11 +37,15 @@ export class FakeAiProvider implements AiProvider {
       return { ok: false, error: { kind: 'InvalidReply' } };
     }
     await step.wait?.();
-    return { ok: true, value: fakeReply(step) };
+    return {
+      ok: true,
+      value: step.reply === undefined ? fakeReply(step) : step.reply,
+    };
   }
 }
 
 function fakeReply(step: FakeAiStep): unknown {
+  if (!step.proposal) return null;
   if (step.scenario === 'extra-fields')
     return { ...step.proposal, injected: true };
   if (step.scenario === 'hallucinated-id') {

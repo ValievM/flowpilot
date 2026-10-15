@@ -7,6 +7,7 @@ import { selectRuntimeOptions, selectWindowOptions } from './runtime';
 import { initialAppearanceTheme, isTrustedNavigation } from './appearance';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
+import { createAiUseCases } from './ai/usecases/startup';
 import {
   createWindowStartupGate,
   type WindowStartupGate,
@@ -53,6 +54,7 @@ if (!app.requestSingleInstanceLock()) {
         process.env,
         manualProvider,
       );
+      const aiUseCases = createAiUseCases(repository, aiRunner, runtime.clock);
       registerIpcHandlers(ipcMain, {
         repository,
         appInfo: {
@@ -61,6 +63,7 @@ if (!app.requestSingleInstanceLock()) {
           getNow: () => runtime.clock.now().toString(),
         },
         aiRunner,
+        aiUseCases,
         manualProvider,
         onAppearanceReady: () => windowStartupGate?.ready(),
       });

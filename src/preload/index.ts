@@ -13,6 +13,8 @@ import {
   type AiIpcResult,
   type AiCancelResult,
   type AiManualReplyResult,
+  type AiScenarioRequest,
+  type AiScenarioResult,
 } from '../shared/contracts';
 import type { Result } from '../shared/ipc-result';
 
@@ -52,6 +54,11 @@ const api: FlowPilotApi = Object.freeze({
       >,
   },
   ai: {
+    scenario: (request: AiScenarioRequest) =>
+      ipcRenderer.invoke(
+        ipcChannels.aiScenario,
+        request,
+      ) as Promise<AiScenarioResult>,
     run: (request: AiIpcRequest) =>
       ipcRenderer.invoke(ipcChannels.aiRun, request) as Promise<AiIpcResult>,
     cancel: (request: { operationId: string }) =>

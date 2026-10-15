@@ -239,6 +239,14 @@ function fakeApiFor(
       set: (request) => apiSetSetting(state, request),
     },
     ai: {
+      scenario: () =>
+        Promise.resolve({
+          ok: false,
+          error: {
+            kind: 'ProviderUnavailable',
+            message: 'AI is unavailable in this test.',
+          },
+        }),
       run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
       cancel: () => Promise.resolve({ ok: false, error: 'ValidationFailed' }),
       prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),

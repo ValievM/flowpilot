@@ -124,6 +124,15 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       ),
     },
     ai: {
+      scenario: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'ProviderUnavailable',
+            message: 'AI is unavailable in this test.',
+          },
+        }),
+      ),
       run: vi.fn(() =>
         Promise.resolve({
           ok: false as const,

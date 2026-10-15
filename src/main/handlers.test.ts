@@ -19,6 +19,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import type { AiIpcResult } from '../shared/contracts';
 import { ipcChannels } from '../shared/contracts';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
+import { createAiUseCases } from './ai/usecases/startup';
 
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
@@ -293,6 +294,11 @@ describe('IPC handlers', () => {
           getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner: new AiRunner(manualProvider),
+        aiUseCases: createAiUseCases(
+          repository,
+          new AiRunner(manualProvider),
+          clock,
+        ),
         manualProvider,
         onAppearanceReady: () => undefined,
       },
@@ -310,6 +316,7 @@ describe('IPC handlers', () => {
       'ai.cancel',
       'ai.prompt',
       'ai.reply',
+      'ai.scenario',
     ]);
     repository.close();
   });
@@ -379,6 +386,7 @@ describe('IPC handlers', () => {
           getNow: () => '2026-10-05T12:00:00Z',
         },
         aiRunner,
+        aiUseCases: createAiUseCases(repository, aiRunner, clock),
         manualProvider,
         onAppearanceReady: () => undefined,
       },

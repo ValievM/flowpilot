@@ -104,6 +104,7 @@ export const ipcChannels = {
   aiPrompt: 'ai.prompt',
   aiReply: 'ai.reply',
   appearanceSetTheme: 'appearance.set-theme',
+  aiScenario: 'ai.scenario',
   appearanceInitialize: 'appearance.initialize',
   appearanceReady: 'appearance.ready',
 } as const;
@@ -131,6 +132,30 @@ export const aiCancelRequestSchema = z
 export const aiReplyRequestSchema = z
   .object({ operationId: z.string().min(1), text: z.string() })
   .strict();
+export const aiScenarioRequestSchema = z.discriminatedUnion('scenario', [
+  z.object({ scenario: z.literal('whatNow') }).strict(),
+  z
+    .object({ scenario: z.literal('createFromText'), text: z.string() })
+    .strict(),
+  z.object({ scenario: z.literal('replan') }).strict(),
+  z
+    .object({
+      scenario: z.literal('editRule'),
+      instruction: z.string(),
+      document: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({ scenario: z.literal('confirm'), proposalId: z.string().min(1) })
+    .strict(),
+]);
+export type AiScenarioRequest = z.infer<typeof aiScenarioRequestSchema>;
+export type AiScenarioResult =
+  | { readonly ok: true; readonly value: unknown }
+  | {
+      readonly ok: false;
+      readonly error: { readonly kind: string; readonly message: string };
+    };
 export type AiIpcRequest = z.infer<typeof aiRequestSchema>;
 export type AiIpcResult =
   | { readonly ok: true; readonly value: AiIpcProposal }
@@ -197,6 +222,7 @@ export type FlowPilotApi = {
   };
   ai: {
     run(request: AiIpcRequest): Promise<AiIpcResult>;
+    scenario(request: AiScenarioRequest): Promise<AiScenarioResult>;
     cancel(request: { operationId: string }): Promise<AiCancelResult>;
     prompt(request: { operationId: string }): Promise<Result<string>>;
     reply(request: {

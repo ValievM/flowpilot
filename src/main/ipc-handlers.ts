@@ -15,6 +15,8 @@ import {
   runAiRequest,
   submitManualReply,
 } from './ai/ipc';
+import type { AiUseCases } from './ai/usecases';
+import { runAiScenario } from './ai/scenario-ipc';
 import type { AiRunner } from './ai/ai-runner';
 import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
 
@@ -27,6 +29,7 @@ type RegistrationDependencies = {
   };
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
+  readonly aiUseCases: AiUseCases;
   readonly onAppearanceReady: () => void;
 };
 
@@ -75,5 +78,8 @@ export function registerIpcHandlers(
   );
   ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
     submitManualReply(request, deps.manualProvider),
+  );
+  ipc.handle(ipcChannels.aiScenario, (_event, request: unknown) =>
+    runAiScenario(request, deps.aiUseCases),
   );
 }

@@ -114,8 +114,12 @@ function hasValidCommandReferences(
       );
     case 'rule.activate':
       return state.ruleIds.has(command.ruleId);
-    case 'rule.import':
-      return hasValidRuleReferences(command.documentJson, state);
+    case 'rule.import': {
+      const ruleId = importedRuleId(command.documentJson, state);
+      if (!ruleId) return false;
+      state.ruleIds.add(ruleId);
+      return true;
+    }
     default:
       return true;
   }
@@ -134,19 +138,21 @@ function hasValidMoveReferences(
     return false;
   return command.status === undefined || command.status.kind === columnState;
 }
-function hasValidRuleReferences(
+function importedRuleId(
   documentJson: string,
   state: ValidationState,
-): boolean {
+): string | undefined {
   const parsed = parseRulesJson(documentJson);
-  if (!parsed.ok) return false;
+  if (!parsed.ok) return undefined;
   const validated = validateRulesDocument(parsed.value);
-  if (!validated.ok) return false;
+  if (!validated.ok) return undefined;
   const { scope } = validated.document;
-  return (
-    scope.task_type_ids.every((id) => state.taskTypeIds.has(id)) &&
-    (scope.discipline_ids ?? []).every((id) => state.disciplineIds.has(id))
-  );
+  if (
+    !scope.task_type_ids.every((id) => state.taskTypeIds.has(id)) ||
+    !(scope.discipline_ids ?? []).every((id) => state.disciplineIds.has(id))
+  )
+    return undefined;
+  return validated.document.id;
 }
 function hasValidCreatedTaskReferences(
   task: Extract<AiCommand, { kind: 'task.create' }>['task'],
