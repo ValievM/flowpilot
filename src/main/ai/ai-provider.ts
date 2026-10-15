@@ -1,5 +1,4 @@
 import type { AiReferenceIndex } from '../../shared/ai-reference-index';
-import type { Proposal } from '../../shared/ai-commands';
 
 export interface AiRequest {
   readonly operationId: string;
@@ -21,5 +20,5 @@ export interface AiProvider {
   ask(
     request: AiRequest,
     signal: AbortSignal,
-  ): Promise<ProviderResult<Proposal>>;
+  ): Promise<ProviderResult<unknown>>;
 }
