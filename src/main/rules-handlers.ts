@@ -62,12 +62,12 @@ export async function importRuleFile(
     const documentJson = files.read(selectedPath);
     const snapshot = deps.repository.load();
     const checked = validateRuleFile(documentJson, snapshot);
-    if (!checked.ok) return checked;
     const applied = deps.repository.apply(
       [{ kind: 'rule.import', documentJson }],
       snapshot.revision,
     );
     if (!applied.ok) return { ok: false, error: { kind: 'InternalError' } };
+    if (!checked.ok) return checked;
     const rule = deps.repository
       .load()
       .rules.find(({ id }) => id === checked.value.id);

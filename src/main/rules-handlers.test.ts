@@ -5,7 +5,12 @@ import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Repository } from '../storage';
 import type { Clock } from '../storage';
-import { activateRule, exportRuleFile, importRuleFile } from './rules-handlers';
+import {
+  activateRule,
+  exportRuleFile,
+  importRuleFile,
+  listRules,
+} from './rules-handlers';
 
 const directories: string[] = [];
 const clock: Clock = {
@@ -86,6 +91,14 @@ describe('rules file handlers', () => {
             ({ path: errorPath }) => errorPath === 'typo',
           ),
         ).toBe(true);
+    }
+    const listed = listRules({}, { repository });
+    expect(listed.ok).toBe(true);
+    if (listed.ok) {
+      const importedDraft = listed.value.find(({ id }) => id === 'rule-a');
+      expect(importedDraft?.status).toBe('draft');
+      expect(importedDraft?.documentJson).toContain('"typo":true');
+      expect(JSON.stringify(importedDraft?.errors)).toContain('"path":"typo"');
     }
     expect(repository.load().rules[0]?.activeDocument).toEqual(activeBefore);
     repository.close();
