@@ -1,4 +1,4 @@
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { MAX_RULE_FILE_BYTES, nodeRuleFiles } from './rules-file-io';
 import { extname } from 'node:path';
 import {
   canActivate,
@@ -48,7 +48,6 @@ export type RuleFileDependencies = {
 
 const emptyRequestSchema = z.object({}).strict();
 const exportRequestSchema = z.object({ id: z.string().min(1) }).strict();
-const MAX_RULE_FILE_BYTES = 1_048_576;
 
 export async function importRuleFile(
   request: unknown,
@@ -61,7 +60,7 @@ export async function importRuleFile(
   if (extname(selectedPath).toLowerCase() !== '.json')
     return { ok: false, error: { kind: 'ValidationFailed' } };
   try {
-    const files = deps.files ?? nodeFiles;
+    const files = deps.files ?? nodeRuleFiles;
     if (files.size(selectedPath) > MAX_RULE_FILE_BYTES)
       return { ok: false, error: { kind: 'ValidationFailed' } };
     const documentJson = files.read(selectedPath);
@@ -140,7 +139,7 @@ export async function exportRuleFile(
   if (extname(selectedPath).toLowerCase() !== '.json')
     return { ok: false, error: { kind: 'ValidationFailed' } };
   try {
-    (deps.files ?? nodeFiles).write(
+    (deps.files ?? nodeRuleFiles).write(
       selectedPath,
       JSON.stringify(rule.activeDocument, null, 2),
     );
@@ -299,11 +298,3 @@ function validationIssues(
     suggestion: `Исправьте область правила: ${action}.`,
   }));
 }
-
-const nodeFiles = {
-  size: (path: string) => statSync(path).size,
-  read: (path: string) => readFileSync(path, 'utf8'),
-  write: (path: string, content: string) => {
-    writeFileSync(path, content, 'utf8');
-  },
-};
