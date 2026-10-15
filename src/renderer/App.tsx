@@ -131,7 +131,7 @@ function MainContent({
   readonly model: AppModel;
   readonly screenProps: ScreenProps;
 }): React.JSX.Element {
-  const { state, view, views } = model;
+  const { state } = model;
   if (shouldShowLoading(model)) return <LoadingState />;
   if (state.loadError && state.tasks.length === 0)
     return (
@@ -144,12 +144,7 @@ function MainContent({
     );
   return (
     <>
-      <ScreenContent
-        {...screenProps}
-        tasks={
-          view === 'board' || view === 'all' ? views.all : views.todayTasks
-        }
-      />
+      <ScreenContent {...screenProps} />
       {model.clock.error && (
         <p className="load-error" role="alert">
           {model.clock.error}
@@ -193,7 +188,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     hasUndatedTasks: views.all.some(
       (task) => task.day === undefined && task.status.kind !== 'done',
     ),
-    tasks: views.todayTasks,
+    tasks: view === 'board' || view === 'all' ? views.all : views.todayTasks,
     today: views.today,
     todayLabel: localDateLabel(views.today),
     available: views.available,
