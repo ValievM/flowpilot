@@ -13,6 +13,7 @@ interface NowScreenProps {
   readonly hasTasks: boolean;
   readonly hasUndatedTasks: boolean;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 function NoAvailableTask({
@@ -72,6 +73,7 @@ export function NowScreen({
   workdays,
   isLoading,
   onStart,
+  onOpenTask,
   hasTasks,
   hasUndatedTasks,
 }: NowScreenProps): React.JSX.Element {
@@ -90,7 +92,18 @@ export function NowScreen({
       <h1>Сейчас</h1>
       <article className="next-step" aria-labelledby="now-task-title">
         {task.rolledOverFrom && <p>Перенесено со вчера.</p>}
-        <h2 id="now-task-title">{task.title}</h2>
+        <h2 id="now-task-title">
+          <button
+            className="task-title-button"
+            type="button"
+            aria-label={`Открыть задачу: ${task.title}`}
+            onClick={(event) => {
+              onOpenTask(task.id, event.currentTarget);
+            }}
+          >
+            {task.title}
+          </button>
+        </h2>
         <p>Доступно сейчас: ближайший срок, затем порядок добавления.</p>
         <DeadlineWarning risk={risk} />
         <button

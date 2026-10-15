@@ -39,6 +39,7 @@ type BoardWorkspaceProps = {
   ui: BoardUiState;
   actions: BoardActions;
   today: TemporalTypes.PlainDate;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 };
 
 type BoardPartProps = {
@@ -46,12 +47,15 @@ type BoardPartProps = {
   ui: BoardUiState;
   actions: BoardActions;
   today: TemporalTypes.PlainDate;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 };
 
 export function BoardScreen({
   today,
+  onOpenTask,
 }: {
   today: TemporalTypes.PlainDate;
+  onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   const data = useBoardSnapshot();
   const ui = useBoardUiState();
@@ -69,7 +73,15 @@ export function BoardScreen({
   if (!data.snapshot) {
     return <BoardLoadFailure error={data.error} onRetry={data.retry} />;
   }
-  return <BoardWorkspace data={data} ui={ui} actions={actions} today={today} />;
+  return (
+    <BoardWorkspace
+      data={data}
+      ui={ui}
+      actions={actions}
+      today={today}
+      onOpenTask={onOpenTask}
+    />
+  );
 }
 
 function useBoardUiState(): BoardUiState {
@@ -116,6 +128,7 @@ function BoardWorkspace({
   ui,
   actions,
   today,
+  onOpenTask,
 }: BoardWorkspaceProps): React.JSX.Element {
   const snapshot = data.snapshot;
   if (!snapshot) return <BoardLoading />;
@@ -133,6 +146,7 @@ function BoardWorkspace({
         ui={ui}
         actions={actions}
         today={today}
+        onOpenTask={onOpenTask}
       />
       <BoardDialogWorkspace snapshot={snapshot} ui={ui} actions={actions} />
     </section>
@@ -144,11 +158,13 @@ function BoardTaskColumns({
   ui,
   actions,
   today,
+  onOpenTask,
 }: BoardPartProps): React.JSX.Element {
   return (
     <BoardColumns
       snapshot={snapshot}
       today={today}
+      onOpenTask={onOpenTask}
       onMove={actions.move}
       onRename={(column) => {
         ui.advanceDialogSession();
@@ -175,7 +191,7 @@ function BoardDialogWorkspace({
   snapshot,
   ui,
   actions,
-}: Omit<BoardPartProps, 'today'>): React.JSX.Element {
+}: Omit<BoardPartProps, 'today' | 'onOpenTask'>): React.JSX.Element {
   return (
     <BoardDialogs
       columns={snapshot.columns}
