@@ -6,6 +6,7 @@ import {
   type AttachmentAddRequest,
   type AttachmentOpenRequest,
   type AttachmentRemoveRequest,
+  type ExportInfo,
   type BackupVerifyResult,
   type CommandsApplyRequest,
   type FlowPilotApi,
@@ -82,7 +83,9 @@ const api: FlowPilotApi = Object.freeze({
   },
   backup: {
     export: () =>
-      ipcRenderer.invoke(ipcChannels.backupExport, {}) as Promise<Result<null>>,
+      ipcRenderer.invoke(ipcChannels.backupExport, {}) as Promise<
+        Result<ExportInfo>
+      >,
     verify: () =>
       ipcRenderer.invoke(
         ipcChannels.backupVerify,
