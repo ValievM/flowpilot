@@ -1,3 +1,4 @@
+import type { RuleValidationIssue } from './rule-validation-issues';
 import { MAX_RULE_FILE_BYTES, nodeRuleFiles } from './rules-file-io';
 import { extname } from 'node:path';
 import {
@@ -6,11 +7,7 @@ import {
   parseRulesJson,
   validateRulesDocument,
 } from '../domain';
-import type {
-  RuleDiagnostic,
-  RulesDocument,
-  RulesValidationError,
-} from '../domain';
+import type { RulesDocument } from '../domain';
 import type { Repository, StoredRule, StorageCommand } from '../storage';
 import type { Snapshot } from '../storage';
 import { z } from 'zod';
@@ -22,14 +19,8 @@ type RuleError =
   | { readonly kind: 'RuleConflict' }
   | { readonly kind: 'InternalError' }
   | {
-      readonly kind: 'RuleInvalid';
       readonly errors: readonly RuleValidationIssue[];
     };
-
-type RuleValidationIssue = Pick<RulesValidationError, 'path' | 'reason'> & {
-  readonly code: string;
-  readonly suggestion: string;
-};
 type RuleResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: RuleError };
@@ -288,14 +279,4 @@ function applyRuleCommand(
   } catch {
     return { ok: false, error: { kind: 'InternalError' } };
   }
-}
-function validationIssues(
-  diagnostics: readonly RuleDiagnostic[],
-): RuleValidationIssue[] {
-  return diagnostics.map(({ code, path, action }) => ({
-    code,
-    path,
-    reason: `Правило конфликтует с каталогом: ${code}.`,
-    suggestion: `Исправьте область правила: ${action}.`,
-  }));
 }
