@@ -68,7 +68,10 @@ type SerializedTask = Omit<
   readonly status: IpcTaskStatus;
   readonly comments: readonly SerializedTaskComment[];
 };
-export type IpcSnapshot = Omit<Snapshot, 'tasks'> & {
+export type IpcSnapshot = Omit<
+  Snapshot,
+  'tasks' | 'taskTypes' | 'disciplines' | 'rules'
+> & {
   readonly tasks: readonly SerializedTask[];
 };
 

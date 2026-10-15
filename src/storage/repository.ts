@@ -11,6 +11,7 @@ import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
+import { readRuleSnapshot } from './rules-snapshot';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
@@ -81,6 +82,7 @@ export class Repository {
       .all() as TaskRow[];
     const tasks = taskRows.map((row) => loadTask(this.database, row));
     const settings = readSettings(this.database);
+    const rules = readRuleSnapshot(this.database);
     const revision = readRevision(this.database);
     return {
       columns: columns.map(({ built_in, ...column }) => ({
@@ -88,6 +90,9 @@ export class Repository {
         builtIn: built_in === 1,
       })),
       tasks,
+      taskTypes: rules.taskTypes,
+      disciplines: rules.disciplines,
+      rules: rules.rules,
       settings,
       revision,
     };

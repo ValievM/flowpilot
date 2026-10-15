@@ -1,13 +1,11 @@
 import type Database from 'better-sqlite3';
 import { executeColumnCommand } from './column-commands';
-import {
-  affectedEntities,
-  snapshotEntity,
-  type EntitySnapshot,
-} from './history-entities';
+import { snapshotEntity, type EntitySnapshot } from './history-entities';
+import { affectedEntities } from './affected-entities';
 import { writeHistory } from './history-log';
 import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
+import { executeRulesCommand } from './rules-commands';
 import type { ApplyResult, RejectedAiCommand, StorageCommand } from './types';
 
 type AttachmentFiles = {
@@ -172,6 +170,7 @@ function executeCommand(
     removeAttachment(database, command.attachmentId, options.now);
     return;
   }
+  if (executeRulesCommand(database, command, options.now)) return;
   if (isColumnCommand(command)) executeColumnCommand(database, command);
   else executeTaskCommand(database, command, options.now);
 }

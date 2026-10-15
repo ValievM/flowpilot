@@ -98,6 +98,9 @@ export const legacySnapshot: Snapshot = {
       addedOrder: 15,
     },
   ],
+  taskTypes: [],
+  disciplines: [],
+  rules: [],
   settings: { aiMode: 'auto', workdays: [1, 3, 5], dailyGoal: { minutes: 90 } },
   revision: 14,
 };
@@ -120,8 +123,7 @@ function applySchemaBefore(database: Database.Database, version: number): void {
     if (migration.version > version) continue;
     database.exec(migration.sql);
   }
-  // Reserved numbers 0010-0012 belong to in-flight issues; a database at
-  // those versions still carries every migration this branch knows about.
+  // Versions beyond the latest known migration represent unsupported schemas.
   database.pragma(`user_version = ${String(version)}`);
 }
 

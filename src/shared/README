@@ -21,14 +21,13 @@ expected-revision transaction as commands. No filesystem paths cross the
 bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
 `IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
 AI proposals use a separate strict command contract in `ai-commands.ts`.
-`task.classify`, `rule.import`, `rule.activate`, and `task.setAiRank` are internal
-main-to-storage commands and are intentionally absent from `ipcCommandSchema`.
-The proposal validator checks snapshot IDs and revision/rule fingerprints before
-returning commands tagged with `source: 'ai'`; it does not call a provider or
-apply writes itself. The provider boundary checks task, nested, and column
-references against authoritative request data. Task-type, discipline, and rule
-references fail closed until #40 provides authoritative catalogs in main-process
-state; no such catalog source currently exists in the repository API.
+`task.classify`, `rule.import`, `rule.activate`, `rule.deactivate`, and
+`rule.bind` are internal main-to-storage commands and are intentionally absent
+from `ipcCommandSchema`. The proposal validator checks authoritative catalog and
+active-rule snapshots plus revision/rule fingerprints before returning commands
+tagged with `source: 'ai'`; it does not call a provider or apply writes itself.
+The provider boundary checks task, nested, column, catalog, and rule references
+against authoritative request data.
 AI `task.update` accepts only user-editable fields. AI `task.create` uses a
 separate strict input shape; conversion derives status from the target column,
 assigns the next add order, and initializes comments and attachments without
@@ -50,11 +49,10 @@ separate from the limited model-visible context. It contains task/column IDs
 and states and is never accepted from or included in the renderer/model request.
 This lets validation detect collisions with completed, over-limit, and nested
 records without exposing those records to the model. Move/create validation also
-enforces the #44 column/status semantics. The current repository API does not
-provide authoritative task-type, discipline, or rule catalogs; those references
-are rejected at the IPC provider boundary until such catalogs are available from
-main-process state. `task.move.status.until` is serialized to an ISO date string
-at the IPC boundary.
+enforces the #44 column/status semantics. Task-type, discipline, and rule
+catalogs are persisted by the storage repository and remain main-process-only;
+the provider boundary rejects unknown catalog references. `task.move.status.until`
+is serialized to an ISO date string at the IPC boundary.
 
 `FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded proposal in an unpackaged
 test build with `FLOWPILOT_TEST=1`; the startup fake returns it through

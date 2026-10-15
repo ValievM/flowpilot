@@ -37,6 +37,11 @@ test.beforeEach(async () => {
     width: SNAPSHOT_WINDOW.width,
     height: SNAPSHOT_WINDOW.height,
   });
+  const windowState = await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window?.isVisible(), focused: window?.isFocused() };
+  });
+  expect(windowState).toEqual({ visible: false, focused: false });
   await expect(
     page.getByRole('heading', { name: 'Сегодня, 5 октября', exact: true }),
   ).toBeVisible();
@@ -224,6 +229,59 @@ for (const width of [900, 1280]) {
         window.localStorage.clear();
       });
       await page.reload();
+      const seeded = await page.evaluate(() =>
+        window.flowpilot.commands.apply({
+          expectedRevision: 0,
+          commands: [
+            {
+              kind: 'task.create',
+              task: {
+                id: 'board-snapshot-today',
+                title: 'Подготовить план на сегодня',
+                description: '',
+                status: { kind: 'todo' },
+                columnId: 'todo',
+                day: '2026-10-05',
+                subtasks: [],
+                comments: [],
+                attachments: [],
+                addedOrder: 0,
+              },
+            },
+            {
+              kind: 'task.create',
+              task: {
+                id: 'board-snapshot-doing',
+                title: 'Продолжить начатый проект',
+                description: '',
+                status: { kind: 'doing' },
+                columnId: 'doing',
+                day: '2026-10-05',
+                subtasks: [],
+                comments: [],
+                attachments: [],
+                addedOrder: 1,
+              },
+            },
+            {
+              kind: 'task.create',
+              task: {
+                id: 'board-snapshot-waiting',
+                title: 'Уточнить дату встречи',
+                description: '',
+                status: { kind: 'waiting', reason: 'Ждём ответ' },
+                columnId: 'waiting',
+                day: '2026-10-05',
+                subtasks: [],
+                comments: [],
+                attachments: [],
+                addedOrder: 2,
+              },
+            },
+          ],
+        }),
+      );
+      expect(seeded).toMatchObject({ ok: true, value: { revision: 1 } });
       const themeClicks = theme === 'light' ? 1 : 2;
       for (let click = 0; click < themeClicks; click += 1) {
         await page.getByRole('button', { name: /Тема:/ }).click();

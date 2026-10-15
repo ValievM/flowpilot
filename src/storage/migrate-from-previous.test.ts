@@ -63,6 +63,48 @@ describe('upgrading databases with previous-version data', () => {
       expectMigratedData(path, previousVersion);
     },
   );
+  it('applies rules schema migration from version 9 to version 10', () => {
+    const directory = makeDirectory();
+    const path = join(directory, 'tasks.sqlite');
+    createPreviousVersionDatabase(path, 9);
+    const repository = new Repository(path, clock);
+    repository.close();
+    const database = new Database(path);
+    try {
+      expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
+      expect(database.prepare('PRAGMA table_info(tasks)').all()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'type_id' }),
+          expect.objectContaining({ name: 'discipline_id' }),
+        ]),
+      );
+      expect(database.prepare('PRAGMA foreign_key_list(tasks)').all()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ table: 'task_types', from: 'type_id' }),
+          expect.objectContaining({
+            table: 'disciplines',
+            from: 'discipline_id',
+          }),
+        ]),
+      );
+      for (const table of [
+        'task_types',
+        'disciplines',
+        'rule_documents',
+        'rule_versions',
+      ]) {
+        expect(
+          database
+            .prepare(
+              `SELECT 1 FROM sqlite_master WHERE type='table' AND name=?`,
+            )
+            .get(table),
+        ).toBeDefined();
+      }
+    } finally {
+      database.close();
+    }
+  });
 
   it.each([latestMigrationVersion + 1, 999])(
     'rejects unsupported database version %s without changing existing data',

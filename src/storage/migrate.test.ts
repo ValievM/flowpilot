@@ -46,7 +46,7 @@ describe('database migrations', () => {
         }[]
       ).map(({ name }) => name),
     ).toContain('version');
-    expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
     expect(
       database
         .prepare("SELECT generation FROM column_generations WHERE id = 'todo'")
@@ -66,19 +66,10 @@ describe('database migrations', () => {
     directories.push(directory);
     const path = join(directory, 'tasks.sqlite');
     const database = new Database(path);
+    database.exec(initialSchema);
     database.exec(`
-      CREATE TABLE tasks (
-        id TEXT PRIMARY KEY
-      );
-      INSERT INTO tasks(id) VALUES('legacy-task');
-      CREATE TABLE comments (
-        id TEXT PRIMARY KEY,
-        task_id TEXT NOT NULL,
-        text TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        position INTEGER NOT NULL,
-        UNIQUE(task_id, position)
-      );
+      INSERT INTO tasks(id,title,column_id,status_kind,position,created_at,updated_at)
+      VALUES('legacy-task','Legacy task','todo','todo',0,'2024-01-01T00:00:00Z','2024-01-01T00:00:00Z');
       CREATE TABLE applied_operations (
         operation_id TEXT PRIMARY KEY,
         proposal_id TEXT NOT NULL UNIQUE,
@@ -99,7 +90,7 @@ describe('database migrations', () => {
 
     migrate(database, path);
 
-    expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
     expect(
       database
         .prepare(

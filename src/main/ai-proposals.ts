@@ -145,46 +145,6 @@ function cloneTaskChanges(changes: AiTaskChanges): AiTaskChanges {
   };
 }
 
-const UNSUPPORTED_COMMANDS: Record<string, true> = {
-  'rule.import': true,
-  'rule.activate': true,
-  'task.classify': true,
-};
-
-export function findUnpersistedCommands(
-  commands: readonly unknown[],
-): RejectedAiCommand[] {
-  const rejected: RejectedAiCommand[] = [];
-  for (const [index, input] of commands.entries()) {
-    const candidate = recordValue(input);
-    const kind =
-      candidate && typeof candidate.kind === 'string' ? candidate.kind : '';
-    if (
-      UNSUPPORTED_COMMANDS[kind] !== true &&
-      !hasCatalogReference(kind, candidate)
-    )
-      continue;
-    rejected.push({ index, kind, reason: 'not-persisted-yet' });
-  }
-  return rejected;
-}
-
-function hasCatalogReference(
-  kind: string,
-  candidate: Record<string, unknown> | undefined,
-): boolean {
-  if (kind !== 'task.create') return false;
-  const task = recordValue(candidate?.task);
-  return task?.typeId !== undefined || task?.disciplineId !== undefined;
-}
-
-function recordValue(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return undefined;
-  // Proposal values are JSON objects at this boundary.
-  return value as Record<string, unknown>;
-}
-
 function commandKind(command: unknown): string {
   if (typeof command !== 'object' || command === null || !('kind' in command))
     return 'unknown';
