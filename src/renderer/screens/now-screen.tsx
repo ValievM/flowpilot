@@ -92,7 +92,18 @@ export function NowScreen({
       <h1>Сейчас</h1>
       <article className="next-step" aria-labelledby="now-task-title">
         {task.rolledOverFrom && <p>Перенесено со вчера.</p>}
-        <h2 id="now-task-title">{task.title}</h2>
+        <h2 id="now-task-title">
+          <button
+            className="task-title-button"
+            type="button"
+            aria-label={`Открыть задачу: ${task.title}`}
+            onClick={(event) => {
+              onOpenTask(task.id, event.currentTarget);
+            }}
+          >
+            {task.title}
+          </button>
+        </h2>
         <p>Доступно сейчас: ближайший срок, затем порядок добавления.</p>
         <DeadlineWarning risk={risk} />
         <button
@@ -103,15 +114,6 @@ export function NowScreen({
           }}
         >
           {task.status.kind === 'doing' ? 'Продолжить' : 'Взять в работу'}
-        </button>
-        <button
-          className="button"
-          type="button"
-          onClick={(event) => {
-            onOpenTask(task.id, event.currentTarget);
-          }}
-        >
-          Открыть задачу
         </button>
       </article>
     </section>

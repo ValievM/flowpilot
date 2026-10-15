@@ -55,7 +55,18 @@ function TaskRow({
     >
       <span className="task-number">{String(index + 1).padStart(2, '0')}</span>
       <div className="task-copy">
-        <h3>{task.title}</h3>
+        <h3>
+          <button
+            className="task-title-button"
+            type="button"
+            aria-label={`Открыть задачу: ${task.title}`}
+            onClick={(event) => {
+              onOpenTask(task.id, event.currentTarget);
+            }}
+          >
+            {task.title}
+          </button>
+        </h3>
         <div className="task-meta">
           {task.status.kind === 'waiting' && (
             <span>Ожидание: {task.status.reason}</span>
@@ -81,15 +92,6 @@ function TaskRow({
       <span className={`state-label state-${task.status.kind}`}>
         {taskState(task)}
       </span>
-      <button
-        className="button"
-        type="button"
-        onClick={(event) => {
-          onOpenTask(task.id, event.currentTarget);
-        }}
-      >
-        Открыть задачу
-      </button>
     </li>
   );
 }

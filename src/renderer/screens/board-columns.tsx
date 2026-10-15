@@ -218,16 +218,18 @@ function BoardTaskCard({
       label={`Задача: ${task.title}`}
     >
       <BoardRiskMark task={task} snapshot={snapshot} today={today} />
-      <h3>{task.title}</h3>
-      <button
-        className="button"
-        type="button"
-        onClick={(event) => {
-          onOpenTask(task.id, event.currentTarget);
-        }}
-      >
-        Открыть задачу
-      </button>
+      <h3>
+        <button
+          className="task-title-button"
+          type="button"
+          aria-label={`Открыть задачу: ${task.title}`}
+          onClick={(event) => {
+            onOpenTask(task.id, event.currentTarget);
+          }}
+        >
+          {task.title}
+        </button>
+      </h3>
       {task.deadline && (
         <p className="task-summary-meta">Срок: {task.deadline}</p>
       )}

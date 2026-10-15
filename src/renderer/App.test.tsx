@@ -743,10 +743,29 @@ describe('persisted today and now screens', () => {
       task: { title: 'Новая задача', columnId: 'todo', day: today() },
     });
   });
+  it('opens task details from Today, Now, and Board and restores focus', async () => {
+    renderApp([{ id: 'card-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня,/ });
+
+    for (const view of ['Сегодня', 'Сейчас', 'Доска']) {
+      if (view !== 'Сегодня') {
+        fireEvent.click(screen.getByRole('button', { name: view }));
+      }
+      const trigger = await screen.findByRole('button', {
+        name: /Открыть задачу:/,
+      });
+      fireEvent.click(trigger);
+      const card = screen.getByLabelText(/^Карточка задачи:/);
+      expect(card).toBeVisible();
+      fireEvent.keyDown(card, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveFocus());
+    }
+  });
+
   it('refreshes the task card and reports a stale revision without retrying', async () => {
     const app = renderApp([{ id: 'card-task', day: today() }]);
     await screen.findByRole('heading', { name: /Сегодня,/ });
-    const open = screen.getByRole('button', { name: 'Открыть задачу' });
+    const open = screen.getByRole('button', { name: /Открыть задачу:/ });
     fireEvent.click(open);
     app.setStaleOnce();
     const title = screen.getByLabelText('Название');

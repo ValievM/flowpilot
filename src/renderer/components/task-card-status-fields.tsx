@@ -37,6 +37,9 @@ export function TaskCardStatusFields({
       );
       return;
     }
+    setPendingWaiting(false);
+    setWaitingReason('');
+    setWaitingUntil('');
     await onApply([
       {
         kind: 'task.move',

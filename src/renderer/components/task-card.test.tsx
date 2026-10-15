@@ -52,6 +52,7 @@ function renderCard(
     commands: CommandsApplyRequest['commands'],
   ) => Promise<'saved' | 'stale' | 'failed'> = () =>
     Promise.resolve('saved' as const),
+  taskValue: Task = task(),
 ) {
   const applySpy = vi.fn(applyCard);
   const state = {
@@ -62,14 +63,25 @@ function renderCard(
   } as unknown as PersistedState;
   const view = render(
     <TaskCard
-      task={task()}
+      task={taskValue}
       state={state}
       today={Temporal.PlainDate.from('2026-10-06')}
       workdays={new Set([1, 2, 3, 4, 5])}
       onClose={vi.fn()}
     />,
   );
-  return { ...view, applySpy };
+  const rerenderTask = (nextTask: Task): void => {
+    view.rerender(
+      <TaskCard
+        task={nextTask}
+        state={state}
+        today={Temporal.PlainDate.from('2026-10-06')}
+        workdays={new Set([1, 2, 3, 4, 5])}
+        onClose={vi.fn()}
+      />,
+    );
+  };
+  return { ...view, applySpy, rerenderTask };
 }
 
 describe('task detail card', () => {
@@ -103,6 +115,29 @@ describe('task detail card', () => {
         },
       ]);
     });
+  });
+
+  it('cancels pending waiting details when choosing another column', async () => {
+    const { applySpy, rerenderTask } = renderCard();
+    const column = screen.getByLabelText('Колонка');
+    fireEvent.change(column, { target: { value: 'waiting' } });
+    expect(screen.getByLabelText('Причина ожидания')).toBeInTheDocument();
+
+    fireEvent.change(column, { target: { value: 'done' } });
+
+    await waitFor(() => {
+      expect(applySpy).toHaveBeenCalledWith([
+        {
+          kind: 'task.move',
+          id: 'task-1',
+          columnId: 'done',
+          status: { kind: 'done' },
+        },
+      ]);
+    });
+    rerenderTask({ ...task(), columnId: 'done', status: { kind: 'done' } });
+    expect(screen.queryByLabelText('Причина ожидания')).not.toBeInTheDocument();
+    expect(column).toHaveValue('done');
   });
 
   it('adds and completes subtasks without moving the parent task', async () => {
