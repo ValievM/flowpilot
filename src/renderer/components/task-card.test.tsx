@@ -116,37 +116,57 @@ describe('task detail card', () => {
       ]);
     });
   });
-  it('recalculates visible deadline risk when the deadline or estimate changes', () => {
-    const { rerenderTask } = renderCard();
-    const deadline = Temporal.PlainDate.from('2026-10-09');
+  it('recalculates visible deadline risk through the deadline and estimate fields', async () => {
+    let currentTask = task();
+    let updateTaskView: (nextTask: Task) => void = () => {};
+    const card = renderCard((commands) => {
+      const command = commands[0];
+      if (command?.kind === 'task.update') {
+        if (command.changes.deadline) {
+          currentTask = {
+            ...currentTask,
+            deadline: Temporal.PlainDate.from(command.changes.deadline),
+          };
+        }
+        if (command.changes.estimate) {
+          currentTask = { ...currentTask, estimate: command.changes.estimate };
+        }
+        updateTaskView(currentTask);
+      }
+      return Promise.resolve('saved' as const);
+    }, currentTask);
+    const { applySpy } = card;
+    updateTaskView = card.rerenderTask;
 
-    rerenderTask({ ...task(), deadline });
-    expect(
-      screen.getByText(
-        'Срок есть, объём неизвестен. По приблизительной оценке.',
-      ),
-    ).toBeVisible();
-
-    rerenderTask({
-      ...task(),
-      deadline,
-      estimate: { unit: 'workdays', value: 4 },
+    const deadline = screen.getByLabelText('Срок');
+    fireEvent.change(deadline, { target: { value: '2026-10-09' } });
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Срок есть, объём неизвестен. По приблизительной оценке.',
+        ),
+      ).toBeVisible();
     });
-    expect(screen.getByText(/^Риск не успеть/)).toBeVisible();
-    expect(
-      screen.getByText(
-        'До срока 4 рабочих дня, оценка остатка 4 рабочих дня: запас исчерпан, начинать нужно сейчас. По приблизительной оценке.',
-      ),
-    ).toBeVisible();
-    expect(document.querySelector('.risk-label')).toHaveClass('is-risk');
 
-    rerenderTask({
-      ...task(),
-      deadline: Temporal.PlainDate.from('2026-10-12'),
-      estimate: { unit: 'workdays', value: 4 },
+    const estimate = screen.getByLabelText('Остаток, рабочие дни');
+    fireEvent.change(estimate, { target: { value: '4' } });
+    fireEvent.blur(estimate);
+    await waitFor(() => {
+      expect(screen.getByText(/^Риск не успеть/)).toBeVisible();
+      expect(
+        screen.getByText(
+          'До срока 4 рабочих дня, оценка остатка 4 рабочих дня: запас исчерпан, начинать нужно сейчас. По приблизительной оценке.',
+        ),
+      ).toBeVisible();
+      expect(document.querySelector('.risk-label')).toHaveClass('is-risk');
     });
-    expect(screen.queryByText(/^Риск не успеть/)).not.toBeInTheDocument();
-    expect(document.querySelector('.risk-label')).toBeNull();
+
+    fireEvent.change(deadline, { target: { value: '2026-10-12' } });
+    await waitFor(() => {
+      expect(screen.queryByText(/^Риск не успеть/)).not.toBeInTheDocument();
+      expect(document.querySelector('.risk-label')).toBeNull();
+    });
+    expect(applySpy).toHaveBeenCalledTimes(3);
   });
 
   it('cancels pending waiting details when choosing another column', async () => {
