@@ -108,6 +108,7 @@ describe('restore stage cleanup failures', () => {
       'не удалось удалить временные файлы восстановления',
     );
     const reopened = new Repository(profile, clock);
+    expect('backup' in result && result.backup?.db).toBeTruthy();
     expect(reopened.load().tasks[0]?.title).toBe('Задача');
     reopened.close();
     expect(

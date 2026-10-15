@@ -124,6 +124,7 @@ function cleanupStageDir(stageDir: string, result: BackupResult): BackupResult {
       error: result.ok
         ? `Профиль восстановлен, но ${note}`
         : `${result.error}; ${note}`,
+      ...('backup' in result && result.backup ? { backup: result.backup } : {}),
     };
   }
   return result;

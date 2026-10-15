@@ -26,4 +26,5 @@ export type BackupResult =
       readonly ok: false;
       readonly kind: 'OperationalFailure';
       readonly error: string;
+      readonly backup?: RestoredProfileBackup | undefined;
     };

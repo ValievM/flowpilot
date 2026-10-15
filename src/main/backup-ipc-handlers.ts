@@ -123,8 +123,9 @@ function reopenRepository(
       rolledBack: false,
     };
   } catch {
-    if (!restored.ok || !restored.backup) return { ok: false };
-    return reopenRolledBackProfile(deps, restored.backup);
+    const backup = 'backup' in restored ? restored.backup : undefined;
+    if (!backup) return { ok: false };
+    return reopenRolledBackProfile(deps, backup);
   }
 }
 
