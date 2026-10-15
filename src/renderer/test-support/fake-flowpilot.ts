@@ -10,6 +10,7 @@ import {
   createFakeAppApi,
   createFakeHistoryFileApi,
 } from './fake-history-file-api';
+import { applyRepeatCommands } from './fake-repeat-commands';
 
 type TestTask = IpcSnapshot['tasks'][number];
 type Command = CommandsApplyRequest['commands'][number];
@@ -153,10 +154,12 @@ function applyCommands(
     if (command.kind === 'task.move' && command.status)
       moveTask(updated, command);
   }
+  const repeats = applyRepeatCommands(state.current, request.commands);
   state.current = {
     ...state.current,
     tasks: updated,
     revision: state.current.revision + 1,
+    ...repeats,
   };
   return state.current;
 }

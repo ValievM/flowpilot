@@ -1,5 +1,6 @@
 import React from 'react';
-import type { Task } from '../domain';
+import type { Outcome, Series, Task } from '../domain';
+import { parsedSeries } from './parse-ipc-repeats';
 import { parsedTasks } from './parse-ipc-tasks';
 import type {
   CommandsApplyRequest,
@@ -9,6 +10,8 @@ import type {
 
 export interface PersistedState {
   readonly tasks: readonly Task[];
+  readonly series: readonly Series[];
+  readonly outcomes: readonly Outcome[];
   readonly columns: IpcSnapshot['columns'];
   readonly revision: number;
   readonly workdays: ReadonlySet<number>;
@@ -239,7 +242,7 @@ export function usePersistedTasks(
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
-  const parsed = parsedTasks(snapshot);
+  const parsed = { ...parsedTasks(snapshot), ...parsedSeries(snapshot) };
   return {
     ...parsed,
     loadError,
