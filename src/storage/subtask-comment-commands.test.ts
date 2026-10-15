@@ -269,12 +269,15 @@ describe('subtask.move', () => {
     repository.close();
   });
 
-  it('keeps the order when moving to the current position', () => {
+  it('does not change task or history when moving to the current position', () => {
     const repository = openRepository();
     createTaskWithSubtasks(repository, [
       { id: 'sub-1', title: 'Один', completed: false },
       { id: 'sub-2', title: 'Два', completed: false },
     ]);
+    const before = repository.load();
+    const historyBefore = repository.history(10);
+
     expect(
       repository.apply(
         [
@@ -287,11 +290,9 @@ describe('subtask.move', () => {
         ],
         1,
       ),
-    ).toEqual({ ok: true, value: { revision: 2 } });
-    expect(repository.load().tasks[0]?.subtasks.map(({ id }) => id)).toEqual([
-      'sub-1',
-      'sub-2',
-    ]);
+    ).toEqual({ ok: true, value: { revision: 1 } });
+    expect(repository.load()).toEqual(before);
+    expect(repository.history(10)).toEqual(historyBefore);
     repository.close();
   });
 

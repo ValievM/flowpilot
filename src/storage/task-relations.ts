@@ -64,8 +64,11 @@ export function editSubtasks(
     .prepare('SELECT * FROM tasks WHERE id = ?')
     .get(taskId) as TaskRow | undefined;
   if (!row) throw new Error('task not found');
-  const result = edit(loadTask(database, row));
+  const task = loadTask(database, row);
+  const result = edit(task);
   if (!result.ok) throw new Error(result.error);
+  if (JSON.stringify(result.task.subtasks) === JSON.stringify(task.subtasks))
+    return;
   database.prepare('DELETE FROM subtasks WHERE task_id = ?').run(taskId);
   const insert = database.prepare(
     'INSERT INTO subtasks(id,task_id,title,completed,position) VALUES(?,?,?,?,?)',

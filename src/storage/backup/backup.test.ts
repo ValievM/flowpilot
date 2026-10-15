@@ -1057,4 +1057,25 @@ describe('backup package', () => {
     ]);
     restored.close();
   });
+  it('rejects malformed comment timestamps before replacing the profile', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    const original = repository.load();
+    repository.close();
+
+    const packageDir = exportPackage(root, profile);
+    const dataPath = join(packageDir, 'data.json');
+    const data = parsed(dataPath) as { comments: Record<string, unknown>[] };
+    const comment = data.comments[0];
+    if (!comment) throw new Error('Missing comment fixture');
+    comment.created_at = 'not-an-instant';
+    save(dataPath, data);
+    updateDataHash(packageDir);
+
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
+    const current = new Repository(profile, clock);
+    expect(current.load()).toEqual(original);
+    current.close();
+  });
 });

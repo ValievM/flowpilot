@@ -68,6 +68,20 @@ function applyTransaction(
     options.commands.forEach((command, index) => {
       captureAndExecute(database, command, { index, options }, changes);
     });
+    const changed = [...changes.values()].some(
+      ({ before, after }) => JSON.stringify(before) !== JSON.stringify(after),
+    );
+    if (!changed) {
+      const revision = readRevision(database);
+      if (options.proposalId)
+        recordAppliedProposal(
+          database,
+          options.proposalId,
+          revision,
+          options.rejectedCommands,
+        );
+      return { revision, replayed: false };
+    }
     database
       .prepare(
         'UPDATE metadata SET revision = revision + 1 WHERE singleton = 1',
