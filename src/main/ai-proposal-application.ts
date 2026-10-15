@@ -205,6 +205,9 @@ export class AiProposalApplication {
       taskTypes: current.taskTypes,
       disciplines: current.disciplines,
       savedRuleIds: current.rules.map(({ id }) => id),
+      currentRuleDocuments: current.rules.flatMap(({ document }) =>
+        document ? [document] : [],
+      ),
       rules: current.rules.flatMap(({ activeDocument }) =>
         activeDocument ? [activeDocument] : [],
       ),

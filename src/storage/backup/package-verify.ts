@@ -251,6 +251,41 @@ function verifyRuleVersionReferences(
         path: 'data.json',
         message: `Версия правила ${version.rule_id} не связана с документом`,
       });
+  for (const rule of data.rules) {
+    const hasActiveDocument = rule.active_document_json !== null;
+    const hasActiveVersion = rule.active_version !== null;
+    if (hasActiveDocument !== hasActiveVersion) {
+      problems.push({
+        path: 'data.json',
+        message: `Активное состояние правила ${rule.id} неполное`,
+      });
+      continue;
+    }
+    if (!hasActiveVersion) {
+      if (rule.status === 'active')
+        problems.push({
+          path: 'data.json',
+          message: `Активная версия правила ${rule.id} не сохранена`,
+        });
+      continue;
+    }
+    const archivedVersion = data.rule_versions.find(
+      ({ rule_id, version }) =>
+        rule_id === rule.id && version === rule.active_version,
+    );
+    if (!archivedVersion) {
+      problems.push({
+        path: 'data.json',
+        message: `Архив не содержит активную версию правила ${rule.id}`,
+      });
+      continue;
+    }
+    if (archivedVersion.document_json !== rule.active_document_json)
+      problems.push({
+        path: 'data.json',
+        message: `Активная версия правила ${rule.id} не совпадает с архивом`,
+      });
+  }
 }
 
 function isPackagePath(path: string): boolean {

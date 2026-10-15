@@ -163,6 +163,99 @@ describe('AI proposal application', () => {
       'Старая версия',
     );
   });
+  it('shows the current draft rather than the active version in confirmation diffs', () => {
+    const activeRule = {
+      schema_version: 'v1',
+      id: 'rule-draft-diff',
+      title: 'Активная версия',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const taskType = { id: 'type-1', name: 'Тип' };
+    const { repository, application } = setup(() => ({
+      ...emptyReferences,
+      taskTypes: [taskType],
+      rules: [activeRule],
+    }));
+    expect(
+      repository.apply(
+        [
+          { kind: 'taskType.create', taskType },
+          { kind: 'rule.import', documentJson: JSON.stringify(activeRule) },
+          { kind: 'rule.activate', ruleId: activeRule.id },
+        ],
+        0,
+      ).ok,
+    ).toBe(true);
+    const currentDraft = { ...activeRule, title: 'Черновик' };
+    expect(
+      repository.apply(
+        [{ kind: 'rule.import', documentJson: JSON.stringify(currentDraft) }],
+        1,
+      ).ok,
+    ).toBe(true);
+    const proposedDraft = { ...activeRule, title: 'Предлагаемая версия' };
+
+    const staged = application.applyProposal(
+      proposal('draft-rule-diff', 2, [
+        { kind: 'rule.import', documentJson: JSON.stringify(proposedDraft) },
+      ]),
+      'confirm',
+    );
+
+    if (staged.kind !== 'confirmation-required')
+      throw new Error('Expected rule confirmation diff');
+    const change = staged.diff.changes.find(
+      ({ entityId, field }) =>
+        entityId === activeRule.id && field === 'document',
+    );
+    expect(change?.before).toMatchObject({ title: 'Черновик' });
+    expect(change?.after).toMatchObject({ title: 'Предлагаемая версия' });
+    expect(repository.load().rules[0]?.document?.title).toBe('Черновик');
+  });
+  it('shows a draft-only rule document in the confirmation diff', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'draft-only-rule',
+      title: 'Сохранённый черновик',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    } as const;
+    const taskType = { id: 'type-1', name: 'Тип' };
+    const { repository, application } = setup(() => ({
+      ...emptyReferences,
+      taskTypes: [taskType],
+    }));
+    expect(
+      repository.apply(
+        [
+          { kind: 'taskType.create', taskType },
+          { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+        ],
+        0,
+      ).ok,
+    ).toBe(true);
+    const proposedRule = { ...rule, title: 'Предлагаемое правило' };
+
+    const staged = application.applyProposal(
+      proposal('draft-only-diff', 1, [
+        { kind: 'rule.import', documentJson: JSON.stringify(proposedRule) },
+      ]),
+      'confirm',
+    );
+
+    if (staged.kind !== 'confirmation-required')
+      throw new Error('Expected rule confirmation diff');
+    const change = staged.diff.changes.find(
+      ({ entityId, field }) => entityId === rule.id && field === 'document',
+    );
+    expect(change?.before).toMatchObject({ title: 'Сохранённый черновик' });
+    expect(change?.after).toMatchObject({ title: 'Предлагаемое правило' });
+  });
 
   it('applies a confirmed proposal with AI history source', () => {
     const { repository, application } = setup();

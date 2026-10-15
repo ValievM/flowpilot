@@ -618,7 +618,63 @@ describe('backup package', () => {
         'отсутствующую колонку',
       );
   });
+  it('rejects active rule state that disagrees with its archived version', () => {
+    const rule = {
+      schema_version: 'v1',
+      id: 'backup-rule',
+      title: 'Правило',
+      scope: { task_type_ids: ['type-1'] },
+      rules: [
+        { id: 'priority', kind: 'priority', level: 'high', reason: 'Важно' },
+      ],
+    };
+    const { root, profile, repository } = setup();
+    expect(
+      repository.apply(
+        [
+          { kind: 'taskType.create', taskType: { id: 'type-1', name: 'Тип' } },
+          { kind: 'rule.import', documentJson: JSON.stringify(rule) },
+          { kind: 'rule.activate', ruleId: rule.id },
+        ],
+        0,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const dataPath = join(packageDir, 'data.json');
+    const data = z
+      .object({
+        rules: z.array(z.record(z.string(), z.unknown())),
+        rule_versions: z.array(z.record(z.string(), z.unknown())),
+      })
+      .loose()
+      .parse(parsed(dataPath));
+    const storedRule = data.rules[0];
+    if (!storedRule) throw new Error('Missing rule backup fixture');
+    storedRule.active_version = 99;
+    save(dataPath, data);
+    updateDataHash(packageDir);
 
+    const verification = verifyPackage(packageDir);
+
+    expect(verification.ok).toBe(false);
+    if (!verification.ok)
+      expect(verification.problems[0]?.message).toContain(
+        'активную версию правила',
+      );
+    storedRule.active_version = 1;
+    storedRule.active_document_json = '{}';
+    save(dataPath, data);
+    updateDataHash(packageDir);
+
+    const mismatchedDocument = verifyPackage(packageDir);
+
+    expect(mismatchedDocument.ok).toBe(false);
+    if (!mismatchedDocument.ok)
+      expect(mismatchedDocument.problems[0]?.message).toContain(
+        'не совпадает с архивом',
+      );
+  });
   it('refuses to overwrite an existing export folder', () => {
     const { root, profile, repository } = setup();
     repository.close();

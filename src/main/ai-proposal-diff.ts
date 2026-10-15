@@ -17,7 +17,9 @@ export function buildProposalDiff(
   const state: DiffState = {
     tasks: new Map(snapshot.tasks.map((task) => [task.id, task])),
     columns: snapshot.columns,
-    rules: new Map(snapshot.rules.map((rule) => [rule.id, rule])),
+    rules: new Map(
+      snapshot.currentRuleDocuments.map((rule) => [rule.id, rule]),
+    ),
     activeRuleIds: new Set(snapshot.rules.map((rule) => rule.id)),
     changes: [],
   };

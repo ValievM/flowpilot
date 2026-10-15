@@ -24,6 +24,7 @@ const snapshot: AiSnapshot = {
   taskTypes: [{ id: 'type-1', name: 'Type' }],
   disciplines: [{ id: 'discipline-1', name: 'Discipline' }],
   rules: [],
+  currentRuleDocuments: [],
 };
 
 const proposal = {

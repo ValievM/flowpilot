@@ -39,6 +39,7 @@ const snapshot: AiSnapshot = {
   disciplines: [{ id: 'discipline-1', name: 'Discipline' }],
   savedRuleIds: [],
   rules: [],
+  currentRuleDocuments: [],
 };
 const proposal = (
   commands: unknown[],

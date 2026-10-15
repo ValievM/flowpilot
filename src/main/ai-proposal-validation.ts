@@ -17,6 +17,7 @@ export interface AiSnapshot {
   readonly taskTypes: readonly TaskType[];
   readonly disciplines: readonly Discipline[];
   readonly rules: readonly RulesDocument[];
+  readonly currentRuleDocuments: readonly RulesDocument[];
 }
 
 interface CommandValidationState {
