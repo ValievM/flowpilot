@@ -99,6 +99,22 @@ test('has no horizontal overflow at 900 pixels with a long task title', async ()
     }),
   ).toBeVisible();
 });
+test('keeps the Today screen usable at 200% zoom at supported widths', async () => {
+  for (const width of [900, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await app?.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(2);
+    });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    expect(await page.evaluate(() => window.innerWidth)).toBeLessThan(width);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
+    await app?.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1);
+    });
+  }
+});
 
 test('keeps the titlebar drag region away from actions at the minimum width', async () => {
   await page.setViewportSize({ width: 900, height: 800 });

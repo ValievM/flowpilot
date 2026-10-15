@@ -975,4 +975,47 @@ describe('persisted today and now screens', () => {
       screen.getByText(/Нет будущих и нераспределённых задач/),
     ).toBeVisible();
   });
+  it('gives every rendered screen control an accessible name', async () => {
+    renderApp([{ id: 'accessibility-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    const expectNamedControls = (): void => {
+      for (const control of screen.getAllByRole('button')) {
+        expect(control).toHaveAccessibleName();
+      }
+      for (const role of ['textbox', 'combobox', 'checkbox'] as const) {
+        for (const control of screen.queryAllByRole(role)) {
+          expect(control).toHaveAccessibleName();
+        }
+      }
+    };
+    expectNamedControls();
+    for (const view of ['Сейчас', 'Доска', 'Все задачи', 'Настройки']) {
+      fireEvent.click(screen.getByRole('button', { name: view }));
+      expectNamedControls();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Открыть задачу: accessibility-task',
+      }),
+    );
+    expectNamedControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Закрыть карточку задачи' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    expectNamedControls();
+  });
+  it('returns focus to the quick-add trigger when its dialog closes', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const trigger = screen.getByRole('button', { name: 'Задача' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByLabelText('Что нужно сделать?')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() => {
+      expect(trigger).toHaveFocus();
+    });
+  });
 });
