@@ -201,9 +201,16 @@ describe('AI task safety contract', () => {
         {
           ...task,
           subtasks: [
-            { id: 'sub-existing', title: 'Existing', completed: false },
+            {
+              id: 'sub-existing',
+              title: 'Existing',
+              completed: false,
+              position: 0,
+            },
           ],
-          comments: [{ id: 'comment-existing', text: 'Existing' }],
+          comments: [
+            { id: 'comment-existing', text: 'Existing', createdAt: null },
+          ],
         },
       ],
     };

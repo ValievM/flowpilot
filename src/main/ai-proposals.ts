@@ -1,4 +1,4 @@
-import type { Task } from '../domain';
+import type { TaskCreationDraft } from '../domain';
 import {
   aiCommandSchema,
   proposalSchema,
@@ -173,7 +173,7 @@ function buildTask(
   task: AiTaskCreation,
   snapshot: AiSnapshot,
   addedOrder: number,
-): Task {
+): TaskCreationDraft {
   const column = snapshot.columns.find(
     (candidate) => candidate.id === task.columnId,
   );

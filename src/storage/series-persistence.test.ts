@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createPreviousVersionDatabase } from '../../tests/storage/migration-fixtures/legacy-database';
 import type { Series } from '../domain';
 import { migrate } from './migrate';
 import { Repository } from './repository';
@@ -45,13 +46,13 @@ describe('series persistence migration', () => {
     );
     directories.push(directory);
     const path = join(directory, 'profile.sqlite');
+    createPreviousVersionDatabase(path, 10);
     const database = new Database(path);
-    database.pragma('user_version = 10');
 
     migrate(database, path);
 
     try {
-      expect(database.pragma('user_version')).toEqual([{ user_version: 11 }]);
+      expect(database.pragma('user_version')).toEqual([{ user_version: 12 }]);
       expect(
         database
           .prepare(

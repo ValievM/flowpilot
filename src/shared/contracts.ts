@@ -4,7 +4,7 @@ import {
   settingFields,
   validateGenericSettingValue,
 } from './command-schema';
-import type { Series, Task, TaskStatus } from '../domain';
+import type { Series, Task, TaskComment, TaskStatus } from '../domain';
 import type { HistoryEntry, Snapshot } from '../storage';
 import type { Result } from './ipc-result';
 import type {
@@ -54,15 +54,19 @@ export type AiIpcProposal = Omit<Proposal, 'commands'> & {
 type IpcTaskStatus =
   | Exclude<TaskStatus, { kind: 'waiting' }>
   | { kind: 'waiting'; reason: string; until?: string };
+type SerializedTaskComment = Omit<TaskComment, 'createdAt'> & {
+  readonly createdAt: string | null;
+};
 type SerializedTask = Omit<
   Task,
-  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status'
+  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status' | 'comments'
 > & {
   readonly day?: string;
   readonly time?: string;
   readonly deadline?: string;
   readonly rolledOverFrom?: string;
   readonly status: IpcTaskStatus;
+  readonly comments: readonly SerializedTaskComment[];
 };
 type SerializedSeries = Omit<Series, 'startsOn' | 'endsOn' | 'time'> & {
   readonly startsOn: string;

@@ -5,7 +5,11 @@ import {
   appendRuleActivationDiff,
   appendRuleImportDiff,
 } from './ai-proposal-command-diff';
-import type { AiFieldChange, DiffState } from './ai-proposal-diff-types';
+import type {
+  AiFieldChange,
+  DiffState,
+  DiffTask,
+} from './ai-proposal-diff-types';
 import type { AiSnapshot } from './ai-proposal-validation';
 
 export type { AiFieldChange } from './ai-proposal-diff-types';
@@ -153,7 +157,7 @@ function appendTaskUpdates(
     state.tasks.set(command.id, applyTaskChanges(task, command.changes));
 }
 
-function applyTaskChanges(task: Task, changes: AiTaskChanges): Task {
+function applyTaskChanges(task: DiffTask, changes: AiTaskChanges): DiffTask {
   const {
     description: previousDescription,
     day: previousDay,

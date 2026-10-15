@@ -1134,4 +1134,120 @@ describe('backup package', () => {
       readdirSync(root).filter((name) => name.startsWith('FlowPilot-export-')),
     ).toEqual([]);
   });
+  it('preserves subtask order and comment times through export and restore', () => {
+    const { root, profile, repository } = setup();
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'task.create',
+            task: {
+              ...task,
+              comments: [],
+              subtasks: [
+                { id: 'sub-1', title: 'Один', completed: false },
+                { id: 'sub-2', title: 'Два', completed: false },
+                { id: 'sub-3', title: 'Три', completed: false },
+              ],
+            },
+          },
+        ],
+        0,
+      ).ok,
+    ).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'subtask.move',
+            taskId: task.id,
+            subtaskId: 'sub-3',
+            position: 0,
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'comment.add',
+            taskId: task.id,
+            comment: { id: 'comment-1', text: 'Первая' },
+          },
+        ],
+        2,
+      ).ok,
+    ).toBe(true);
+    const expectedTask = repository.load().tasks[0];
+    repository.close();
+
+    const packageDir = exportPackage(root, profile);
+    const restoredPath = join(root, 'restored-profile.sqlite');
+    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restored = new Repository(restoredPath, clock);
+    const restoredTask = restored.load().tasks[0];
+    expect(restoredTask?.subtasks).toEqual(expectedTask?.subtasks);
+    expect(restoredTask?.comments).toEqual(expectedTask?.comments);
+    restored.close();
+  });
+  it('reads a legacy package comment without a creation time as null', () => {
+    const { root, profile, repository } = setup();
+    expect(
+      repository.apply(
+        [{ kind: 'task.create', task: { ...task, comments: [] } }],
+        0,
+      ).ok,
+    ).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'comment.add',
+            taskId: task.id,
+            comment: { id: 'comment-1', text: 'Заметка' },
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    repository.close();
+
+    const packageDir = exportPackage(root, profile);
+    const dataPath = join(packageDir, 'data.json');
+    const data = parsed(dataPath) as { comments: Record<string, unknown>[] };
+    for (const comment of data.comments) delete comment.created_at;
+    save(dataPath, data);
+    updateDataHash(packageDir);
+
+    const restoredPath = join(root, 'legacy-profile.sqlite');
+    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restored = new Repository(restoredPath, clock);
+    expect(restored.load().tasks[0]?.comments).toEqual([
+      { id: 'comment-1', text: 'Заметка', createdAt: null },
+    ]);
+    restored.close();
+  });
+  it('rejects malformed comment timestamps before replacing the profile', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    const original = repository.load();
+    repository.close();
+
+    const packageDir = exportPackage(root, profile);
+    const dataPath = join(packageDir, 'data.json');
+    const data = parsed(dataPath) as { comments: Record<string, unknown>[] };
+    const comment = data.comments[0];
+    if (!comment) throw new Error('Missing comment fixture');
+    comment.created_at = 'not-an-instant';
+    save(dataPath, data);
+    updateDataHash(packageDir);
+
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
+    const current = new Repository(profile, clock);
+    expect(current.load()).toEqual(original);
+    current.close();
+  });
 });

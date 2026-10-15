@@ -66,15 +66,25 @@ export const legacySnapshot: Snapshot = {
       deadline: Temporal.PlainDate.from('2026-10-12'),
       estimate: { unit: 'workdays', value: 3 },
       subtasks: [
-        { id: 'legacy-subtask-done', title: 'Check schema', completed: true },
+        {
+          id: 'legacy-subtask-done',
+          title: 'Check schema',
+          completed: true,
+          position: 0,
+        },
         {
           id: 'legacy-subtask-open',
           title: 'Check rollback',
           completed: false,
+          position: 1,
         },
       ],
       comments: [
-        { id: 'legacy-comment', text: 'Keep the existing attachment.' },
+        {
+          id: 'legacy-comment',
+          text: 'Keep the existing attachment.',
+          createdAt: Temporal.Instant.from('2026-10-05T11:00:00.000Z'),
+        },
       ],
       attachments: [
         {
@@ -118,8 +128,9 @@ function applySchemaBefore(database: Database.Database, version: number): void {
   for (const migration of migrationFiles) {
     if (migration.version > version) continue;
     database.exec(migration.sql);
-    database.pragma(`user_version = ${String(migration.version)}`);
   }
+  // Versions beyond the latest known migration represent unsupported schemas.
+  database.pragma(`user_version = ${String(version)}`);
 }
 
 function seedLegacyRows(

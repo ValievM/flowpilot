@@ -69,7 +69,10 @@ function toDomainTask(task: BoardTask): Task {
       : {}),
     ...(task.estimate ? { estimate: task.estimate } : {}),
     subtasks: task.subtasks,
-    comments: task.comments,
+    comments: task.comments.map(({ createdAt, ...comment }) => ({
+      ...comment,
+      createdAt: createdAt === null ? null : Temporal.Instant.from(createdAt),
+    })),
     attachments: task.attachments,
     ...(task.rolledOverFrom
       ? { rolledOverFrom: Temporal.PlainDate.from(task.rolledOverFrom) }

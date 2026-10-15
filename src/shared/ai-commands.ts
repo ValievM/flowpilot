@@ -1,5 +1,11 @@
 import { Temporal } from 'temporal-polyfill';
-import type { Task, TaskComment, TaskStatus, Subtask } from '../domain';
+import type {
+  SubtaskDraft,
+  Task,
+  TaskCommentDraft,
+  TaskCreationDraft,
+  TaskStatus,
+} from '../domain';
 import { z } from 'zod';
 import { commandSchema } from './command-schema';
 
@@ -22,8 +28,8 @@ export interface AiTaskCreation {
   readonly columnId: string;
   readonly typeId?: string;
   readonly disciplineId?: string;
-  readonly subtasks: readonly Subtask[];
-  readonly comment?: TaskComment;
+  readonly subtasks: readonly SubtaskDraft[];
+  readonly comment?: TaskCommentDraft;
 }
 
 const dateValueSchema = z.union([
@@ -102,12 +108,12 @@ export type AiBaseCommand =
   | {
       readonly kind: 'subtask.add';
       readonly taskId: string;
-      readonly subtask: Subtask;
+      readonly subtask: SubtaskDraft;
     }
   | {
       readonly kind: 'comment.add';
       readonly taskId: string;
-      readonly comment: TaskComment;
+      readonly comment: TaskCommentDraft;
     };
 
 const aiTaskCreateCommandSchema = z
@@ -200,7 +206,7 @@ export const aiCommandSchema = z.union([
 export type AiCommand = z.infer<typeof aiCommandSchema>;
 export type AiPlannedCommand =
   | Exclude<AiBaseCommand, { kind: 'task.create' }>
-  | { readonly kind: 'task.create'; readonly task: Task }
+  | { readonly kind: 'task.create'; readonly task: TaskCreationDraft }
   | Extract<
       AiCommand,
       {

@@ -87,8 +87,14 @@ function createdTask(
     status: serializedStatus(task.status),
     columnId: task.columnId,
     addedOrder: task.addedOrder,
-    subtasks: task.subtasks,
-    comments: task.comments,
+    subtasks: task.subtasks.map((subtask, position) => ({
+      ...subtask,
+      position,
+    })),
+    comments: task.comments.map((comment) => ({
+      ...comment,
+      createdAt: null,
+    })),
     attachments: [],
     ...(task.day ? { day: task.day.toString() } : {}),
     ...(task.time ? { time: task.time.toString() } : {}),

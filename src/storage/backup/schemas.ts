@@ -18,6 +18,15 @@ const plainTime = z.string().refine((value) => {
   }
 });
 
+const instant = z.string().refine((value) => {
+  try {
+    Temporal.Instant.from(value);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 const column = z
   .object({
     id: z.string().min(1),
@@ -95,7 +104,8 @@ const comment = z
     id: z.string().min(1),
     task_id: z.string().min(1),
     text: z.string(),
-    created_at: z.string(),
+    // Legacy packages exported before the field carry no key: read as null.
+    created_at: instant.nullable().default(null),
     position: z.number().int(),
   })
   .strict();

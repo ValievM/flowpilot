@@ -97,10 +97,19 @@ test('AC-03 release-1: yesterday Doing rolls over after next-day restart with th
     snapshot.value.tasks.filter((task) => task.id === 'ac03-long-task'),
   ).toHaveLength(1);
   expect(snapshot.value.tasks[0]?.subtasks).toEqual([
-    { id: 'ac03-subtask', title: 'Проверить материалы', completed: true },
+    {
+      id: 'ac03-subtask',
+      title: 'Проверить материалы',
+      completed: true,
+      position: 0,
+    },
   ]);
   expect(snapshot.value.tasks[0]?.comments).toEqual([
-    { id: 'ac03-comment', text: 'Комментарий остаётся' },
+    {
+      id: 'ac03-comment',
+      text: 'Комментарий остаётся',
+      createdAt: '2026-10-05T12:00:00Z',
+    },
   ]);
   await openView('Доска');
   await expect(

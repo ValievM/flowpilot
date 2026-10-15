@@ -40,7 +40,14 @@ function task(): Task {
     description: 'Короткое описание',
     status: { kind: 'todo' },
     columnId: 'todo',
-    subtasks: [{ id: 'sub-1', title: 'Собрать материалы', completed: false }],
+    subtasks: [
+      {
+        id: 'sub-1',
+        title: 'Собрать материалы',
+        completed: false,
+        position: 0,
+      },
+    ],
     comments: [],
     attachments: [],
     addedOrder: 1,

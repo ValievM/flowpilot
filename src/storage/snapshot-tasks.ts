@@ -89,15 +89,22 @@ function loadTaskRelations(
   database: Database.Database,
   taskId: string,
 ): TaskRelations {
-  // Result shapes follow the fixed table columns in migration 0001.
+  // Result shapes follow the fixed table columns in migrations 0001 and 0013.
   const subtasks = database
     .prepare(
-      'SELECT id,title,completed FROM subtasks WHERE task_id = ? ORDER BY position',
+      'SELECT id,title,completed,position FROM subtasks WHERE task_id = ? ORDER BY position',
     )
-    .all(taskId) as { id: string; title: string; completed: number }[];
+    .all(taskId) as {
+    id: string;
+    title: string;
+    completed: number;
+    position: number;
+  }[];
   const commentRows = database
-    .prepare('SELECT id,text FROM comments WHERE task_id = ? ORDER BY position')
-    .all(taskId) as TaskComment[];
+    .prepare(
+      'SELECT id,text,created_at FROM comments WHERE task_id = ? ORDER BY position',
+    )
+    .all(taskId) as { id: string; text: string; created_at: string | null }[];
   const attachmentRows = database
     .prepare(
       'SELECT id,name,media_type,size_bytes FROM attachments WHERE task_id = ? ORDER BY position',
@@ -109,12 +116,17 @@ function loadTaskRelations(
     size_bytes: number;
   }[];
   return {
-    subtasks: subtasks.map(({ id, title, completed }) => ({
+    subtasks: subtasks.map(({ id, title, completed, position }) => ({
       id,
       title,
       completed: completed === 1,
+      position,
     })),
-    comments: commentRows,
+    comments: commentRows.map(({ id, text, created_at }) => ({
+      id,
+      text,
+      createdAt: created_at === null ? null : Temporal.Instant.from(created_at),
+    })),
     attachments: attachmentRows.map(({ id, name, media_type, size_bytes }) => ({
       id,
       name,

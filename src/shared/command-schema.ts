@@ -1,6 +1,10 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
 import {
+  attachmentAddSchema,
+  attachmentRemoveSchema,
+} from './storage-command-schemas';
+import {
   seriesCreateSchema,
   seriesRecordOutcomeSchema,
   seriesStopSchema,
@@ -14,7 +18,11 @@ import {
   ruleBindSchema,
   ruleDeactivateSchema,
   ruleImportSchema,
+  subtaskMoveSchema,
+  subtaskRemoveSchema,
+  subtaskRenameSchema,
   taskClassifySchema,
+  taskSetAiRankSchema,
   taskTypeCreateSchema,
   taskTypeDeleteSchema,
   taskTypeRenameSchema,
@@ -197,20 +205,10 @@ const commentAddSchema = z
   .object({
     kind: z.literal('comment.add'),
     taskId: z.string().min(1),
-    comment: z.object({ id: z.string().min(1), text: z.string() }).strict(),
-  })
-  .strict();
-const attachmentAddSchema = z
-  .object({
-    kind: z.literal('attachment.add'),
-    taskId: z.string().min(1),
-    sourcePath: z.string().min(1),
-  })
-  .strict();
-const attachmentRemoveSchema = z
-  .object({
-    kind: z.literal('attachment.remove'),
-    attachmentId: z.string().min(1),
+    // The creation time is stamped by the main-process clock, never accepted.
+    comment: z
+      .object({ id: z.string().min(1), text: z.string().min(1).max(5000) })
+      .strict(),
   })
   .strict();
 const columnCreateSchema = z
@@ -247,13 +245,6 @@ const settingCommandSchema =
 const genericSettingCommandSchema = settingCommandFields.superRefine(
   validateGenericSettingValue,
 );
-const aiRankCommandSchema = z
-  .object({
-    kind: z.literal('task.setAiRank'),
-    taskId: z.string().min(1),
-    rank: z.number().int().min(0),
-  })
-  .strict();
 
 export const commandSchema = z.discriminatedUnion('kind', [
   taskCreateSchema,
@@ -261,6 +252,9 @@ export const commandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   attachmentAddSchema,
   attachmentRemoveSchema,
@@ -272,7 +266,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
   seriesStopSchema,
   seriesRecordOutcomeSchema,
   settingCommandSchema,
-  aiRankCommandSchema,
+  taskSetAiRankSchema,
   taskClassifySchema,
   taskTypeCreateSchema,
   taskTypeRenameSchema,
@@ -292,6 +286,9 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   columnCreateSchema,
   columnRenameSchema,
