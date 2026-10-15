@@ -161,17 +161,18 @@ describe('task attachments', () => {
     });
   });
 
-  it('retains the missing attachment row and offers its removal', async () => {
+  it('retains the missing attachment row without refreshing and offers its removal', async () => {
     const open = vi.fn(() =>
       Promise.resolve({ ok: false as const, error: 'MissingFile' as const }),
     );
-    renderAttachments({ attachments: [attachment], open });
+    const { refresh } = renderAttachments({ attachments: [attachment], open });
 
     fireEvent.click(screen.getByRole('button', { name: 'Открыть' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Файл исчез с диска',
     );
+    expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByText('Конспект.pdf')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Удалить файл Конспект.pdf' }),
