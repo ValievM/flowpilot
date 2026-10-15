@@ -1,5 +1,18 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
+import {
+  disciplineCreateSchema,
+  disciplineDeleteSchema,
+  disciplineRenameSchema,
+  ruleActivateSchema,
+  ruleBindSchema,
+  ruleDeactivateSchema,
+  ruleImportSchema,
+  taskClassifySchema,
+  taskTypeCreateSchema,
+  taskTypeDeleteSchema,
+  taskTypeRenameSchema,
+} from './storage-command-schemas';
 
 const dateValueSchema = z.union([
   z.iso.date().transform((value) => Temporal.PlainDate.from(value)),
@@ -251,6 +264,17 @@ export const commandSchema = z.discriminatedUnion('kind', [
   columnDeleteSchema,
   settingCommandSchema,
   aiRankCommandSchema,
+  taskClassifySchema,
+  taskTypeCreateSchema,
+  taskTypeRenameSchema,
+  taskTypeDeleteSchema,
+  disciplineCreateSchema,
+  disciplineRenameSchema,
+  disciplineDeleteSchema,
+  ruleImportSchema,
+  ruleActivateSchema,
+  ruleDeactivateSchema,
+  ruleBindSchema,
 ]);
 
 export const ipcCommandSchema = z.discriminatedUnion('kind', [

@@ -20,6 +20,7 @@ const task: Task = {
 const snapshot: AiSnapshot = {
   revision: 4,
   ruleVersions: { rules: 'v1' },
+  savedRuleIds: [],
   tasks: [task],
   columns: [
     { id: 'todo', name: 'Todo', description: '', state: 'todo', builtIn: true },
@@ -41,6 +42,7 @@ const snapshot: AiSnapshot = {
   taskTypes: [{ id: 'type-1', name: 'Type' }],
   disciplines: [{ id: 'discipline-1', name: 'Discipline' }],
   rules: [],
+  currentRuleDocuments: [],
 };
 const proposal = (commands: unknown[]) => ({
   id: 'proposal-1',

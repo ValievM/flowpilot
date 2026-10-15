@@ -1,20 +1,14 @@
 import type { Task } from '../domain';
 import type { AiTaskChanges, AiPlannedCommand } from '../shared/ai-commands';
+import {
+  appendClassificationDiff,
+  appendRuleActivationDiff,
+  appendRuleImportDiff,
+} from './ai-proposal-command-diff';
+import type { AiFieldChange, DiffState } from './ai-proposal-diff-types';
 import type { AiSnapshot } from './ai-proposal-validation';
 
-export interface AiFieldChange {
-  readonly commandIndex: number;
-  readonly entityId: string;
-  readonly field: string;
-  readonly before: unknown;
-  readonly after: unknown;
-}
-
-interface DiffState {
-  readonly tasks: Map<string, Task>;
-  readonly columns: AiSnapshot['columns'];
-  readonly changes: AiFieldChange[];
-}
+export type { AiFieldChange } from './ai-proposal-diff-types';
 
 export function buildProposalDiff(
   commands: readonly AiPlannedCommand[],
@@ -23,6 +17,10 @@ export function buildProposalDiff(
   const state: DiffState = {
     tasks: new Map(snapshot.tasks.map((task) => [task.id, task])),
     columns: snapshot.columns,
+    rules: new Map(
+      snapshot.currentRuleDocuments.map((rule) => [rule.id, rule]),
+    ),
+    activeRuleIds: new Set(snapshot.rules.map((rule) => rule.id)),
     changes: [],
   };
   commands.forEach((command, commandIndex) => {
@@ -56,8 +54,13 @@ function appendCommandDiff(
       appendCommentChange(command, commandIndex, state);
       return;
     case 'task.classify':
+      appendClassificationDiff(command, commandIndex, state);
+      return;
     case 'rule.import':
+      appendRuleImportDiff(command, commandIndex, state);
+      return;
     case 'rule.activate':
+      appendRuleActivationDiff(command, commandIndex, state);
       return;
   }
 }
