@@ -121,6 +121,51 @@ describe('explicit AI use cases', () => {
     });
   });
 
+  it('uses configured workdays when calculating deadline risk in AI context', async () => {
+    const { repository } = setup();
+    seedTask(repository);
+    const initial = repository.load();
+    repository.apply(
+      [{ kind: 'setting.set', key: 'workdays', value: [2, 3, 4, 5, 6] }],
+      initial.revision,
+    );
+    repository.apply(
+      [
+        {
+          kind: 'task.update',
+          id: 'task-1',
+          changes: {
+            deadline: Temporal.PlainDate.from('2026-10-10'),
+            estimate: { unit: 'workdays', value: 4 },
+          },
+        },
+      ],
+      repository.load().revision,
+    );
+    const provider = new FakeAiProvider([
+      {
+        scenario: 'success',
+        reply: { action: { taskId: 'task-1' }, reason: 'Срок близко.' },
+      },
+    ]);
+    const useCases = createAiUseCases(repository, new AiRunner(provider), {
+      now: () => now.toInstant(),
+    });
+
+    await useCases.whatNow();
+
+    expect(provider.calls[0]?.context).toMatchObject({
+      context: {
+        tasks: [
+          {
+            id: 'task-1',
+            deadlineRisk: { ok: true, risk: 'ok' },
+          },
+        ],
+      },
+    });
+  });
+
   it('rejects a what-now answer that references another task', async () => {
     const { repository, application } = setup();
     seedTask(repository);

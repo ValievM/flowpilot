@@ -29,6 +29,7 @@ export function createAiUseCases(
     ),
     getContext: (snapshot) => {
       const now = clock.now().toZonedDateTimeISO('UTC');
+      const configuredWorkdays = snapshot.settings.workdays;
       return buildContext({
         today: now.toPlainDate(),
         now,
@@ -38,7 +39,13 @@ export function createAiUseCases(
         activeRules: getReferenceData(snapshot).rules,
         taskTypes: snapshot.taskTypes,
         disciplines: snapshot.disciplines,
-        workdays: new Set([1, 2, 3, 4, 5]),
+        workdays: new Set(
+          Array.isArray(configuredWorkdays)
+            ? configuredWorkdays.filter(
+                (day): day is number => typeof day === 'number',
+              )
+            : [1, 2, 3, 4, 5],
+        ),
         columns: snapshot.columns,
       });
     },
