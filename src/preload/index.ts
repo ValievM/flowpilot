@@ -49,13 +49,13 @@ const api: FlowPilotApi = Object.freeze({
   catalog: {
     list: () =>
       ipcRenderer.invoke(ipcChannels.catalogList, {}) as Promise<
-        Result<IpcCatalog>
+        IpcRuleResult<IpcCatalog>
       >,
   },
   rules: {
     list: () =>
       ipcRenderer.invoke(ipcChannels.rulesList, {}) as Promise<
-        Result<readonly IpcStoredRule[]>
+        IpcRuleResult<readonly IpcStoredRule[]>
       >,
     importFile: () =>
       ipcRenderer.invoke(ipcChannels.rulesImportFile, {}) as Promise<

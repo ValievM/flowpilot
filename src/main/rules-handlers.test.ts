@@ -11,6 +11,7 @@ import {
   deactivateRule,
   exportRuleFile,
   importRuleFile,
+  listCatalogs,
   listRules,
 } from './rules-handlers';
 const directories: string[] = [];
@@ -219,6 +220,19 @@ describe('rules file handlers', () => {
     );
     expect(result).toEqual({ ok: false, error: { kind: 'ValidationFailed' } });
     expect(opened).toBe(false);
+    repository.close();
+  });
+
+  it('returns structured errors from catalog and rule list channels', () => {
+    const { repository } = openRepository();
+    expect(listCatalogs({ unexpected: true }, { repository })).toEqual({
+      ok: false,
+      error: { kind: 'ValidationFailed' },
+    });
+    expect(listRules({ unexpected: true }, { repository })).toEqual({
+      ok: false,
+      error: { kind: 'ValidationFailed' },
+    });
     repository.close();
   });
 

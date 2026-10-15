@@ -222,10 +222,10 @@ export type FlowPilotApi = {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
   };
   catalog: {
-    list(): Promise<Result<Pick<Snapshot, 'taskTypes' | 'disciplines'>>>;
+    list(): Promise<IpcRuleResult<Pick<Snapshot, 'taskTypes' | 'disciplines'>>>;
   };
   rules: {
-    list(): Promise<Result<Snapshot['rules']>>;
+    list(): Promise<IpcRuleResult<Snapshot['rules']>>;
     importFile(): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
     exportFile(request: RuleIdRequest): Promise<IpcRuleResult<null>>;
     activate(
