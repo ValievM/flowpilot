@@ -1,2 +1,12 @@
-export { exportTo, restore, verifyPackage } from './backup';
-export type { BackupProblem, BackupResult, Verification } from './backup';
+export {
+  exportTo,
+  restore,
+  rollbackRestoredProfile,
+  verifyPackage,
+} from './backup';
+export type {
+  BackupProblem,
+  BackupResult,
+  RestoredProfileBackup,
+  Verification,
+} from './backup';

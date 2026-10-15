@@ -109,14 +109,23 @@ export class AttachmentStore {
   }
 
   getPath(attachmentId: string): string | undefined {
+    const result = this.getPathResult(attachmentId);
+    return result.kind === 'Found' ? result.path : undefined;
+  }
+
+  getPathResult(
+    attachmentId: string,
+  ):
+    | { kind: 'Found'; path: string }
+    | { kind: 'NotFound' }
+    | { kind: 'MissingFile' } {
     const row = this.database
       .prepare('SELECT id FROM attachments WHERE id = ?')
       .get(attachmentId) as { id: string } | undefined;
-    return row &&
-      safeAttachmentId(row.id) &&
-      isAttachmentDirectory(this.attachmentDir())
-      ? join(this.attachmentDir(), row.id)
-      : undefined;
+    if (!row || !safeAttachmentId(row.id)) return { kind: 'NotFound' };
+    if (!isAttachmentDirectory(this.attachmentDir()))
+      return { kind: 'MissingFile' };
+    return { kind: 'Found', path: join(this.attachmentDir(), row.id) };
   }
 
   verify(

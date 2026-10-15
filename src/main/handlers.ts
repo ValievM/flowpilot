@@ -171,6 +171,21 @@ function serializeOutcome(
     newTime: outcome.newTime.toString(),
   };
 }
-function mapApplyError(kind: 'StaleRevision' | 'InvalidCommand'): ErrorCode {
-  return kind === 'StaleRevision' ? 'StaleRevision' : 'ValidationFailed';
+function mapApplyError(
+  kind:
+    | 'StaleRevision'
+    | 'InvalidCommand'
+    | 'FileNotFound'
+    | 'TooLarge'
+    | 'NotReadable',
+): ErrorCode {
+  switch (kind) {
+    case 'StaleRevision':
+    case 'FileNotFound':
+    case 'TooLarge':
+    case 'NotReadable':
+      return kind;
+    case 'InvalidCommand':
+      return 'ValidationFailed';
+  }
 }

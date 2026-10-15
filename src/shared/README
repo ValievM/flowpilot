@@ -2,7 +2,7 @@
 
 Renderer access uses only `window.flowpilot`; Node, Electron, filesystem, and
 SQLite are not exposed. The API is defined by `FlowPilotApi` in `contracts.ts`,
-with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
+with `Result<T, ErrorCode>` and `ErrorCode` in `ipc-result.ts`.
 
 - `snapshot.load()` (`snapshot.load`): empty strict request; returns
   an `IpcSnapshot`.
@@ -14,11 +14,13 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
 - `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
   where `now` is the ISO timestamp from the main-process clock.
 
-Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes:
-`StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
-`InternalError`. Schemas reject unknown fields. Settings writes use the same
-expected-revision transaction as commands. No filesystem paths cross the
-bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
+Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes
+include `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`,
+`AlreadyUndone`, `NotUndoable`, `FileNotFound`, `TooLarge`, `NotReadable`,
+`MissingFile`, `PackageInvalid`, `Cancelled`, and `InternalError`. Schemas reject
+unknown fields. Settings writes use the same expected-revision transaction as
+commands. No filesystem paths cross the bridge; main resolves
+`<profile>/flowpilot.db` and owns the single writer.
 `IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
 AI proposals use a separate strict command contract in `ai-commands.ts`.
 `task.classify`, `rule.import`, `rule.activate`, `rule.deactivate`, and
@@ -62,3 +64,17 @@ Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, `FLOWPILOT_TEST_PROFILE`,
 and `FLOWPILOT_TEST_AI_REPLY` are honored only for unpackaged applications with
 `FLOWPILOT_TEST=1`. Packaged apps always use system time, Electron's user-data
 directory, and manual exchange for AI. The injected `Clock` makes tests deterministic.
+History is available through `history.list(limit?, before?)` and
+`history.undo(entryId?)`. A missing `entryId` undoes the newest compatible entry.
+List requests are strict and require a positive integer limit.
+
+`attachments.add({ taskId })` opens the main-process file dialog; renderer paths
+are rejected. `attachments.open({ attachmentId })` resolves only a path from the
+repository, and `attachments.remove({ attachmentId })` records the change through
+the repository transaction.
+
+`backup.export()` opens a folder dialog. `backup.verify()` opens a package-folder
+dialog and returns validation problems or an opaque package token. Only that
+token is accepted by `backup.restore(packageToken)`. Package paths and contents
+remain in main; restore closes and reopens the repository around the storage
+restore operation.

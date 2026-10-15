@@ -279,7 +279,7 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
-  it('registers the public IPC channels including AI run and cancellation', () => {
+  it('registers all public IPC channels including history and backups', () => {
     const channels: string[] = [];
     const repository = openRepository();
     const manualProvider = new ManualExchangeProvider();
@@ -295,6 +295,14 @@ describe('IPC handlers', () => {
         aiRunner: new AiRunner(manualProvider),
         manualProvider,
         onAppearanceReady: () => undefined,
+        onRepositoryReplaced: () => undefined,
+        dialogs: {
+          pickFile: () => Promise.resolve(undefined),
+          pickFolder: () => Promise.resolve(undefined),
+        },
+        shell: { open: () => Promise.resolve('') },
+        profilePath: '/tmp/flowpilot-test.db',
+        clock,
       },
     );
     expect(channels).toEqual([
@@ -310,6 +318,14 @@ describe('IPC handlers', () => {
       'ai.cancel',
       'ai.prompt',
       'ai.reply',
+      'history.list',
+      'history.undo',
+      'attachments.add',
+      'attachments.open',
+      'attachments.remove',
+      'backup.export',
+      'backup.verify',
+      'backup.restore',
     ]);
     repository.close();
   });
@@ -381,6 +397,14 @@ describe('IPC handlers', () => {
         aiRunner,
         manualProvider,
         onAppearanceReady: () => undefined,
+        onRepositoryReplaced: () => undefined,
+        dialogs: {
+          pickFile: () => Promise.resolve(undefined),
+          pickFolder: () => Promise.resolve(undefined),
+        },
+        shell: { open: () => Promise.resolve('') },
+        profilePath: '/tmp/flowpilot-test.db',
+        clock,
       },
     );
 

@@ -189,7 +189,10 @@ export type ApplyResult =
       ok: false;
       error:
         | { kind: 'StaleRevision'; expected: number; actual: number }
-        | { kind: 'InvalidCommand'; message: string };
+        | { kind: 'InvalidCommand'; message: string }
+        | { kind: 'FileNotFound' }
+        | { kind: 'TooLarge' }
+        | { kind: 'NotReadable' };
     };
 
 export type UndoResult =
