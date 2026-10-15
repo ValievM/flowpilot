@@ -7,6 +7,8 @@ export {
 export type {
   BackupProblem,
   BackupResult,
+  ExportInfo,
+  ExportResult,
   RestoredProfileBackup,
   Verification,
 } from './backup';

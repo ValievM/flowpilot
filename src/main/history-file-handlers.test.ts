@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   truncateSync,
   unlinkSync,
@@ -18,10 +19,10 @@ import { createHistoryFileHandlers } from './history-file-handlers';
 const directories: string[] = [];
 const clock = { now: () => Temporal.Instant.from('2026-10-05T12:00:00Z') };
 
-function makeSystem() {
+function makeSystem(testClock = clock) {
   const directory = mkdtempSync(join(tmpdir(), 'flowpilot-history-ipc-'));
   directories.push(directory);
-  let repository = new Repository(join(directory, 'flowpilot.db'), clock);
+  let repository = new Repository(join(directory, 'flowpilot.db'), testClock);
   const dialogState: { file?: string; folder?: string } = {};
   const opened: string[] = [];
   const handlers = createHistoryFileHandlers({
@@ -42,7 +43,7 @@ function makeSystem() {
       },
     },
     profilePath: join(directory, 'flowpilot.db'),
-    clock,
+    clock: testClock,
     makeToken: () => 'verified-package-token',
   });
   return {
@@ -318,9 +319,12 @@ describe('history and file IPC handlers', () => {
     const exportParent = join(system.directory, 'exports');
     mkdirSync(exportParent);
     system.dialogState.folder = exportParent;
-    expect(await system.handlers.backupExport({})).toEqual({
+    expect(await system.handlers.backupExport({})).toMatchObject({
       ok: true,
-      value: null,
+      value: {
+        folderPath: join(exportParent, 'FlowPilot-export-2026-10-05'),
+        exportedAt: '2026-10-05T12:00:00Z',
+      },
     });
     system
       .repository()
@@ -399,6 +403,95 @@ describe('history and file IPC handlers', () => {
 
     expect(result).toEqual({ ok: false, error: 'NotReadable' });
     expect(system.repository().load().tasks).toHaveLength(1);
+    system.repository().close();
+  });
+  it('returns the selected export folder and the timestamp used in its name', async () => {
+    let clockReads = 0;
+    const testClock = {
+      now: () => {
+        clockReads += 1;
+        return Temporal.Instant.from(
+          clockReads === 1 ? '2026-10-05T23:59:59Z' : '2026-10-06T00:00:00Z',
+        );
+      },
+    };
+    const system = makeSystem(testClock);
+    const exportParent = join(system.directory, 'exports');
+    mkdirSync(exportParent);
+    system.dialogState.folder = exportParent;
+
+    const result = await system.handlers.backupExport({});
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        folderPath: join(exportParent, 'FlowPilot-export-2026-10-05'),
+        exportedAt: '2026-10-05T23:59:59Z',
+      },
+    });
+    expect(clockReads).toBe(1);
+    system.repository().close();
+  });
+
+  it('returns AlreadyExists without changing a prior same-day export', async () => {
+    const system = makeSystem();
+    const exportParent = join(system.directory, 'exports');
+    mkdirSync(exportParent);
+    system.dialogState.folder = exportParent;
+    const first = await system.handlers.backupExport({});
+    expect(first.ok).toBe(true);
+    const existingFolder = join(exportParent, 'FlowPilot-export-2026-10-05');
+    const before = readdirSync(existingFolder).map((name) => [
+      name,
+      readFileSync(join(existingFolder, name), 'utf8'),
+    ]);
+
+    const second = await system.handlers.backupExport({});
+
+    expect(second).toEqual({ ok: false, error: 'AlreadyExists' });
+    expect(
+      readdirSync(existingFolder).map((name) => [
+        name,
+        readFileSync(join(existingFolder, name), 'utf8'),
+      ]),
+    ).toEqual(before);
+    expect(readdirSync(exportParent)).toEqual(['FlowPilot-export-2026-10-05']);
+    system.repository().close();
+  });
+
+  it('returns Cancelled without creating an export when the folder dialog is cancelled', async () => {
+    const system = makeSystem();
+
+    const result = await system.handlers.backupExport({});
+
+    expect(result).toEqual({ ok: false, error: 'Cancelled' });
+    expect(readdirSync(system.directory)).toContain('flowpilot.db');
+    expect(readdirSync(system.directory)).not.toContain('exports');
+    system.repository().close();
+  });
+
+  it('returns NotReadable without exposing the path when the profile cannot be read', async () => {
+    const system = makeSystem();
+    const exportParent = join(system.directory, 'exports');
+    mkdirSync(exportParent);
+    system.repository().close();
+    writeFileSync(join(system.directory, 'flowpilot.db'), 'not a database');
+    system.dialogState.folder = exportParent;
+
+    const result = await system.handlers.backupExport({});
+
+    expect(result).toEqual({ ok: false, error: 'NotReadable' });
+    expect(JSON.stringify(result)).not.toContain(system.directory);
+    expect(readdirSync(exportParent)).toEqual([]);
+  });
+
+  it('rejects extra export request fields without opening the folder dialog', async () => {
+    const system = makeSystem();
+
+    const result = await system.handlers.backupExport({ path: '/private' });
+
+    expect(result).toEqual({ ok: false, error: 'ValidationFailed' });
+    expect(system.dialogState.folder).toBeUndefined();
     system.repository().close();
   });
 });

@@ -72,7 +72,7 @@ function save(path: string, value: unknown): void {
 function exportPackage(root: string, profile: string): string {
   const result = exportTo(root, profile, clock);
   if (!result.ok) throw new Error(result.error);
-  return result.value;
+  return result.value.folderPath;
 }
 function updateDataHash(directory: string): void {
   const manifest = z
