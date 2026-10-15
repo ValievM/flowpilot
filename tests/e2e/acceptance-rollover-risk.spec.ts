@@ -212,7 +212,7 @@ test('AC-09 release-1: risk interface matches table rows 2, 4, 10, and 12', asyn
   );
 });
 
-test('AC-12 release-1: persisted cards remain after restarting the same profile; history controls are available', async () => {
+test('AC-12 release-1: persisted cards survive restart and history supports repeated undo', async () => {
   await seed([
     {
       id: 'ac12-persisted',
@@ -234,4 +234,41 @@ test('AC-12 release-1: persisted cards remain after restarting the same profile;
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Отменить' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'История' })).toBeVisible();
+  const added = await page.evaluate(
+    (day) =>
+      window.flowpilot.commands.apply({
+        expectedRevision: 1,
+        commands: [
+          {
+            kind: 'task.create',
+            task: {
+              id: 'ac12-second',
+              title: 'Вторая карточка',
+              description: '',
+              status: { kind: 'todo' },
+              columnId: 'todo',
+              day,
+              subtasks: [],
+              comments: [],
+              attachments: [],
+              addedOrder: 1,
+            },
+          },
+        ],
+      }),
+    TODAY,
+  );
+  expect(added).toMatchObject({ ok: true, value: { revision: 2 } });
+  const undo = page.getByRole('button', { name: 'Отменить' });
+  await undo.click();
+  await expect(
+    page.getByRole('heading', { name: 'Вторая карточка', level: 3 }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Сохранённая карточка', level: 3 }),
+  ).toBeVisible();
+  await undo.click();
+  await expect(
+    page.getByRole('heading', { name: 'Сохранённая карточка', level: 3 }),
+  ).toHaveCount(0);
 });
