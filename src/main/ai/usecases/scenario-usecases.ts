@@ -118,6 +118,7 @@ export class AiUseCases {
   ): Promise<AiUseCaseResult<ProposalScenarioResult>> {
     const state = this.state();
     const prompt = renderRuleEditPrompt({
+      instruction,
       document,
       taskIds: state.snapshot.tasks.map(({ id }) => id),
       taskTypeIds: state.snapshot.taskTypes.map(({ id }) => id),

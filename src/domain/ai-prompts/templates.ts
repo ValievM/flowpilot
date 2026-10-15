@@ -181,6 +181,7 @@ export interface ReplanPromptInput {
 }
 
 export interface RuleEditPromptInput {
+  readonly instruction: string;
   readonly document: unknown;
   readonly taskIds: readonly string[];
   readonly taskTypeIds: readonly string[];
@@ -214,6 +215,7 @@ export function renderRuleEditPrompt(
   input: RuleEditPromptInput,
 ): RenderedPrompt {
   return render('ruleEdit', input.version, {
+    instruction: input.instruction,
     document: input.document,
     taskIds: input.taskIds,
     taskTypeIds: input.taskTypeIds,

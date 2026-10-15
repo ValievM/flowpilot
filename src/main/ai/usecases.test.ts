@@ -294,6 +294,65 @@ describe('explicit AI use cases', () => {
     expect(repository.load().tasks).toHaveLength(1);
   });
 
+  it('includes the requested change in the rule-edit provider prompt', async () => {
+    const { repository } = setup();
+    seedTask(repository);
+    const provider = new FakeAiProvider([
+      {
+        scenario: 'success',
+        reply: {
+          taskId: 'task-1',
+          document: {
+            schema_version: 'v1',
+            id: 'ai-rule',
+            title: 'Правило для задачи',
+            scope: { task_type_ids: [] },
+            rules: [
+              {
+                id: 'priority',
+                kind: 'priority',
+                level: 'high',
+                reason: 'Сначала важное.',
+              },
+            ],
+          },
+        },
+      },
+      {
+        scenario: 'success',
+        reply: {
+          taskId: 'task-1',
+          document: {
+            schema_version: 'v1',
+            id: 'ai-rule',
+            title: 'Правило для задачи',
+            scope: { task_type_ids: [] },
+            rules: [
+              {
+                id: 'priority',
+                kind: 'priority',
+                level: 'high',
+                reason: 'Сначала важное.',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+    const useCases = createAiUseCases(repository, new AiRunner(provider), {
+      now: () => now.toInstant(),
+    });
+    const firstInstruction = 'Поставь приоритет выше.';
+    const secondInstruction = 'Измени уровень правила.';
+
+    await useCases.editRule(firstInstruction, {});
+    await useCases.editRule(secondInstruction, {});
+
+    const contexts = provider.calls.map((call) => JSON.stringify(call.context));
+    expect(contexts[0]).toContain(`"instruction":"${firstInstruction}"`);
+    expect(contexts[1]).toContain(`"instruction":"${secondInstruction}"`);
+  });
+
   it('creates and activates a validated rule through the shared application path', async () => {
     const { repository, application } = setup();
     seedTask(repository);
