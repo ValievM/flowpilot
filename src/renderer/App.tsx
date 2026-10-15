@@ -193,7 +193,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     hasUndatedTasks: views.all.some(
       (task) => task.day === undefined && task.status.kind !== 'done',
     ),
-    tasks: views.todayTasks,
+    tasks: views.all,
     today: views.today,
     todayLabel: localDateLabel(views.today),
     available: views.available,

@@ -879,10 +879,15 @@ describe('persisted today and now screens', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
   });
 
-  it('filters today and later with domain ordering and keeps undated work for later', async () => {
+  it('filters today and later in domain order, retaining undated work for later', async () => {
     renderApp([
       { id: 'today-task', day: today(), addedOrder: 1 },
-      { id: 'tomorrow-task', day: '2026-10-06', addedOrder: 2 },
+      {
+        id: 'tomorrow-task',
+        day: '2026-10-06',
+        deadline: '2026-10-08',
+        addedOrder: 2,
+      },
       { id: 'undated-task', addedOrder: 3 },
       {
         id: 'waiting-task',
@@ -896,6 +901,12 @@ describe('persisted today and now screens', () => {
         status: { kind: 'done' },
         addedOrder: 5,
       },
+      {
+        id: 'urgent-later-task',
+        day: '2026-10-07',
+        deadline: '2026-10-06',
+        addedOrder: 6,
+      },
     ]);
     await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
     fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
@@ -904,10 +915,16 @@ describe('persisted today and now screens', () => {
     expect(screen.getByText('today-task')).toBeVisible();
     expect(screen.queryByText('tomorrow-task')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Позже 2' }));
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(screen.getByText('tomorrow-task')).toBeVisible();
-    expect(screen.getByText('undated-task')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Позже 3' }));
+    const laterRows = screen.getAllByRole('listitem');
+    expect(laterRows).toHaveLength(3);
+    expect(
+      laterRows.map(
+        (row) =>
+          within(row).getByRole('button', { name: /Открыть задачу:/ })
+            .textContent,
+      ),
+    ).toEqual(['urgent-later-task', 'tomorrow-task', 'undated-task']);
     expect(screen.queryByText('waiting-task')).not.toBeInTheDocument();
     expect(screen.queryByText('done-task')).not.toBeInTheDocument();
   });
