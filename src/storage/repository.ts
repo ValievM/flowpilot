@@ -12,6 +12,7 @@ import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
 import { readRuleSnapshot } from './rules-snapshot';
+import { loadOutcomes, loadSeries } from './series-persistence';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
@@ -93,6 +94,8 @@ export class Repository {
       taskTypes: rules.taskTypes,
       disciplines: rules.disciplines,
       rules: rules.rules,
+      series: loadSeries(this.database),
+      outcomes: loadOutcomes(this.database),
       settings,
       revision,
     };

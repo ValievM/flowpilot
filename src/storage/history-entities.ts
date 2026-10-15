@@ -1,10 +1,15 @@
 import Database from 'better-sqlite3';
 import { advanceColumnGeneration } from './column-generations';
+import {
+  restoreSeriesHistoryEntity,
+  snapshotSeriesHistoryEntity,
+} from './series-history';
 export type EntityRef =
   | { kind: 'task' | 'column' | 'setting'; id: string }
   | { kind: 'taskType'; id: string }
   | { kind: 'discipline'; id: string }
-  | { kind: 'rule'; id: string };
+  | { kind: 'rule'; id: string }
+  | { kind: 'series' | 'series_outcome'; id: string };
 type Row = Record<string, string | number | null>;
 export type EntitySnapshot = EntityRef & {
   state: string | null;
@@ -25,13 +30,9 @@ export function snapshotEntity(
       version: row ? Number(row.version) : null,
     };
   }
+  if (isSeriesEntity(ref)) return snapshotSeriesHistoryEntity(database, ref);
   if (ref.kind === 'column') return snapshotColumn(database, ref);
-  if (
-    ref.kind === 'taskType' ||
-    ref.kind === 'discipline' ||
-    ref.kind === 'rule'
-  )
-    return snapshotStorageEntity(database, ref);
+  if (isStoredEntity(ref)) return snapshotStorageEntity(database, ref);
   const row = database
     .prepare('SELECT * FROM tasks WHERE id = ?')
     .get(ref.id) as Row | undefined;
@@ -53,6 +54,19 @@ export function snapshotEntity(
     }),
     version,
   };
+}
+function isSeriesEntity(
+  ref: EntityRef,
+): ref is Extract<EntityRef, { kind: 'series' | 'series_outcome' }> {
+  return ref.kind === 'series' || ref.kind === 'series_outcome';
+}
+
+function isStoredEntity(
+  ref: EntityRef,
+): ref is Extract<EntityRef, { kind: 'taskType' | 'discipline' | 'rule' }> {
+  return (
+    ref.kind === 'taskType' || ref.kind === 'discipline' || ref.kind === 'rule'
+  );
 }
 function snapshotStorageEntity(
   database: Database.Database,
@@ -112,6 +126,10 @@ export function restoreEntity(
         .prepare('INSERT INTO settings(key,value_json,version) VALUES(?,?,?)')
         .run(row.key, row.value_json, row.version);
     }
+    return;
+  }
+  if (snapshot.kind === 'series' || snapshot.kind === 'series_outcome') {
+    restoreSeriesHistoryEntity(database, snapshot);
     return;
   }
   if (snapshot.kind === 'column') {

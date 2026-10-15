@@ -20,6 +20,9 @@ export interface PersistedState {
   refresh(): Promise<IpcSnapshot | undefined>;
   updateWorkdays(workdays: ReadonlySet<number>): Promise<boolean>;
   apply(commands: CommandsApplyRequest['commands']): Promise<boolean>;
+  applyCard(
+    commands: CommandsApplyRequest['commands'],
+  ): Promise<'saved' | 'stale' | 'failed'>;
 }
 
 interface PersistenceControls {
@@ -192,6 +195,52 @@ function useCommandApply(
     [api, controls, refresh, snapshot],
   );
 }
+function useTaskCardApply(
+  api: FlowPilotApi,
+  snapshot: IpcSnapshot | undefined,
+  refresh: () => Promise<IpcSnapshot | undefined>,
+  controls: PersistenceControls,
+): PersistedState['applyCard'] {
+  return React.useCallback(
+    async (commands) => {
+      if (!snapshot) return 'failed';
+      controls.setSaved(false);
+      try {
+        const result = await api.commands.apply({
+          commands,
+          expectedRevision: snapshot.revision,
+        });
+        if (!result.ok && result.error === 'StaleRevision') {
+          const fresh = await refresh();
+          if (fresh) controls.setSnapshot(fresh);
+          controls.setSaved(true);
+          controls.setCommandError(
+            'Данные задачи изменились. Показана актуальная карточка; повторите изменение.',
+          );
+          return 'stale';
+        }
+        if (!result.ok) {
+          controls.setSaved(true);
+          controls.setCommandError(
+            'Сохранение не удалось. Данные не изменены; попробуйте снова.',
+          );
+          return 'failed';
+        }
+        controls.setSnapshot(result.value);
+        controls.setSaved(true);
+        controls.setCommandError(undefined);
+        return 'saved';
+      } catch {
+        controls.setSaved(true);
+        controls.setCommandError(
+          'Сохранение не удалось. Данные не изменены; попробуйте снова.',
+        );
+        return 'failed';
+      }
+    },
+    [api, controls, refresh, snapshot],
+  );
+}
 
 interface ParsedTasks {
   readonly tasks: readonly Task[];
@@ -240,6 +289,7 @@ export function usePersistedTasks(
   const refresh = useSnapshotRefresh(api, controls);
   const updateWorkdays = useWorkdaysUpdate(api, snapshot, controls);
   const apply = useCommandApply(api, snapshot, refresh, controls);
+  const applyCard = useTaskCardApply(api, snapshot, refresh, controls);
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -254,5 +304,6 @@ export function usePersistedTasks(
     refresh,
     updateWorkdays,
     apply,
+    applyCard,
   };
 }

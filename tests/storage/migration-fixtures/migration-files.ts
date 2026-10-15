@@ -8,6 +8,7 @@ import restoreHistory from '../../../src/storage/migrations/0007_restore_history
 import aiApplication from '../../../src/storage/migrations/0008_ai_application.sql?raw';
 import rejectedAiCommands from '../../../src/storage/migrations/0009_rejected_ai_commands.sql?raw';
 import rulesStorage from '../../../src/storage/migrations/0010_rules_storage.sql?raw';
+import seriesStorage from '../../../src/storage/migrations/0011_series_storage.sql?raw';
 
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
@@ -47,6 +48,11 @@ export const migrationFiles = [
     version: 10,
     filename: '0010_rules_storage.sql',
     sql: rulesStorage,
+  },
+  {
+    version: 11,
+    filename: '0011_series_storage.sql',
+    sql: seriesStorage,
   },
 ] as const;
 

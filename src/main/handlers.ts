@@ -146,6 +146,29 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
           : {}),
       };
     }),
+    series: snapshot.series.map(({ startsOn, endsOn, time, ...series }) => ({
+      ...series,
+      startsOn: startsOn.toString(),
+      ...(endsOn ? { endsOn: endsOn.toString() } : {}),
+      ...(time ? { time: time.toString() } : {}),
+    })),
+    outcomes: snapshot.outcomes.map(serializeOutcome),
+  };
+}
+function serializeOutcome(
+  outcome: Snapshot['outcomes'][number],
+): IpcSnapshot['outcomes'][number] {
+  const base = {
+    seriesId: outcome.seriesId,
+    date: outcome.date.toString(),
+    recordedAt: outcome.recordedAt.toString(),
+  };
+  if (outcome.kind !== 'rescheduled') return { ...base, kind: outcome.kind };
+  return {
+    ...base,
+    kind: outcome.kind,
+    newDate: outcome.newDate.toString(),
+    newTime: outcome.newTime.toString(),
   };
 }
 function mapApplyError(kind: 'StaleRevision' | 'InvalidCommand'): ErrorCode {

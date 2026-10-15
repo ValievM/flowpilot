@@ -4,7 +4,7 @@ import {
   settingFields,
   validateGenericSettingValue,
 } from './command-schema';
-import type { Task, TaskStatus } from '../domain';
+import type { Series, Task, TaskStatus } from '../domain';
 import type { Snapshot } from '../storage';
 import type { Result } from './ipc-result';
 import type {
@@ -64,11 +64,33 @@ type SerializedTask = Omit<
   readonly rolledOverFrom?: string;
   readonly status: IpcTaskStatus;
 };
+type SerializedSeries = Omit<Series, 'startsOn' | 'endsOn' | 'time'> & {
+  readonly startsOn: string;
+  readonly endsOn?: string;
+  readonly time?: string;
+};
+type SerializedOutcome =
+  | {
+      readonly kind: 'done' | 'skipped' | 'dismissed';
+      readonly seriesId: string;
+      readonly date: string;
+      readonly recordedAt: string;
+    }
+  | {
+      readonly kind: 'rescheduled';
+      readonly seriesId: string;
+      readonly date: string;
+      readonly newDate: string;
+      readonly newTime: string;
+      readonly recordedAt: string;
+    };
 export type IpcSnapshot = Omit<
   Snapshot,
-  'tasks' | 'taskTypes' | 'disciplines' | 'rules'
+  'tasks' | 'series' | 'outcomes' | 'taskTypes' | 'disciplines' | 'rules'
 > & {
   readonly tasks: readonly SerializedTask[];
+  readonly series: readonly SerializedSeries[];
+  readonly outcomes: readonly SerializedOutcome[];
 };
 
 export const ipcChannels = {

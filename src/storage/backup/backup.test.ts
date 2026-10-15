@@ -151,6 +151,75 @@ describe('backup package', () => {
     expect(restored.history(1).entries[0]?.source).toBe('restore');
     restored.close();
   });
+  it('round-trips series and outcomes without changing the package format version', () => {
+    const { root, profile, repository } = setup();
+    const series = {
+      id: 'training',
+      title: 'Тренировка',
+      weekdays: [2, 4],
+      time: Temporal.PlainTime.from('18:00'),
+      startsOn: Temporal.PlainDate.from('2026-10-06'),
+    };
+    expect(repository.apply([{ kind: 'series.create', series }], 0).ok).toBe(
+      true,
+    );
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.recordOutcome',
+            seriesId: series.id,
+            outcome: {
+              kind: 'rescheduled',
+              date: series.startsOn,
+              newDate: Temporal.PlainDate.from('2026-10-07'),
+              newTime: Temporal.PlainTime.from('19:00'),
+            },
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    const expected = repository.load();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const manifest = z
+      .object({ formatVersion: z.number() })
+      .loose()
+      .parse(parsed(join(packageDir, 'manifest.json')));
+    const restoredPath = join(root, 'restored-series.sqlite');
+
+    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restored = new Repository(restoredPath, clock);
+    expect(restored.load()).toEqual({
+      ...expected,
+      revision: expected.revision + 1,
+    });
+    expect(manifest.formatVersion).toBe(1);
+    restored.close();
+  });
+
+  it('reads older format-version-one packages without series sections', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const data = parsed(join(packageDir, 'data.json')) as Record<
+      string,
+      unknown
+    >;
+    delete data.series;
+    delete data.outcomes;
+    save(join(packageDir, 'data.json'), data);
+    updateDataHash(packageDir);
+    const restoredPath = join(root, 'restored-legacy.sqlite');
+
+    expect(verifyPackage(packageDir).ok).toBe(true);
+    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restored = new Repository(restoredPath, clock);
+    expect(restored.load().series).toEqual([]);
+    expect(restored.load().outcomes).toEqual([]);
+    restored.close();
+  });
 
   it('rejects truncated data and does not touch current profile', () => {
     const { root, profile, repository } = setup();
@@ -159,6 +228,53 @@ describe('backup package', () => {
     repository.close();
     const packageDir = exportPackage(root, profile);
     writeFileSync(join(packageDir, 'data.json'), '{');
+    expect(verifyPackage(packageDir).ok).toBe(false);
+    expect(restore(packageDir, profile, clock).ok).toBe(false);
+    const current = new Repository(profile, clock);
+    expect(current.load()).toEqual(expected);
+    current.close();
+  });
+  it('rejects a backup with an inverted series range without replacing the profile', () => {
+    const { root, profile, repository } = setup();
+    expect(repository.apply([{ kind: 'task.create', task }], 0).ok).toBe(true);
+    expect(
+      repository.apply(
+        [
+          {
+            kind: 'series.create',
+            series: {
+              id: 'series-1',
+              title: 'Серия',
+              weekdays: [1],
+              startsOn: Temporal.PlainDate.from('2026-10-06'),
+            },
+          },
+        ],
+        1,
+      ).ok,
+    ).toBe(true);
+    const expected = repository.load();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+    const data = z
+      .object({
+        series: z.array(
+          z
+            .object({
+              starts_on: z.string(),
+              ends_on: z.string().nullable(),
+            })
+            .loose(),
+        ),
+      })
+      .loose()
+      .parse(parsed(join(packageDir, 'data.json')));
+    const series = data.series[0];
+    if (!series) throw new Error('missing exported series');
+    series.ends_on = '2026-10-05';
+    save(join(packageDir, 'data.json'), data);
+    updateDataHash(packageDir);
+
     expect(verifyPackage(packageDir).ok).toBe(false);
     expect(restore(packageDir, profile, clock).ok).toBe(false);
     const current = new Repository(profile, clock);

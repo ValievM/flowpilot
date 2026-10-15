@@ -2,6 +2,7 @@ import React from 'react';
 import type { ThemeChoice } from '../shared/contracts';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
+import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
@@ -38,6 +39,9 @@ interface AppModel {
   readonly cycleTheme: () => void;
   readonly startTask: (task: Task) => Promise<void>;
   readonly addTask: (title: string) => Promise<boolean>;
+  readonly taskCardId: string | undefined;
+  readonly openTask: (taskId: string, trigger: HTMLElement) => void;
+  readonly closeTask: () => void;
 }
 
 function useAppModel(initialTheme: ThemeChoice): AppModel {
@@ -45,6 +49,8 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   const [motionChoice, setMotionChoice] = useReducedMotion();
   const [view, setView] = React.useState<View>('today');
   const [quickAddOpen, setQuickAddOpen] = React.useState(false);
+  const [taskCardId, setTaskCardId] = React.useState<string>();
+  const taskCardTrigger = React.useRef<HTMLElement | null>(null);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
   const clock = useCurrentTime();
   const state = usePersistedTasks();
@@ -54,6 +60,14 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     setTheme((current) =>
       current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
     );
+  };
+  const openTask = (id: string, trigger: HTMLElement): void => {
+    taskCardTrigger.current = trigger;
+    setTaskCardId(id);
+  };
+  const closeTask = (): void => {
+    setTaskCardId(undefined);
+    requestAnimationFrame(() => taskCardTrigger.current?.focus());
   };
   return {
     theme,
@@ -71,6 +85,9 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     cycleTheme,
     startTask: (task) => startTask(state, task),
     addTask: (title) => addTask(state, title, views.today.toString()),
+    taskCardId,
+    openTask,
+    closeTask,
   };
 }
 
@@ -169,6 +186,7 @@ function MainContent({
 
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const { state, view, views } = model;
+  const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
     view,
     hasTasks: views.all.length > 0,
@@ -189,6 +207,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     saveError: state.settingsError,
     onViewChange: model.setView,
     onStart: (task) => void model.startTask(task),
+    onOpenTask: model.openTask,
   };
   return (
     <div className="app-shell">
@@ -213,6 +232,15 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
           <MainContent model={model} screenProps={screenProps} />
         </main>
       </div>
+      {taskCard && (
+        <TaskCard
+          task={taskCard}
+          state={state}
+          today={views.today}
+          workdays={state.workdays}
+          onClose={model.closeTask}
+        />
+      )}
       <QuickAddDialog
         open={model.quickAddOpen}
         onClose={() => {

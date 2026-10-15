@@ -30,7 +30,7 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 const APP_VERSION = '0.1.0';
 
 export function exportTo(
@@ -237,7 +237,7 @@ function readProfile(path: string): BackupData {
     const query = (table: string): Record<string, unknown>[] =>
       database
         .prepare(
-          `SELECT * FROM ${table}${table === 'columns' ? ' ORDER BY position' : table === 'tasks' ? ' ORDER BY position,id' : ''}`,
+          `SELECT * FROM ${table}${table === 'columns' ? ' ORDER BY position' : table === 'tasks' ? ' ORDER BY position,id' : table === 'series' ? ' ORDER BY id' : table === 'series_outcomes' ? ' ORDER BY series_id,date' : ''}`,
         )
         .all() as Record<string, unknown>[];
     const metadata = database
@@ -254,6 +254,8 @@ function readProfile(path: string): BackupData {
       disciplines: query('disciplines'),
       rules: query('rule_documents'),
       rule_versions: query('rule_versions'),
+      series: query('series'),
+      outcomes: query('series_outcomes'),
       revision: metadata.revision,
     });
   } finally {

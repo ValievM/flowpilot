@@ -37,6 +37,8 @@ export function snapshot(tasks: IpcSnapshot['tasks'] = [task()]): IpcSnapshot {
   return {
     columns,
     tasks,
+    series: [],
+    outcomes: [],
     settings: { workdays: [1, 2, 3, 4, 5] },
     revision: 12,
   };
@@ -181,6 +183,11 @@ function toIpcStatus(
 
 export function renderBoard(value = createBoardApi()): MockBoardApi {
   window.flowpilot = value;
-  render(<BoardScreen today={Temporal.PlainDate.from('2026-10-06')} />);
+  render(
+    <BoardScreen
+      today={Temporal.PlainDate.from('2026-10-06')}
+      onOpenTask={() => undefined}
+    />,
+  );
   return value;
 }
