@@ -10,6 +10,7 @@ import restoreHistory from './migrations/0007_restore_history.sql?raw';
 import aiApplication from './migrations/0008_ai_application.sql?raw';
 import rejectedAiCommands from './migrations/0009_rejected_ai_commands.sql?raw';
 import rulesStorage from './migrations/0010_rules_storage.sql?raw';
+import seriesStorage from './migrations/0011_series_storage.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -22,6 +23,7 @@ const MIGRATIONS = [
   { version: 8, sql: aiApplication },
   { version: 9, sql: rejectedAiCommands },
   { version: 10, sql: rulesStorage },
+  { version: 11, sql: seriesStorage },
 ] as const;
 export class ForeignDatabaseError extends Error {
   constructor() {

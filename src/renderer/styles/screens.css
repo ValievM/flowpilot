@@ -19,6 +19,24 @@
   font-size: var(--type-task);
 }
 
+.task-title-button {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.task-title-button:focus-visible {
+  outline: var(--selection-stroke) solid var(--accent);
+  outline-offset: var(--space-4);
+}
+
 .all-task-list {
   display: grid;
   max-width: var(--panel-min);

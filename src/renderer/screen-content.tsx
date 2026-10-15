@@ -10,7 +10,6 @@ import { taskSummaryData } from './task-summary-data';
 import type { MotionChoice } from './use-reduced-motion';
 import type { ThemeChoice } from '../shared/contracts';
 import type { View } from './types';
-
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -31,6 +30,7 @@ export interface ScreenProps {
   readonly saveError: string | undefined;
   readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -45,6 +45,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         today={props.today}
         todayLabel={props.todayLabel}
         onViewChange={props.onViewChange}
+        onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />
     );
@@ -58,10 +59,12 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         hasUndatedTasks={props.hasUndatedTasks}
         workdays={props.workdays}
         isLoading={props.loading}
+        onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />
     );
-  if (props.view === 'board') return <BoardScreen today={props.today} />;
+  if (props.view === 'board')
+    return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')
     return (
       <section className="simple-screen">
@@ -69,10 +72,20 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         <h1>Все задачи</h1>
         <div className="all-task-list">
           {props.tasks.map((task) => (
-            <TaskSummary
-              key={task.id}
-              task={taskSummaryData(task, props.today, props.workdays)}
-            />
+            <div className="task-summary-entry" key={task.id}>
+              <TaskSummary
+                task={taskSummaryData(task, props.today, props.workdays)}
+              />
+              <button
+                className="button"
+                type="button"
+                onClick={(event) => {
+                  props.onOpenTask(task.id, event.currentTarget);
+                }}
+              >
+                Открыть задачу
+              </button>
+            </div>
           ))}
         </div>
       </section>

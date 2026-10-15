@@ -5,7 +5,21 @@ import type {
   TaskType,
 } from '../domain';
 import type { Temporal } from 'temporal-polyfill';
+export type SeriesOutcomeInput<T> = T extends Outcome
+  ? Omit<T, 'seriesId' | 'recordedAt'>
+  : never;
+export type SeriesChanges = {
+  readonly title?: string;
+  readonly description?: string | null;
+  readonly weekdays?: readonly number[];
+  readonly time?: Temporal.PlainTime | null;
+  readonly startsOn?: Temporal.PlainDate;
+  readonly endsOn?: Temporal.PlainDate | null;
+};
+
 import type {
+  Outcome,
+  Series,
   Task,
   TaskColumn,
   TaskStatus,
@@ -39,6 +53,8 @@ export interface Snapshot {
   readonly taskTypes: readonly TaskType[];
   readonly disciplines: readonly Discipline[];
   readonly rules: readonly StoredRule[];
+  readonly series: readonly Series[];
+  readonly outcomes: readonly Outcome[];
   readonly settings: Readonly<Record<string, unknown>>;
   readonly revision: number;
 }
@@ -132,7 +148,19 @@ export type StorageCommand =
   | { kind: 'rule.import'; documentJson: string }
   | { kind: 'rule.activate'; ruleId: string }
   | { kind: 'rule.deactivate'; ruleId: string }
-  | { kind: 'rule.bind'; ruleId: string; scope: RulesDocument['scope'] };
+  | { kind: 'rule.bind'; ruleId: string; scope: RulesDocument['scope'] }
+  | { kind: 'series.create'; series: Series }
+  | {
+      kind: 'series.update';
+      id: string;
+      changes: SeriesChanges;
+    }
+  | { kind: 'series.stop'; id: string; endDate: Temporal.PlainDate }
+  | {
+      kind: 'series.recordOutcome';
+      seriesId: string;
+      outcome: SeriesOutcomeInput<Outcome>;
+    };
 
 export interface RejectedAiCommand {
   readonly index: number;

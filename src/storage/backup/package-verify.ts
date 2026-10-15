@@ -16,7 +16,7 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 type PackageContents = { manifest: BackupManifest; data: BackupData };
 
 export function verifyPackage(dir: string): Verification {

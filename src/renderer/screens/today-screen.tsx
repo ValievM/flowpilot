@@ -16,6 +16,7 @@ interface TodayScreenProps {
   readonly todayLabel: string;
   readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 function taskState(task: Task): string {
@@ -36,11 +37,13 @@ function TaskRow({
   today,
   workdays,
   index,
+  onOpenTask,
 }: {
   readonly task: Task;
   readonly today: Temporal.PlainDate;
   readonly workdays: ReadonlySet<number>;
   readonly index: number;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   const risk = deadlineRisk(task, today, workdays);
   const riskText = deadlineMessage(risk);
@@ -52,7 +55,18 @@ function TaskRow({
     >
       <span className="task-number">{String(index + 1).padStart(2, '0')}</span>
       <div className="task-copy">
-        <h3>{task.title}</h3>
+        <h3>
+          <button
+            className="task-title-button"
+            type="button"
+            aria-label={`Открыть задачу: ${task.title}`}
+            onClick={(event) => {
+              onOpenTask(task.id, event.currentTarget);
+            }}
+          >
+            {task.title}
+          </button>
+        </h3>
         <div className="task-meta">
           {task.status.kind === 'waiting' && (
             <span>Ожидание: {task.status.reason}</span>
@@ -158,11 +172,11 @@ export function TodayScreen({
   hasUndatedTasks,
   available,
   workdays,
-
   today,
   todayLabel,
   onViewChange,
   onStart,
+  onOpenTask,
 }: TodayScreenProps): React.JSX.Element {
   const nextTask = available[0];
   const nextRisk = nextTask
@@ -195,6 +209,7 @@ export function TodayScreen({
                 today={today}
                 workdays={workdays}
                 index={index}
+                onOpenTask={onOpenTask}
               />
             ))}
           </ol>
