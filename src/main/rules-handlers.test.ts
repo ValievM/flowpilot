@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Temporal } from 'temporal-polyfill';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Repository } from '../storage';
 import type { Clock } from '../storage';
 import {
@@ -145,6 +145,66 @@ describe('rules file handlers', () => {
       },
     );
     expect(result).toEqual({ ok: false, error: { kind: 'Cancelled' } });
+    repository.close();
+  });
+
+  it('returns InternalError when dialogs or repository loading reject', async () => {
+    const { repository } = openRepository();
+    repository.apply(
+      [{ kind: 'taskType.create', taskType: { id: 'study', name: 'Учёба' } }],
+      0,
+    );
+    repository.apply([{ kind: 'rule.import', documentJson: validRule }], 1);
+    repository.apply([{ kind: 'rule.activate', ruleId: 'rule-a' }], 2);
+    const dialogError = new Error('dialog failed');
+    const importResult = await importRuleFile(
+      {},
+      {
+        repository,
+        dialogs: {
+          openRulesFile: () => Promise.reject(dialogError),
+          saveRulesFile: () => Promise.reject(dialogError),
+        },
+      },
+    );
+    expect(importResult).toEqual({
+      ok: false,
+      error: { kind: 'InternalError' },
+    });
+
+    const exportResult = await exportRuleFile(
+      { id: 'rule-a' },
+      {
+        repository,
+        dialogs: {
+          openRulesFile: () => Promise.resolve(undefined),
+          saveRulesFile: () => Promise.reject(dialogError),
+        },
+      },
+    );
+    expect(exportResult).toEqual({
+      ok: false,
+      error: { kind: 'InternalError' },
+    });
+
+    const load = vi.spyOn(repository, 'load').mockImplementation(() => {
+      throw new Error('repository failed');
+    });
+    const loadResult = await exportRuleFile(
+      { id: 'rule-a' },
+      {
+        repository,
+        dialogs: {
+          openRulesFile: () => Promise.resolve(undefined),
+          saveRulesFile: () => Promise.resolve(undefined),
+        },
+      },
+    );
+    expect(loadResult).toEqual({
+      ok: false,
+      error: { kind: 'InternalError' },
+    });
+    load.mockRestore();
     repository.close();
   });
 

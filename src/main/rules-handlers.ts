@@ -55,11 +55,11 @@ export async function importRuleFile(
 ): Promise<RuleResult<StoredRule>> {
   if (!emptyRequestSchema.safeParse(request).success)
     return { ok: false, error: { kind: 'ValidationFailed' } };
-  const selectedPath = await deps.dialogs.openRulesFile();
-  if (!selectedPath) return { ok: false, error: { kind: 'Cancelled' } };
-  if (extname(selectedPath).toLowerCase() !== '.json')
-    return { ok: false, error: { kind: 'ValidationFailed' } };
   try {
+    const selectedPath = await deps.dialogs.openRulesFile();
+    if (!selectedPath) return { ok: false, error: { kind: 'Cancelled' } };
+    if (extname(selectedPath).toLowerCase() !== '.json')
+      return { ok: false, error: { kind: 'ValidationFailed' } };
     const files = deps.files ?? nodeRuleFiles;
     if (files.size(selectedPath) > MAX_RULE_FILE_BYTES)
       return { ok: false, error: { kind: 'ValidationFailed' } };
@@ -130,15 +130,16 @@ export async function exportRuleFile(
   const parsed = exportRequestSchema.safeParse(request);
   if (!parsed.success)
     return { ok: false, error: { kind: 'ValidationFailed' } };
-  const rule = deps.repository
-    .load()
-    .rules.find(({ id }) => id === parsed.data.id);
-  if (!rule?.activeDocument) return { ok: false, error: { kind: 'NotFound' } };
-  const selectedPath = await deps.dialogs.saveRulesFile();
-  if (!selectedPath) return { ok: false, error: { kind: 'Cancelled' } };
-  if (extname(selectedPath).toLowerCase() !== '.json')
-    return { ok: false, error: { kind: 'ValidationFailed' } };
   try {
+    const rule = deps.repository
+      .load()
+      .rules.find(({ id }) => id === parsed.data.id);
+    if (!rule?.activeDocument)
+      return { ok: false, error: { kind: 'NotFound' } };
+    const selectedPath = await deps.dialogs.saveRulesFile();
+    if (!selectedPath) return { ok: false, error: { kind: 'Cancelled' } };
+    if (extname(selectedPath).toLowerCase() !== '.json')
+      return { ok: false, error: { kind: 'ValidationFailed' } };
     (deps.files ?? nodeRuleFiles).write(
       selectedPath,
       JSON.stringify(rule.activeDocument, null, 2),
