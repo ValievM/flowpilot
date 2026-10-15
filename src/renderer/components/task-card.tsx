@@ -5,6 +5,7 @@ import type { CommandsApplyRequest } from '../../shared/contracts';
 import { deadlineRisk } from '../../domain/risk/risk';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 import type { PersistedState } from '../use-persisted-tasks';
+import { TaskAttachments } from './task-attachments';
 import { TaskCardActivity } from './task-card-activity';
 import { TaskCardScheduleFields } from './task-card-schedule-fields';
 import { TaskCardStatusFields } from './task-card-status-fields';
@@ -155,6 +156,7 @@ export function TaskCard({
             }}
           />
         </div>
+        <TaskAttachments task={task} refresh={() => state.refresh()} />
         <TaskCardActivity task={task} onApply={applyCard} />
       </div>
       <p className="task-card-status" role="status" aria-live="polite">

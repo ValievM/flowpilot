@@ -82,6 +82,57 @@
   font-size: var(--type-section);
 }
 
+.task-attachments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.task-attachments-note,
+.task-attachments-empty,
+.task-attachments-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.task-attachments-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-attachment {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.task-attachment-info {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--space-4);
+  overflow-wrap: anywhere;
+}
+
+.task-attachment-info span {
+  color: var(--muted);
+  font-size: var(--type-caption);
+}
+
+.task-attachment .icon-button {
+  flex: none;
+}
+
+.task-attachments-message:empty {
+  display: none;
+}
+
 .task-subtask {
   display: flex;
   min-width: 0;
