@@ -42,6 +42,21 @@ describe('AI proposal application', () => {
     expect(repository.load().tasks[0]?.title).toBe('Draft');
     expect(repository.history(10).entries).toEqual(historyBefore);
   });
+  it('hands the AI rationale to the person who has to confirm the proposal', () => {
+    const { repository, application } = setup();
+    seedTask(repository);
+    const value = proposal('confirm-rationale', 1, [
+      { kind: 'task.update', id: 'task-1', changes: { title: 'Final draft' } },
+    ]);
+
+    const staged = application.applyProposal(value, 'confirm');
+
+    expect(staged).toMatchObject({
+      kind: 'confirmation-required',
+      rationale: value.rationale,
+    });
+    expect(value.rationale.length).toBeGreaterThan(0);
+  });
   it('activates a saved draft rule through an AI proposal', () => {
     const rule = {
       schema_version: 'v1',

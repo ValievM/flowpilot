@@ -32,6 +32,7 @@ export type ProposalOutcome =
   | {
       readonly kind: 'confirmation-required';
       readonly proposalId: string;
+      readonly rationale: string;
       readonly diff: {
         readonly changes: readonly AiFieldChange[];
         readonly rejectedCommands: readonly RejectedCommand[];
@@ -191,6 +192,7 @@ export class AiProposalApplication {
     return {
       kind: 'confirmation-required',
       proposalId: proposal.id,
+      rationale: proposal.rationale,
       diff: { changes, rejectedCommands },
       rejectedCommands,
     };

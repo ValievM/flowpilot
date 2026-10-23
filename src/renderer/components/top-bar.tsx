@@ -7,6 +7,7 @@ const labels: Record<View, string> = {
   board: 'Доска',
   all: 'Все задачи',
   chat: 'Чат с AI',
+  replan: 'Перестроить порядок',
   settings: 'Настройки',
 };
 
@@ -18,6 +19,7 @@ interface TopBarProps {
   error: string | undefined;
   undoDisabled: boolean;
   onAddTask: () => void;
+  replan: { readonly running: boolean; readonly onRun: () => void };
   onUndo: () => void;
   onOpenHistory: () => void;
   addButtonRef: React.RefObject<HTMLButtonElement | null>;
@@ -32,6 +34,7 @@ export function TopBar({
   error,
   undoDisabled,
   onAddTask,
+  replan,
   onUndo,
   onOpenHistory,
   addButtonRef,
@@ -87,6 +90,14 @@ export function TopBar({
           onClick={onOpenHistory}
         >
           История
+        </button>
+        <button
+          className="button no-drag"
+          type="button"
+          disabled={replan.running}
+          onClick={replan.onRun}
+        >
+          Перестроить
         </button>
         <button
           className="button button-primary add-button no-drag"

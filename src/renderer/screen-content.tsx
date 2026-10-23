@@ -11,7 +11,8 @@ import type { MotionChoice } from './use-reduced-motion';
 import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
-import type { ChatModel } from './chat/use-chat';
+import type { AppAi } from './chat/chat-bridge';
+import { ReplanScreen } from './screens/replan-screen';
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -38,7 +39,7 @@ export interface ScreenProps {
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
   readonly allTasks: readonly Task[];
-  readonly chat: ChatModel;
+  readonly ai: AppAi;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -75,8 +76,17 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
     return (
       <ChatScreen
         tasks={props.allTasks}
-        chat={props.chat}
+        chat={props.ai.chat}
         onStart={props.onStart}
+      />
+    );
+  if (props.view === 'replan')
+    return (
+      <ReplanScreen
+        replan={props.ai.replan}
+        tasks={props.allTasks}
+        mode={props.ai.chat.mode}
+        loadMode={props.ai.chat.loadMode}
       />
     );
   if (props.view === 'board')
