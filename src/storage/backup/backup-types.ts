@@ -7,6 +7,35 @@ export type Verification =
       readonly value: { manifest: BackupManifest; data: BackupData };
     }
   | { readonly ok: false; readonly problems: readonly BackupProblem[] };
+export type RestoredProfileBackup = Readonly<{
+  db: string;
+  attachments: string | undefined;
+}>;
+export type ExportInfo = Readonly<{
+  folderPath: string;
+  exportedAt: string;
+}>;
+export type ExportResult =
+  | { readonly ok: true; readonly value: ExportInfo }
+  | {
+      readonly ok: false;
+      readonly kind: 'AlreadyExists' | 'OperationalFailure';
+      readonly error: string;
+    };
 export type BackupResult =
-  | { readonly ok: true; readonly value: string }
-  | { readonly ok: false; readonly error: string };
+  | {
+      readonly ok: true;
+      readonly value: string;
+      readonly backup?: RestoredProfileBackup | undefined;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: 'PackageInvalid';
+      readonly error: string;
+    }
+  | {
+      readonly ok: false;
+      readonly kind: 'OperationalFailure';
+      readonly error: string;
+      readonly backup?: RestoredProfileBackup | undefined;
+    };

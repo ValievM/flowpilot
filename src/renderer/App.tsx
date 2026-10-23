@@ -2,9 +2,11 @@ import React from 'react';
 import type { ThemeChoice } from '../shared/contracts';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
+import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
+import { useSidebarVisibility } from './use-sidebar-visibility';
 import { ScreenContent } from './screen-content';
 import type { ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
@@ -17,6 +19,11 @@ import { useTheme } from './theme/use-theme';
 import type { View } from './types';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
+import { HistoryPanel } from './components/history-panel';
+import type { HistoryState } from './use-history';
+import { useHistory } from './use-history';
+import { RepeatSchedule } from './screens/repeat-schedule';
+import { createSeries } from './create-series';
 
 function localDateLabel(date: TemporalTypes.PlainDate): string {
   return `Сегодня, ${date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}`;
@@ -32,12 +39,17 @@ interface AppModel {
   readonly quickAddOpen: boolean;
   readonly setQuickAddOpen: (open: boolean) => void;
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
+  readonly historyButtonRef: React.RefObject<HTMLButtonElement | null>;
+  readonly history: HistoryState;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
   readonly clock: LocalClock;
   readonly cycleTheme: () => void;
   readonly startTask: (task: Task) => Promise<void>;
   readonly addTask: (title: string) => Promise<boolean>;
+  readonly taskCardId: string | undefined;
+  readonly openTask: (taskId: string, trigger: HTMLElement) => void;
+  readonly closeTask: () => void;
 }
 
 function useAppModel(initialTheme: ThemeChoice): AppModel {
@@ -45,15 +57,27 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   const [motionChoice, setMotionChoice] = useReducedMotion();
   const [view, setView] = React.useState<View>('today');
   const [quickAddOpen, setQuickAddOpen] = React.useState(false);
+  const [taskCardId, setTaskCardId] = React.useState<string>();
+  const taskCardTrigger = React.useRef<HTMLElement | null>(null);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
+  const historyButtonRef = React.useRef<HTMLButtonElement>(null);
   const clock = useCurrentTime();
   const state = usePersistedTasks();
+  const history = useHistory(() => state.refresh());
   const views = taskViews(state.tasks, clock);
   useQuickAddShortcut(quickAddOpen, setQuickAddOpen);
   const cycleTheme = (): void => {
     setTheme((current) =>
       current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system',
     );
+  };
+  const openTask = (id: string, trigger: HTMLElement): void => {
+    taskCardTrigger.current = trigger;
+    setTaskCardId(id);
+  };
+  const closeTask = (): void => {
+    setTaskCardId(undefined);
+    requestAnimationFrame(() => taskCardTrigger.current?.focus());
   };
   return {
     theme,
@@ -65,12 +89,17 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     quickAddOpen,
     setQuickAddOpen,
     addButtonRef,
+    historyButtonRef,
+    history,
     state,
     views,
     clock,
     cycleTheme,
     startTask: (task) => startTask(state, task),
     addTask: (title) => addTask(state, title, views.today.toString()),
+    taskCardId,
+    openTask,
+    closeTask,
   };
 }
 
@@ -114,7 +143,7 @@ function MainContent({
   readonly model: AppModel;
   readonly screenProps: ScreenProps;
 }): React.JSX.Element {
-  const { state, view, views } = model;
+  const { state } = model;
   if (shouldShowLoading(model)) return <LoadingState />;
   if (state.loadError && state.tasks.length === 0)
     return (
@@ -127,12 +156,7 @@ function MainContent({
     );
   return (
     <>
-      <ScreenContent
-        {...screenProps}
-        tasks={
-          view === 'board' || view === 'all' ? views.all : views.todayTasks
-        }
-      />
+      <ScreenContent {...screenProps} />
       {model.clock.error && (
         <p className="load-error" role="alert">
           {model.clock.error}
@@ -168,14 +192,16 @@ function MainContent({
 }
 
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
+  const sidebar = useSidebarVisibility();
   const { state, view, views } = model;
+  const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
     view,
     hasTasks: views.all.length > 0,
     hasUndatedTasks: views.all.some(
       (task) => task.day === undefined && task.status.kind !== 'done',
     ),
-    tasks: views.todayTasks,
+    tasks: view === 'board' || view === 'all' ? views.all : views.todayTasks,
     today: views.today,
     todayLabel: localDateLabel(views.today),
     available: views.available,
@@ -187,12 +213,15 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onMotionChoiceChange: model.setMotionChoice,
     onWorkdaysChange: (workdays) => state.updateWorkdays(workdays),
     saveError: state.settingsError,
-    onViewChange: model.setView,
+    backup: window.flowpilot.backup,
+    onSnapshotRefresh: () => state.refresh(),
     onStart: (task) => void model.startTask(task),
+    onOpenTask: model.openTask,
   };
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>
       <Sidebar
+        hidden={sidebar.hidden}
         view={view}
         availableCount={views.available.length}
         theme={model.theme}
@@ -202,24 +231,66 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
       <div className="workspace">
         <TopBar
           view={view}
+          sidebarHidden={sidebar.hidden}
+          onToggleSidebar={sidebar.toggle}
           saved={state.isSaved}
+          undoDisabled={
+            !model.history.entries.some(
+              (entry) => entry.source !== 'undo' && entry.source !== 'restore',
+            )
+          }
           error={state.commandError ?? state.settingsError}
           onAddTask={() => {
             model.setQuickAddOpen(true);
           }}
+          onUndo={() => void model.history.undo()}
+          onOpenHistory={() => {
+            model.history.setOpen(true);
+            void model.history.refresh();
+          }}
           addButtonRef={model.addButtonRef}
+          historyButtonRef={model.historyButtonRef}
         />
         <main className="main-content" aria-busy={state.isLoading}>
           <MainContent model={model} screenProps={screenProps} />
+          <RepeatSchedule state={state} clock={model.clock} view={view} />
         </main>
+        {model.history.notice && (
+          <p className="history-notice" role="status">
+            {model.history.notice}
+          </p>
+        )}
       </div>
+      {taskCard && (
+        <TaskCard
+          task={taskCard}
+          state={state}
+          today={views.today}
+          workdays={state.workdays}
+          onClose={model.closeTask}
+        />
+      )}
       <QuickAddDialog
         open={model.quickAddOpen}
         onClose={() => {
           model.setQuickAddOpen(false);
         }}
         onSubmit={model.addTask}
+        today={views.today}
+        onCreateSeries={(series) => createSeries(state, series)}
         addButtonRef={model.addButtonRef}
+      />
+      <HistoryPanel
+        open={model.history.open}
+        entries={model.history.entries}
+        tasks={state.tasks}
+        loading={model.history.loading}
+        error={model.history.error}
+        onClose={() => {
+          model.history.setOpen(false);
+        }}
+        onUndo={(id) => model.history.undo(id)}
+        triggerRef={model.historyButtonRef}
       />
     </div>
   );

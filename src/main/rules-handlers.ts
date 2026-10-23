@@ -11,6 +11,7 @@ import type { RulesDocument } from '../domain';
 import type { Repository, StoredRule, StorageCommand } from '../storage';
 import type { Snapshot } from '../storage';
 import { z } from 'zod';
+import { validationIssues } from './rule-validation-issues';
 
 type RuleError =
   | { readonly kind: 'ValidationFailed' }
@@ -19,6 +20,7 @@ type RuleError =
   | { readonly kind: 'RuleConflict' }
   | { readonly kind: 'InternalError' }
   | {
+      readonly kind: 'RuleInvalid';
       readonly errors: readonly RuleValidationIssue[];
     };
 type RuleResult<T> =

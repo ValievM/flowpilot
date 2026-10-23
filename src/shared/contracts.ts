@@ -4,9 +4,13 @@ import {
   settingFields,
   validateGenericSettingValue,
 } from './command-schema';
-import type { Task, TaskStatus } from '../domain';
-import type { Snapshot } from '../storage';
+import type { Series, Task, TaskComment, TaskStatus } from '../domain';
+import type { ExportInfo, HistoryEntry, Snapshot } from '../storage';
 import type { Result } from './ipc-result';
+import type { CatalogApi, RulesApi } from './rule-contracts';
+
+export * from './rule-contracts';
+export type { ExportInfo } from '../storage';
 import type {
   AiCommand,
   AiTaskChanges,
@@ -54,50 +58,48 @@ export type AiIpcProposal = Omit<Proposal, 'commands'> & {
 type IpcTaskStatus =
   | Exclude<TaskStatus, { kind: 'waiting' }>
   | { kind: 'waiting'; reason: string; until?: string };
+type SerializedTaskComment = Omit<TaskComment, 'createdAt'> & {
+  readonly createdAt: string | null;
+};
 type SerializedTask = Omit<
   Task,
-  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status'
+  'day' | 'time' | 'deadline' | 'rolledOverFrom' | 'status' | 'comments'
 > & {
   readonly day?: string;
   readonly time?: string;
   readonly deadline?: string;
   readonly rolledOverFrom?: string;
   readonly status: IpcTaskStatus;
+  readonly comments: readonly SerializedTaskComment[];
 };
+type SerializedSeries = Omit<Series, 'startsOn' | 'endsOn' | 'time'> & {
+  readonly startsOn: string;
+  readonly endsOn?: string;
+  readonly time?: string;
+};
+type SerializedOutcome =
+  | {
+      readonly kind: 'done' | 'skipped' | 'dismissed';
+      readonly seriesId: string;
+      readonly date: string;
+      readonly recordedAt: string;
+    }
+  | {
+      readonly kind: 'rescheduled';
+      readonly seriesId: string;
+      readonly date: string;
+      readonly newDate: string;
+      readonly newTime: string;
+      readonly recordedAt: string;
+    };
 export type IpcSnapshot = Omit<
   Snapshot,
-  'tasks' | 'taskTypes' | 'disciplines' | 'rules'
+  'tasks' | 'series' | 'outcomes' | 'taskTypes' | 'disciplines' | 'rules'
 > & {
   readonly tasks: readonly SerializedTask[];
+  readonly series: readonly SerializedSeries[];
+  readonly outcomes: readonly SerializedOutcome[];
 };
-export type IpcCatalog = Pick<Snapshot, 'taskTypes' | 'disciplines'>;
-export type IpcStoredRule = Snapshot['rules'][number];
-
-export type IpcRuleIssue = {
-  readonly path: string;
-  readonly code: string;
-  readonly reason: string;
-  readonly suggestion: string;
-};
-export type IpcRuleResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | {
-      readonly ok: false;
-      readonly error:
-        | {
-            readonly kind:
-              | 'ValidationFailed'
-              | 'Cancelled'
-              | 'NotFound'
-              | 'RuleConflict'
-              | 'InternalError';
-          }
-        | {
-            readonly kind: 'RuleInvalid';
-            readonly errors: readonly IpcRuleIssue[];
-          };
-    };
-
 export const ipcChannels = {
   snapshotLoad: 'snapshot.load',
   commandsApply: 'commands.apply',
@@ -118,7 +120,66 @@ export const ipcChannels = {
   appearanceSetTheme: 'appearance.set-theme',
   appearanceInitialize: 'appearance.initialize',
   appearanceReady: 'appearance.ready',
+  historyList: 'history.list',
+  historyUndo: 'history.undo',
+  attachmentsAdd: 'attachments.add',
+  attachmentsOpen: 'attachments.open',
+  attachmentsRemove: 'attachments.remove',
+  backupExport: 'backup.export',
+  backupVerify: 'backup.verify',
+  backupRestore: 'backup.restore',
 } as const;
+export const historyListRequestSchema = z
+  .object({
+    limit: z.number().int().positive(),
+    before: z.string().min(1).optional(),
+  })
+  .strict();
+export const historyUndoRequestSchema = z
+  .object({ entryId: z.string().min(1).optional() })
+  .strict();
+export const attachmentAddRequestSchema = z
+  .object({ taskId: z.string().min(1) })
+  .strict();
+export const attachmentOpenRequestSchema = z
+  .object({ attachmentId: z.string().min(1) })
+  .strict();
+export const attachmentRemoveRequestSchema = attachmentOpenRequestSchema;
+export const backupExportRequestSchema = z.object({}).strict();
+export const backupVerifyRequestSchema = z.object({}).strict();
+export const backupRestoreRequestSchema = z
+  .object({ packageToken: z.string().min(1) })
+  .strict();
+export type IpcHistoryEntry = HistoryEntry;
+export type BackupVerifyResult =
+  | {
+      readonly ok: true;
+      readonly value: {
+        readonly packageToken: string;
+        readonly problems: readonly [];
+      };
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'PackageInvalid';
+      readonly problems: readonly {
+        readonly path: string;
+        readonly message: string;
+      }[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: 'ValidationFailed' | 'Cancelled';
+    };
+export type HistoryListRequest = z.infer<typeof historyListRequestSchema>;
+export type HistoryUndoRequest = z.infer<typeof historyUndoRequestSchema>;
+export type AttachmentAddRequest = z.infer<typeof attachmentAddRequestSchema>;
+export type AttachmentOpenRequest = z.infer<typeof attachmentOpenRequestSchema>;
+export type AttachmentRemoveRequest = z.infer<
+  typeof attachmentRemoveRequestSchema
+>;
+export type BackupRestoreRequest = z.infer<typeof backupRestoreRequestSchema>;
+
 export const appearanceThemeRequestSchema = z
   .object({ theme: z.enum(['system', 'light', 'dark']) })
   .strict();
@@ -162,22 +223,6 @@ export type AiCancelResult =
   | { readonly ok: true; readonly value: null }
   | { readonly ok: false; readonly error: 'ValidationFailed' };
 
-export const catalogListRequestSchema = z.object({}).strict();
-export const rulesListRequestSchema = z.object({}).strict();
-export const rulesImportFileRequestSchema = z.object({}).strict();
-export const ruleIdRequestSchema = z.object({ id: z.string().min(1) }).strict();
-export const ruleBindRequestSchema = z
-  .object({
-    id: z.string().min(1),
-    scope: z
-      .object({
-        task_type_ids: z.array(z.string().min(1)),
-        discipline_ids: z.array(z.string().min(1)).optional(),
-      })
-      .strict(),
-  })
-  .strict();
-
 export const snapshotLoadRequestSchema = z.object({}).strict();
 export const commandsApplyRequestSchema = z
   .object({
@@ -206,8 +251,6 @@ export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
 export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
-export type RuleIdRequest = z.infer<typeof ruleIdRequestSchema>;
-export type RuleBindRequest = z.infer<typeof ruleBindRequestSchema>;
 
 export type FlowPilotApi = {
   appearance: {
@@ -221,26 +264,28 @@ export type FlowPilotApi = {
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
   };
-  catalog: {
-    list(): Promise<IpcRuleResult<Pick<Snapshot, 'taskTypes' | 'disciplines'>>>;
-  };
-  rules: {
-    list(): Promise<IpcRuleResult<Snapshot['rules']>>;
-    importFile(): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
-    exportFile(request: RuleIdRequest): Promise<IpcRuleResult<null>>;
-    activate(
-      request: RuleIdRequest,
-    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
-    deactivate(
-      request: RuleIdRequest,
-    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
-    bind(
-      request: RuleBindRequest,
-    ): Promise<IpcRuleResult<Snapshot['rules'][number]>>;
-  };
+  catalog: CatalogApi;
+  rules: RulesApi;
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;
     set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
+  };
+  history: {
+    list(
+      limit?: number,
+      before?: string,
+    ): Promise<Result<readonly IpcHistoryEntry[]>>;
+    undo(entryId?: string): Promise<Result<IpcSnapshot>>;
+  };
+  attachments: {
+    add(request: AttachmentAddRequest): Promise<Result<IpcSnapshot>>;
+    open(request: AttachmentOpenRequest): Promise<Result<null>>;
+    remove(request: AttachmentRemoveRequest): Promise<Result<IpcSnapshot>>;
+  };
+  backup: {
+    export(): Promise<Result<ExportInfo>>;
+    verify(): Promise<BackupVerifyResult>;
+    restore(packageToken: string): Promise<Result<IpcSnapshot>>;
   };
   ai: {
     run(request: AiIpcRequest): Promise<AiIpcResult>;

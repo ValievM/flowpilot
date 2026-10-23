@@ -7,6 +7,7 @@ import type {
   IpcSnapshot,
 } from '../../shared/contracts';
 import { BoardScreen } from './board-screen';
+import { featureMocks } from './board-test-feature-mocks';
 
 export const columns: IpcSnapshot['columns'] = [
   {
@@ -37,6 +38,8 @@ export function snapshot(tasks: IpcSnapshot['tasks'] = [task()]): IpcSnapshot {
   return {
     columns,
     tasks,
+    series: [],
+    outcomes: [],
     settings: { workdays: [1, 2, 3, 4, 5] },
     revision: 12,
   };
@@ -138,47 +141,7 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       reply: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
     },
     snapshot: { load: loadMock },
-    catalog: {
-      list: vi.fn(() =>
-        Promise.resolve({
-          ok: true as const,
-          value: { taskTypes: [], disciplines: [] },
-        }),
-      ),
-    },
-    rules: {
-      list: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
-      importFile: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: { kind: 'Cancelled' as const },
-        }),
-      ),
-      exportFile: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: { kind: 'NotFound' as const },
-        }),
-      ),
-      activate: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: { kind: 'NotFound' as const },
-        }),
-      ),
-      deactivate: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: { kind: 'NotFound' as const },
-        }),
-      ),
-      bind: vi.fn(() =>
-        Promise.resolve({
-          ok: false as const,
-          error: { kind: 'NotFound' as const },
-        }),
-      ),
-    },
+    ...featureMocks(() => current),
     commands: { apply: applyMock },
     settings: {
       get: vi.fn(() => Promise.resolve({ ok: true as const, value: {} })),
@@ -222,6 +185,11 @@ function toIpcStatus(
 
 export function renderBoard(value = createBoardApi()): MockBoardApi {
   window.flowpilot = value;
-  render(<BoardScreen today={Temporal.PlainDate.from('2026-10-06')} />);
+  render(
+    <BoardScreen
+      today={Temporal.PlainDate.from('2026-10-06')}
+      onOpenTask={() => undefined}
+    />,
+  );
   return value;
 }

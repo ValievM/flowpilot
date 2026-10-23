@@ -1,6 +1,8 @@
+@import url('./task-card.css');
 @import url('./today.css');
 @import url('./board.css');
 @import url('./screens.css');
+@import url('./history.css');
 
 *,
 *::before,
@@ -51,6 +53,7 @@ input:focus-visible {
   display: grid;
   min-height: 100vh;
   grid-template-columns: var(--size-titlebar-sidebar) minmax(0, 1fr);
+  transition: grid-template-columns var(--motion-panel) var(--motion-curve);
 }
 
 .sidebar-titlebar-drag {
@@ -62,9 +65,13 @@ input:focus-visible {
 .sidebar {
   position: sticky;
   top: 0;
+  transition:
+    opacity var(--motion-panel) var(--motion-curve),
+    visibility 0s linear 0s;
   display: flex;
-  min-height: 100vh;
-  height: 100%;
+  align-self: start;
+  height: 100vh;
+  overflow: hidden;
   flex-direction: column;
   gap: var(--space-32);
   padding: var(--space-24) var(--space-12);
@@ -165,6 +172,36 @@ svg {
   padding: var(--space-8) var(--space-32);
   border-bottom: var(--stroke) solid var(--line);
   background: var(--chrome);
+  transition: padding-left var(--motion-panel) var(--motion-curve);
+  position: sticky;
+  z-index: 5;
+  top: 0;
+}
+
+/* Hidden sidebar: the column collapses smoothly, the panel fades and leaves the tab order (inert). */
+.app-shell.is-sidebar-hidden {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.is-sidebar-hidden .sidebar {
+  border-right-color: transparent;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-panel) var(--motion-curve),
+    visibility 0s linear var(--motion-panel);
+}
+
+.sidebar-toggle {
+  flex: none;
+}
+
+.is-sidebar-hidden .topbar {
+  padding-left: calc(var(--size-titlebar-sidebar) + var(--space-8));
+}
+
+:root[data-full-screen] .is-sidebar-hidden .topbar {
+  padding-left: var(--space-32);
 }
 
 .breadcrumbs,

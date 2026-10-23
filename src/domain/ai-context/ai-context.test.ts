@@ -239,7 +239,13 @@ describe('AI context assembly (F-10)', () => {
                 sizeBytes: 10,
               },
             ],
-            comments: [{ id: 'c', text: 'see /Users/private/notes.txt' }],
+            comments: [
+              {
+                id: 'c',
+                text: 'see /Users/private/notes.txt',
+                createdAt: null,
+              },
+            ],
           }),
         ],
       }),
@@ -315,6 +321,7 @@ describe('AI context assembly (F-10)', () => {
               {
                 id: 'c',
                 text: 'Use https://example.com/config/secret.json, not a local path.',
+                createdAt: null,
               },
             ],
           }),
@@ -339,6 +346,7 @@ describe('AI context assembly (F-10)', () => {
               {
                 id: 'c',
                 text: 'See C:\\work\\My Documents\\private, then \\\\server\\share\\My Documents\\private, config/secret, and https://example.com/config/secret.',
+                createdAt: null,
               },
             ],
           }),
@@ -366,7 +374,11 @@ describe('AI context assembly (F-10)', () => {
             title: '/Users/Ada/My Documents/private',
             description: 'Work at /home/Ada/Project Files/working',
             comments: [
-              { id: 'c', text: 'Avoid /var/lib/My Data/archive, thanks.' },
+              {
+                id: 'c',
+                text: 'Avoid /var/lib/My Data/archive, thanks.',
+                createdAt: null,
+              },
             ],
           }),
         ],
@@ -421,6 +433,7 @@ describe('AI context assembly (F-10)', () => {
               {
                 id: 'comment-1',
                 text: 'C:\\work\\My Documents\\private report, Документы/секрет; https://example.com/?next=config/secret',
+                createdAt: null,
               },
             ],
           }),
@@ -453,6 +466,7 @@ describe('AI context assembly (F-10)', () => {
               {
                 id: 'comment-1',
                 text: 'and/or; see https://example.com/config/secret.txt.',
+                createdAt: null,
               },
             ],
           }),
@@ -479,7 +493,13 @@ describe('AI context assembly (F-10)', () => {
               'Review shared drive\\project notes\\private file.txt, then continue',
             description:
               'input/output; and/or. Keep URL https://example.com/config/secret.txt.',
-            comments: [{ id: 'comment-1', text: 'Keep this prose, please.' }],
+            comments: [
+              {
+                id: 'comment-1',
+                text: 'Keep this prose, please.',
+                createdAt: null,
+              },
+            ],
           }),
         ],
       }),
@@ -511,8 +531,14 @@ describe('AI context assembly (F-10)', () => {
                 id: 'sub-1',
                 title: 'Read /Users/Ada/private report',
                 completed: true,
+                position: 0,
               },
-              { id: 'sub-2', title: 'Solve exercises', completed: false },
+              {
+                id: 'sub-2',
+                title: 'Solve exercises',
+                completed: false,
+                position: 1,
+              },
             ],
           }),
         ],

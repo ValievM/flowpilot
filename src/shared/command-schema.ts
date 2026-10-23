@@ -1,6 +1,16 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
 import {
+  attachmentAddSchema,
+  attachmentRemoveSchema,
+} from './storage-command-schemas';
+import {
+  seriesCreateSchema,
+  seriesRecordOutcomeSchema,
+  seriesStopSchema,
+  seriesUpdateSchema,
+} from './series-command-schema';
+import {
   disciplineCreateSchema,
   disciplineDeleteSchema,
   disciplineRenameSchema,
@@ -8,7 +18,11 @@ import {
   ruleBindSchema,
   ruleDeactivateSchema,
   ruleImportSchema,
+  subtaskMoveSchema,
+  subtaskRemoveSchema,
+  subtaskRenameSchema,
   taskClassifySchema,
+  taskSetAiRankSchema,
   taskTypeCreateSchema,
   taskTypeDeleteSchema,
   taskTypeRenameSchema,
@@ -91,9 +105,7 @@ const columnSchema = z
 const nonEmptyWorkdays = z
   .array(z.number().int().min(1).max(7))
   .min(1)
-  .max(7)
   .refine((days) => new Set(days).size === days.length);
-
 const themeChoice = z.enum(['system', 'light', 'dark']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
@@ -193,20 +205,10 @@ const commentAddSchema = z
   .object({
     kind: z.literal('comment.add'),
     taskId: z.string().min(1),
-    comment: z.object({ id: z.string().min(1), text: z.string() }).strict(),
-  })
-  .strict();
-const attachmentAddSchema = z
-  .object({
-    kind: z.literal('attachment.add'),
-    taskId: z.string().min(1),
-    sourcePath: z.string().min(1),
-  })
-  .strict();
-const attachmentRemoveSchema = z
-  .object({
-    kind: z.literal('attachment.remove'),
-    attachmentId: z.string().min(1),
+    // The creation time is stamped by the main-process clock, never accepted.
+    comment: z
+      .object({ id: z.string().min(1), text: z.string().min(1).max(5000) })
+      .strict(),
   })
   .strict();
 const columnCreateSchema = z
@@ -234,6 +236,7 @@ const columnDeleteSchema = z
       .optional(),
   })
   .strict();
+
 const settingCommandFields = z
   .object({ ...settingFields, kind: z.literal('setting.set') })
   .strict();
@@ -242,13 +245,6 @@ const settingCommandSchema =
 const genericSettingCommandSchema = settingCommandFields.superRefine(
   validateGenericSettingValue,
 );
-const aiRankCommandSchema = z
-  .object({
-    kind: z.literal('task.setAiRank'),
-    taskId: z.string().min(1),
-    rank: z.number().int().min(0),
-  })
-  .strict();
 
 export const commandSchema = z.discriminatedUnion('kind', [
   taskCreateSchema,
@@ -256,14 +252,21 @@ export const commandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   attachmentAddSchema,
   attachmentRemoveSchema,
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
+  seriesCreateSchema,
+  seriesUpdateSchema,
+  seriesStopSchema,
+  seriesRecordOutcomeSchema,
   settingCommandSchema,
-  aiRankCommandSchema,
+  taskSetAiRankSchema,
   taskClassifySchema,
   taskTypeCreateSchema,
   taskTypeRenameSchema,
@@ -283,10 +286,17 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   taskMoveSchema,
   subtaskAddSchema,
   subtaskCompleteSchema,
+  subtaskRenameSchema,
+  subtaskRemoveSchema,
+  subtaskMoveSchema,
   commentAddSchema,
   columnCreateSchema,
   columnRenameSchema,
   columnDeleteSchema,
+  seriesCreateSchema,
+  seriesUpdateSchema,
+  seriesStopSchema,
+  seriesRecordOutcomeSchema,
   genericSettingCommandSchema,
   taskTypeCreateSchema,
   taskTypeRenameSchema,

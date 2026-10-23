@@ -15,12 +15,32 @@ export interface Subtask {
   id: string;
   title: string;
   completed: boolean;
+  position: number;
+}
+
+export interface SubtaskDraft {
+  id: string;
+  title: string;
+  completed: boolean;
 }
 
 export interface TaskComment {
   id: string;
   text: string;
+  /** null for legacy rows created before the timestamp was tracked. */
+  createdAt: Temporal.Instant | null;
 }
+
+export interface TaskCommentDraft {
+  id: string;
+  text: string;
+}
+
+/** A task payload for creation commands: relations carry no persisted fields. */
+export type TaskCreationDraft = Omit<Task, 'subtasks' | 'comments'> & {
+  subtasks: readonly SubtaskDraft[];
+  comments: readonly TaskCommentDraft[];
+};
 
 export interface AttachmentMetadata {
   id: string;

@@ -1,6 +1,9 @@
 import type { RuleDiagnostic, RulesValidationError } from '../domain';
 
-export type RuleValidationIssue = Pick<RulesValidationError, 'path' | 'reason'> & {
+export type RuleValidationIssue = Pick<
+  RulesValidationError,
+  'path' | 'reason'
+> & {
   readonly code: string;
   readonly suggestion: string;
 };

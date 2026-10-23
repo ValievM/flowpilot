@@ -26,6 +26,14 @@ test.afterEach(async () => {
   if (app) await app.close();
   removeSmokeProfile(profilePath);
 });
+
+test('exposes an array from the history preload API', async () => {
+  const result = await page.evaluate(() => window.flowpilot.history.list());
+
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(Array.isArray(result.value)).toBe(true);
+});
+
 for (const width of [900, 1280]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`matches ${theme} settings snapshot at ${width.toString()}px`, async () => {
@@ -110,7 +118,9 @@ for (const width of [900, 1280]) {
       const content = await page.locator('.workspace').boundingBox();
       if (!sidebar || !content)
         throw new Error('Боковая панель или содержимое не отображается.');
-      expect(sidebar.height).toBeGreaterThanOrEqual(content.height);
+      // D-42: the sidebar is fixed to the window, it does not stretch with the page.
+      expect(sidebar.height).toBe(800);
+      expect(content.height).toBeGreaterThan(800);
       await expect(page).toHaveScreenshot(
         `settings-${theme}-${width.toString()}.png`,
         { fullPage: true, maxDiffPixelRatio: 0.00001 },

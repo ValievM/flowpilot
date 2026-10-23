@@ -12,6 +12,7 @@ import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
 import { readRuleSnapshot } from './rules-snapshot';
+import { loadOutcomes, loadSeries } from './series-persistence';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
@@ -93,6 +94,8 @@ export class Repository {
       taskTypes: rules.taskTypes,
       disciplines: rules.disciplines,
       rules: rules.rules,
+      series: loadSeries(this.database),
+      outcomes: loadOutcomes(this.database),
       settings,
       revision,
     };
@@ -131,14 +134,15 @@ export class Repository {
           message: `Invalid ${invalid.kind} command`,
         },
       };
-    const prepared = this.prepareAttachments(commands);
-    if (!prepared.ok) return prepared;
+    const preparedResult = this.prepareAttachments(commands);
+    if (!preparedResult.ok) return preparedResult;
+    const prepared = preparedResult.value;
     return applyCommands(this.database, {
       commands,
       expectedRevision,
       now: this.clock.now().toString(),
       attachmentFiles: this.attachments,
-      preparedAttachments: prepared.value,
+      preparedAttachments: prepared,
       source: options.source ?? 'user',
       ...(options.proposalId !== undefined
         ? { proposalId: options.proposalId }
@@ -147,12 +151,11 @@ export class Repository {
     });
   }
 
-  private prepareAttachments(commands: readonly StorageCommand[]):
+  private prepareAttachments(
+    commands: readonly StorageCommand[],
+  ):
     | { ok: true; value: Map<number, AttachmentRecord> }
-    | {
-        ok: false;
-        error: { kind: 'InvalidCommand'; message: string };
-      } {
+    | Extract<ApplyResult, { ok: false }> {
     const prepared = new Map<number, AttachmentRecord>();
     for (const [index, command] of commands.entries()) {
       if (command.kind !== 'attachment.add') continue;
@@ -164,7 +167,14 @@ export class Repository {
         for (const file of prepared.values()) this.attachments.discard(file.id);
         return {
           ok: false,
-          error: { kind: 'InvalidCommand', message: result.error.kind },
+          error:
+            result.error.kind === 'NotAFile' ||
+            result.error.kind === 'CopyFailed'
+              ? {
+                  kind: 'InvalidCommand',
+                  message: result.error.kind,
+                }
+              : result.error,
         };
       }
       prepared.set(index, result.value);
@@ -205,6 +215,13 @@ export class Repository {
       now: this.clock.now().toString(),
     });
   }
+  attachmentPath(attachmentId: string): string | undefined {
+    return this.attachments.getPath(attachmentId);
+  }
+  attachmentPathResult(attachmentId: string) {
+    return this.attachments.getPathResult(attachmentId);
+  }
+
   close(): void {
     this.database.close();
   }

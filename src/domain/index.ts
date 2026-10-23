@@ -30,15 +30,29 @@ export type {
   SkipGroup,
 } from './repeat';
 export { rollOver } from './rollover';
-export { updateSubtask } from './subtasks';
-export type { UpdateSubtaskResult } from './subtasks';
+export {
+  moveSubtask,
+  removeSubtask,
+  renameSubtask,
+  SUBTASK_TITLE_MAX_LENGTH,
+  updateSubtask,
+} from './subtasks';
+export type {
+  MoveSubtaskResult,
+  RemoveSubtaskResult,
+  RenameSubtaskResult,
+  UpdateSubtaskResult,
+} from './subtasks';
 export type {
   AttachmentMetadata,
   RemainingEstimate,
   Subtask,
+  SubtaskDraft,
   Task,
   TaskColumn,
   TaskComment,
+  TaskCommentDraft,
+  TaskCreationDraft,
   TaskStatus,
 } from './task';
 export { laterView, nowView, todayView } from './views';

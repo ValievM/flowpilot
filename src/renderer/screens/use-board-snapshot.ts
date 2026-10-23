@@ -1,4 +1,5 @@
 import React from 'react';
+import { toWireCommands } from '../wire-commands';
 import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
 
 const SNAPSHOT_LOAD_ERROR =
@@ -117,7 +118,7 @@ async function applyBoardCommands(input: ApplyInput): Promise<ApplyResult> {
   setMessageIfCurrent(input.setError, isCurrent, '');
   try {
     const result = await window.flowpilot.commands.apply({
-      commands: input.commands,
+      commands: toWireCommands(input.commands),
       expectedRevision: input.snapshot.revision,
     });
     if (result.ok) {

@@ -7,6 +7,11 @@ import type {
 } from '../../shared/contracts';
 import type { Result } from '../../shared/ipc-result';
 import { fakeCatalogApi, fakeRulesApi } from './fake-catalog-rules';
+import {
+  createFakeAppApi,
+  createFakeHistoryFileApi,
+} from './fake-history-file-api';
+import { applyRepeatCommands } from './fake-repeat-commands';
 
 type TestTask = IpcSnapshot['tasks'][number];
 type Command = CommandsApplyRequest['commands'][number];
@@ -84,8 +89,14 @@ function createdTask(
     status: serializedStatus(task.status),
     columnId: task.columnId,
     addedOrder: task.addedOrder,
-    subtasks: task.subtasks,
-    comments: task.comments,
+    subtasks: task.subtasks.map((subtask, position) => ({
+      ...subtask,
+      position,
+    })),
+    comments: task.comments.map((comment) => ({
+      ...comment,
+      createdAt: null,
+    })),
     attachments: [],
     ...(task.day ? { day: task.day.toString() } : {}),
     ...(task.time ? { time: task.time.toString() } : {}),
@@ -144,10 +155,12 @@ function applyCommands(
     if (command.kind === 'task.move' && command.status)
       moveTask(updated, command);
   }
+  const repeats = applyRepeatCommands(state.current, request.commands);
   state.current = {
     ...state.current,
     tasks: updated,
     revision: state.current.revision + 1,
+    ...repeats,
   };
   return state.current;
 }
@@ -241,23 +254,14 @@ function fakeApiFor(
       get: () => Promise.resolve({ ok: true, value: state.current.settings }),
       set: (request) => apiSetSetting(state, request),
     },
+    ...createFakeHistoryFileApi(() => state.current),
     ai: {
       run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
       cancel: () => Promise.resolve({ ok: false, error: 'ValidationFailed' }),
       prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),
       reply: () => Promise.resolve({ ok: false, error: 'NotFound' }),
     },
-    app: {
-      info: () =>
-        Promise.resolve({
-          ok: true,
-          value: {
-            name: 'FlowPilot',
-            version: 'test',
-            now: clock() ?? '2026-10-05T12:00:00Z',
-          },
-        }),
-    },
+    app: createFakeAppApi(clock),
   };
 }
 
@@ -270,6 +274,8 @@ export function fakeApi(
     current: {
       columns,
       tasks,
+      series: [],
+      outcomes: [],
       settings: { workdays },
       revision: 0,
     },

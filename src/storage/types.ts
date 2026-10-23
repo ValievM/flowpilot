@@ -5,12 +5,27 @@ import type {
   TaskType,
 } from '../domain';
 import type { Temporal } from 'temporal-polyfill';
+export type SeriesOutcomeInput<T> = T extends Outcome
+  ? Omit<T, 'seriesId' | 'recordedAt'>
+  : never;
+export type SeriesChanges = {
+  readonly title?: string;
+  readonly description?: string | null;
+  readonly weekdays?: readonly number[];
+  readonly time?: Temporal.PlainTime | null;
+  readonly startsOn?: Temporal.PlainDate;
+  readonly endsOn?: Temporal.PlainDate | null;
+};
+
 import type {
+  Outcome,
+  Series,
+  SubtaskDraft,
   Task,
   TaskColumn,
+  TaskCommentDraft,
+  TaskCreationDraft,
   TaskStatus,
-  Subtask,
-  TaskComment,
   WaitingDetails,
 } from '../domain';
 export type HistoryEntry = {
@@ -39,6 +54,8 @@ export interface Snapshot {
   readonly taskTypes: readonly TaskType[];
   readonly disciplines: readonly Discipline[];
   readonly rules: readonly StoredRule[];
+  readonly series: readonly Series[];
+  readonly outcomes: readonly Outcome[];
   readonly settings: Readonly<Record<string, unknown>>;
   readonly revision: number;
 }
@@ -84,17 +101,30 @@ type TaskUpdateChanges = Partial<
 };
 
 export type StorageCommand =
-  | { kind: 'task.create'; task: Task }
+  | { kind: 'task.create'; task: TaskCreationDraft }
   | { kind: 'task.update'; id: string; changes: TaskUpdateChanges }
   | { kind: 'task.move'; id: string; columnId: string; status?: TaskStatus }
-  | { kind: 'subtask.add'; taskId: string; subtask: Subtask }
+  | { kind: 'subtask.add'; taskId: string; subtask: SubtaskDraft }
   | {
       kind: 'subtask.complete';
       taskId: string;
       subtaskId: string;
       completed: boolean;
     }
-  | { kind: 'comment.add'; taskId: string; comment: TaskComment }
+  | {
+      kind: 'subtask.rename';
+      taskId: string;
+      subtaskId: string;
+      title: string;
+    }
+  | { kind: 'subtask.remove'; taskId: string; subtaskId: string }
+  | {
+      kind: 'subtask.move';
+      taskId: string;
+      subtaskId: string;
+      position: number;
+    }
+  | { kind: 'comment.add'; taskId: string; comment: TaskCommentDraft }
   | { kind: 'attachment.add'; taskId: string; sourcePath: string }
   | { kind: 'attachment.remove'; attachmentId: string }
   | { kind: 'task.setAiRank'; taskId: string; rank: number }
@@ -132,7 +162,19 @@ export type StorageCommand =
   | { kind: 'rule.import'; documentJson: string }
   | { kind: 'rule.activate'; ruleId: string }
   | { kind: 'rule.deactivate'; ruleId: string }
-  | { kind: 'rule.bind'; ruleId: string; scope: RulesDocument['scope'] };
+  | { kind: 'rule.bind'; ruleId: string; scope: RulesDocument['scope'] }
+  | { kind: 'series.create'; series: Series }
+  | {
+      kind: 'series.update';
+      id: string;
+      changes: SeriesChanges;
+    }
+  | { kind: 'series.stop'; id: string; endDate: Temporal.PlainDate }
+  | {
+      kind: 'series.recordOutcome';
+      seriesId: string;
+      outcome: SeriesOutcomeInput<Outcome>;
+    };
 
 export interface RejectedAiCommand {
   readonly index: number;
@@ -161,7 +203,10 @@ export type ApplyResult =
       ok: false;
       error:
         | { kind: 'StaleRevision'; expected: number; actual: number }
-        | { kind: 'InvalidCommand'; message: string };
+        | { kind: 'InvalidCommand'; message: string }
+        | { kind: 'FileNotFound' }
+        | { kind: 'TooLarge' }
+        | { kind: 'NotReadable' };
     };
 
 export type UndoResult =

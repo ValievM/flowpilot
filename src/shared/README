@@ -2,7 +2,7 @@
 
 Renderer access uses only `window.flowpilot`; Node, Electron, filesystem, and
 SQLite are not exposed. The API is defined by `FlowPilotApi` in `contracts.ts`,
-with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
+with `Result<T, ErrorCode>` and `ErrorCode` in `ipc-result.ts`.
 
 - `snapshot.load()` (`snapshot.load`): empty strict request; returns
   an `IpcSnapshot`.
@@ -25,17 +25,20 @@ with `Result<T>` and `ErrorCode` in `ipc-result.ts`.
   and `rules.bind` accept strict rule-id/scope requests and return the updated
   rule. Cancellation and activation conflicts are explicit result errors.
 
-Every reply is a discriminated result: success is `{ ok: true, value }`. The
-standard `Result<T>` failure is `{ ok: false, error: ErrorCode }`; its codes are
-`StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`, and
-`InternalError`. The rule API (`catalog.list` and every `rules.*` method) uses
-`IpcRuleResult<T>` instead: failures have an `error` object with `kind` equal to
-`ValidationFailed`, `Cancelled`, `NotFound`, `RuleConflict`, or `InternalError`,
-or `{ kind: 'RuleInvalid', errors }`, where each error has `path`, `code`,
-`reason`, and `suggestion` strings. Schemas reject unknown fields. Settings writes use the same
-expected-revision transaction as commands. No filesystem paths cross the
-bridge; main resolves `<profile>/flowpilot.db` and owns the single writer.
-`IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
+Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes
+include `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`,
+`AlreadyUndone`, `NotUndoable`, `FileNotFound`, `TooLarge`, `AlreadyExists`,
+`NotReadable`, `MissingFile`, `PackageInvalid`, `Cancelled`, and `InternalError`.
+The rule API (`catalog.list` and every `rules.*` method) uses `IpcRuleResult<T>`
+instead: failures have an `error` object with `kind` equal to `ValidationFailed`,
+`Cancelled`, `NotFound`, `RuleConflict`, or `InternalError`, or
+`{ kind: 'RuleInvalid', errors }`, where each error has `path`, `code`, `reason`,
+and `suggestion` strings. Schemas reject unknown fields. Settings writes use the same expected-revision
+transaction as commands. Filesystem paths do not cross the bridge except the
+display-only export folder returned by `backup.export()`; renderer requests do
+not accept paths. Main resolves `<profile>/flowpilot.db` and owns the single
+writer. `IpcSnapshot` carries dates and times as ISO strings for safe IPC
+serialization.
 AI proposals use a separate strict command contract in `ai-commands.ts`.
 `task.classify`, `rule.import`, `rule.activate`, `rule.deactivate`, and
 `rule.bind` are internal main-to-storage commands and are intentionally absent
@@ -78,3 +81,18 @@ Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, `FLOWPILOT_TEST_PROFILE`,
 and `FLOWPILOT_TEST_AI_REPLY` are honored only for unpackaged applications with
 `FLOWPILOT_TEST=1`. Packaged apps always use system time, Electron's user-data
 directory, and manual exchange for AI. The injected `Clock` makes tests deterministic.
+History is available through `history.list(limit?, before?)` and
+`history.undo(entryId?)`. A missing `entryId` undoes the newest compatible entry.
+List requests are strict and require a positive integer limit.
+
+`attachments.add({ taskId })` opens the main-process file dialog; renderer paths
+are rejected. `attachments.open({ attachmentId })` resolves only a path from the
+repository, and `attachments.remove({ attachmentId })` records the change through
+the repository transaction.
+
+`backup.export()` opens a folder dialog and returns the selected export folder
+and its ISO export timestamp for display only; its request is empty and strict.
+`backup.verify()` opens a package-folder dialog and returns validation problems
+or an opaque package token. Only that token is accepted by
+`backup.restore(packageToken)`. Package paths and contents remain in main;
+restore closes and reopens the repository around the storage restore operation.

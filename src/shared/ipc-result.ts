@@ -3,7 +3,16 @@ export type ErrorCode =
   | 'ValidationFailed'
   | 'UndoConflict'
   | 'NotFound'
-  | 'InternalError';
+  | 'InternalError'
+  | 'AlreadyUndone'
+  | 'NotUndoable'
+  | 'FileNotFound'
+  | 'TooLarge'
+  | 'AlreadyExists'
+  | 'NotReadable'
+  | 'MissingFile'
+  | 'PackageInvalid'
+  | 'Cancelled';
 
-export type Result<T> =
-  { ok: true; value: T } | { ok: false; error: ErrorCode };
+export type Result<T, E = ErrorCode> =
+  { ok: true; value: T } | { ok: false; error: E };

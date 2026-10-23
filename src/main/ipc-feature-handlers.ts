@@ -37,8 +37,11 @@ export function registerFeatureIpcHandlers(
   ipc: Pick<IpcMain, 'handle'>,
   deps: FeatureDependencies,
 ): void {
+  // The repository is replaced after a restore, so read it at call time.
   const ruleDeps: RuleFileDependencies = {
-    repository: deps.repository,
+    get repository() {
+      return deps.repository;
+    },
     dialogs: deps.ruleDialogs,
   };
   registerRulesHandlers(ipc, ruleDeps);

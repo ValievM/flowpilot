@@ -123,8 +123,15 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
   return {
     ...snapshot,
     tasks: snapshot.tasks.map((task) => {
-      const { day, time, deadline, rolledOverFrom, status, ...taskFields } =
-        task;
+      const {
+        day,
+        time,
+        deadline,
+        rolledOverFrom,
+        status,
+        comments,
+        ...taskFields
+      } = task;
       const serializedStatus: IpcSnapshot['tasks'][number]['status'] =
         status.kind === 'waiting'
           ? status.until
@@ -137,6 +144,10 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
           : status;
       return {
         ...taskFields,
+        comments: comments.map(({ createdAt, ...comment }) => ({
+          ...comment,
+          createdAt: createdAt?.toString() ?? null,
+        })),
         status: serializedStatus,
         ...(day ? { day: day.toString() } : {}),
         ...(time ? { time: time.toString() } : {}),
@@ -146,8 +157,46 @@ function serializeSnapshot(snapshot: Snapshot): IpcSnapshot {
           : {}),
       };
     }),
+    series: snapshot.series.map(({ startsOn, endsOn, time, ...series }) => ({
+      ...series,
+      startsOn: startsOn.toString(),
+      ...(endsOn ? { endsOn: endsOn.toString() } : {}),
+      ...(time ? { time: time.toString() } : {}),
+    })),
+    outcomes: snapshot.outcomes.map(serializeOutcome),
   };
 }
-function mapApplyError(kind: 'StaleRevision' | 'InvalidCommand'): ErrorCode {
-  return kind === 'StaleRevision' ? 'StaleRevision' : 'ValidationFailed';
+function serializeOutcome(
+  outcome: Snapshot['outcomes'][number],
+): IpcSnapshot['outcomes'][number] {
+  const base = {
+    seriesId: outcome.seriesId,
+    date: outcome.date.toString(),
+    recordedAt: outcome.recordedAt.toString(),
+  };
+  if (outcome.kind !== 'rescheduled') return { ...base, kind: outcome.kind };
+  return {
+    ...base,
+    kind: outcome.kind,
+    newDate: outcome.newDate.toString(),
+    newTime: outcome.newTime.toString(),
+  };
+}
+function mapApplyError(
+  kind:
+    | 'StaleRevision'
+    | 'InvalidCommand'
+    | 'FileNotFound'
+    | 'TooLarge'
+    | 'NotReadable',
+): ErrorCode {
+  switch (kind) {
+    case 'StaleRevision':
+    case 'FileNotFound':
+    case 'TooLarge':
+    case 'NotReadable':
+      return kind;
+    case 'InvalidCommand':
+      return 'ValidationFailed';
+  }
 }

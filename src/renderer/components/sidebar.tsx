@@ -23,6 +23,7 @@ const views: readonly { id: View; label: string; icon: string }[] = [
 ];
 
 interface SidebarProps {
+  hidden: boolean;
   view: View;
   availableCount: number;
   theme: ThemeChoice;
@@ -31,6 +32,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  hidden,
   view,
   availableCount,
   theme,
@@ -44,7 +46,7 @@ export function Sidebar({
         ? 'светлая'
         : 'тёмная';
   return (
-    <aside className="sidebar" aria-label="Основная панель">
+    <aside className="sidebar" aria-label="Основная панель" inert={hidden}>
       <div className="sidebar-titlebar-drag" aria-hidden="true" />
       <a
         className="brand"

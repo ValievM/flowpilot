@@ -19,7 +19,7 @@ import {
   type BackupData,
   type BackupManifest,
 } from './schemas';
-import type { BackupResult } from './backup-types';
+import type { ExportResult } from './backup-types';
 import { MAX_ATTACHMENT_SIZE_BYTES } from '../attachments/attachment-store';
 import {
   copyRegularFile,
@@ -30,38 +30,43 @@ import {
 } from './package-files';
 
 const FORMAT_VERSION = 1;
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 const APP_VERSION = '0.1.0';
 
 export function exportTo(
   parentDir: string,
   profilePath: string,
   clock: Clock,
-): BackupResult {
+): ExportResult {
   let temporary = '';
   let ownsTemporary = false;
   try {
-    const exportedAt = clock.now();
+    const exportedAt = clock.now().toString();
     const folder = join(
       parentDir,
-      `FlowPilot-export-${exportedAt.toString().slice(0, 10)}`,
+      `FlowPilot-export-${exportedAt.slice(0, 10)}`,
     );
     temporary = `${folder}.tmp-${String(process.pid)}`;
     if (existsSync(folder))
-      return { ok: false, error: 'Папка экспорта уже существует' };
+      return {
+        ok: false,
+        kind: 'AlreadyExists',
+        error: 'Папка экспорта уже существует',
+      };
     mkdirSync(temporary, { recursive: false });
     ownsTemporary = true;
     const data = readProfile(profilePath);
     const files = writeDataFiles(temporary, profilePath, data);
-    writeManifest(
-      temporary,
-      createManifest(exportedAt.toString(), data, files),
-    );
+    writeManifest(temporary, createManifest(exportedAt, data, files));
     renameSync(temporary, folder);
-    return { ok: true, value: folder };
+    return { ok: true, value: { folderPath: folder, exportedAt } };
   } catch (error) {
     if (ownsTemporary) rmSync(temporary, { recursive: true, force: true });
-    return { ok: false, error: errorMessage(error) };
+    return {
+      ok: false,
+      kind: 'OperationalFailure',
+      error: errorMessage(error),
+    };
   }
 }
 
@@ -237,7 +242,7 @@ function readProfile(path: string): BackupData {
     const query = (table: string): Record<string, unknown>[] =>
       database
         .prepare(
-          `SELECT * FROM ${table}${table === 'columns' ? ' ORDER BY position' : table === 'tasks' ? ' ORDER BY position,id' : ''}`,
+          `SELECT * FROM ${table}${table === 'columns' ? ' ORDER BY position' : table === 'tasks' ? ' ORDER BY position,id' : table === 'series' ? ' ORDER BY id' : table === 'series_outcomes' ? ' ORDER BY series_id,date' : ''}`,
         )
         .all() as Record<string, unknown>[];
     const metadata = database
@@ -254,6 +259,8 @@ function readProfile(path: string): BackupData {
       disciplines: query('disciplines'),
       rules: query('rule_documents'),
       rule_versions: query('rule_versions'),
+      series: query('series'),
+      outcomes: query('series_outcomes'),
       revision: metadata.revision,
     });
   } finally {

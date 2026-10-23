@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
+import { createFileDialogs, createRuleDialogs } from './dialogs';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+} from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { Repository } from '../storage';
@@ -55,21 +63,7 @@ if (!app.requestSingleInstanceLock()) {
       );
       registerIpcHandlers(ipcMain, {
         repository,
-        ruleDialogs: {
-          openRulesFile: async () => {
-            const choice = await dialog.showOpenDialog({
-              properties: ['openFile'],
-              filters: [{ name: 'JSON', extensions: ['json'] }],
-            });
-            return choice.canceled ? undefined : choice.filePaths[0];
-          },
-          saveRulesFile: async () => {
-            const choice = await dialog.showSaveDialog({
-              filters: [{ name: 'JSON', extensions: ['json'] }],
-            });
-            return choice.canceled ? undefined : choice.filePath;
-          },
-        },
+        ruleDialogs: createRuleDialogs(dialog),
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
@@ -78,6 +72,13 @@ if (!app.requestSingleInstanceLock()) {
         aiRunner,
         manualProvider,
         onAppearanceReady: () => windowStartupGate?.ready(),
+        onRepositoryReplaced: (next) => {
+          repository = next;
+        },
+        dialogs: createFileDialogs(dialog),
+        shell: { open: (filePath) => shell.openPath(filePath) },
+        profilePath: path.join(runtime.profilePath, 'flowpilot.db'),
+        clock: runtime.clock,
       });
       createWindow();
       app.on('activate', () => {

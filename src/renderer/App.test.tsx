@@ -668,6 +668,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={close}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -684,6 +686,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={close}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -699,6 +703,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={vi.fn()}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -709,6 +715,80 @@ describe('persisted today and now screens', () => {
       'Не удалось сохранить задачу',
     );
     expect(field).not.toHaveAttribute('aria-invalid', 'true');
+  });
+  it('creates a weekday series from quick add and defaults its start date to today', async () => {
+    const onCreateSeries = vi.fn().mockResolvedValue(true);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        onCreateSeries={onCreateSeries}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        addButtonRef={createRef<HTMLButtonElement>()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Пробежка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    for (const day of ['Понедельник', 'Среда', 'Пятница'])
+      fireEvent.click(screen.getByRole('checkbox', { name: day }));
+    fireEvent.click(screen.getByRole('button', { name: 'Создать серию' }));
+    await waitFor(() => {
+      expect(onCreateSeries).toHaveBeenCalledWith({
+        title: 'Пробежка',
+        weekdays: [1, 3, 5],
+        startsOn: Temporal.PlainDate.from('2026-10-05'),
+      });
+    });
+  });
+  it('does not allow a repeat series without a selected weekday', () => {
+    const onCreateSeries = vi.fn().mockResolvedValue(true);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        onCreateSeries={onCreateSeries}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        addButtonRef={createRef<HTMLButtonElement>()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Пробежка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    expect(
+      screen.getByRole('button', { name: 'Создать серию' }),
+    ).toBeDisabled();
+    expect(onCreateSeries).not.toHaveBeenCalled();
+  });
+  it('saves quick-add repeats through the application command API', async () => {
+    const app = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Утренняя тренировка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Создать серию' }));
+    await screen.findByRole('heading', { name: 'Повторы сегодня' });
+    expect(app.calls[0]?.commands[0]).toMatchObject({
+      kind: 'series.create',
+      series: {
+        title: 'Утренняя тренировка',
+        weekdays: [1],
+        startsOn: Temporal.PlainDate.from('2026-10-05'),
+      },
+    });
+    expect(app.snapshot().series).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Выполнено' }));
+    await waitFor(() => {
+      expect(app.snapshot().outcomes[0]?.kind).toBe('done');
+    });
+    expect(app.snapshot().series).toHaveLength(1);
   });
   it('shows a stale-retry load error without reporting a save failure', async () => {
     const fake = renderApp();
@@ -742,6 +822,45 @@ describe('persisted today and now screens', () => {
       kind: 'task.create',
       task: { title: 'Новая задача', columnId: 'todo', day: today() },
     });
+  });
+  it('opens task details from Today, Now, and Board and restores focus', async () => {
+    renderApp([{ id: 'card-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня,/ });
+
+    for (const view of ['Сегодня', 'Сейчас', 'Доска']) {
+      if (view !== 'Сегодня') {
+        fireEvent.click(screen.getByRole('button', { name: view }));
+      }
+      const trigger = await screen.findByRole('button', {
+        name: /Открыть задачу:/,
+      });
+      fireEvent.click(trigger);
+      const card = screen.getByLabelText(/^Карточка задачи:/);
+      expect(card).toBeVisible();
+      fireEvent.keyDown(card, { key: 'Escape' });
+      await waitFor(() => expect(trigger).toHaveFocus());
+    }
+  });
+
+  it('refreshes the task card and reports a stale revision without retrying', async () => {
+    const app = renderApp([{ id: 'card-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня,/ });
+    const open = screen.getByRole('button', { name: /Открыть задачу:/ });
+    fireEvent.click(open);
+    app.setStaleOnce();
+    const title = screen.getByLabelText('Название');
+    fireEvent.change(title, { target: { value: 'Новое название' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(
+      await within(
+        screen.getByLabelText('Карточка задачи: card-task'),
+      ).findByRole('status'),
+    ).toHaveTextContent(
+      'Данные задачи изменились. Показана актуальная карточка; повторите изменение.',
+    );
+    expect(app.calls).toHaveLength(1);
+    expect(app.snapshot().tasks[0]?.title).toBe('card-task');
+    expect(title).toHaveValue('Новое название');
   });
 
   it('reloads once for stale revisions, then retains entered text on a retry failure', async () => {
@@ -805,5 +924,213 @@ describe('persisted today and now screens', () => {
       id: 'move-me',
       columnId: 'doing',
     });
+  });
+
+  it('shows every status and the matching counts in the all-tasks view', async () => {
+    renderApp([
+      { id: 'today-task', day: today(), addedOrder: 1 },
+      {
+        id: 'waiting-task',
+        day: today(),
+        status: { kind: 'waiting', reason: 'Жду ответ' },
+        addedOrder: 2,
+      },
+      {
+        id: 'done-task',
+        day: today(),
+        status: { kind: 'done' },
+        addedOrder: 3,
+      },
+      { id: 'tomorrow-task', day: '2026-10-06', addedOrder: 4 },
+      { id: 'undated-task', addedOrder: 5 },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Все задачи' }),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Все 5' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByText('Ожидание')).toBeVisible();
+    expect(screen.getByText('Готово')).toBeVisible();
+    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+  });
+
+  it('filters today and later in domain order, retaining undated work for later', async () => {
+    renderApp([
+      { id: 'today-task', day: today(), addedOrder: 1 },
+      {
+        id: 'tomorrow-task',
+        day: '2026-10-06',
+        deadline: '2026-10-08',
+        addedOrder: 2,
+      },
+      { id: 'undated-task', addedOrder: 3 },
+      {
+        id: 'waiting-task',
+        day: '2026-10-07',
+        status: { kind: 'waiting', reason: 'Жду ответ' },
+        addedOrder: 4,
+      },
+      {
+        id: 'done-task',
+        day: '2026-10-08',
+        status: { kind: 'done' },
+        addedOrder: 5,
+      },
+      {
+        id: 'urgent-later-task',
+        day: '2026-10-07',
+        deadline: '2026-10-06',
+        addedOrder: 6,
+      },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня 1' }));
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText('today-task')).toBeVisible();
+    expect(screen.queryByText('tomorrow-task')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Позже 3' }));
+    const laterRows = screen.getAllByRole('listitem');
+    expect(laterRows).toHaveLength(3);
+    expect(
+      laterRows.map(
+        (row) =>
+          within(row).getByRole('button', { name: /Открыть задачу:/ })
+            .textContent,
+      ),
+    ).toEqual(['urgent-later-task', 'tomorrow-task', 'undated-task']);
+    expect(screen.queryByText('waiting-task')).not.toBeInTheDocument();
+    expect(screen.queryByText('done-task')).not.toBeInTheDocument();
+  });
+
+  it('switches filters with arrow keys and opens a task with Enter', async () => {
+    renderApp([{ id: 'open-me', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    const allFilter = screen.getByRole('button', { name: 'Все 1' });
+    allFilter.focus();
+    fireEvent.keyDown(allFilter, { key: 'ArrowRight' });
+    expect(screen.getByRole('button', { name: 'Сегодня 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Все 1' }));
+    const task = screen.getByRole('button', {
+      name: 'Открыть задачу: open-me',
+    });
+    task.focus();
+    fireEvent.keyDown(task, { key: 'Enter' });
+    expect(
+      await screen.findByRole('complementary', {
+        name: 'Карточка задачи: open-me',
+      }),
+    ).toBeVisible();
+  });
+
+  it('explains empty filters and shows deadline risk without truncating long titles', async () => {
+    renderApp([
+      {
+        id: 'Длинное название задачи, которое должно переноситься при узкой ширине окна',
+        day: today(),
+        deadline: '2026-10-05',
+        estimate: { unit: 'workdays', value: 3 },
+      },
+    ]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Все задачи' }));
+    expect(screen.getByText(/Риск не успеть/)).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: /Длинное название задачи, которое должно переноситься/,
+      }),
+    ).toHaveClass('task-title-button');
+    fireEvent.click(screen.getByRole('button', { name: 'Позже 0' }));
+    expect(
+      screen.getByText(/Нет будущих и нераспределённых задач/),
+    ).toBeVisible();
+  });
+  it('gives every rendered screen control an accessible name', async () => {
+    renderApp([{ id: 'accessibility-task', day: today() }]);
+    await screen.findByRole('heading', { name: /Сегодня, 5 октября/ });
+    const expectNamedControls = (): void => {
+      for (const control of screen.getAllByRole('button')) {
+        expect(control).toHaveAccessibleName();
+      }
+      for (const role of ['textbox', 'combobox', 'checkbox'] as const) {
+        for (const control of screen.queryAllByRole(role)) {
+          expect(control).toHaveAccessibleName();
+        }
+      }
+    };
+    expectNamedControls();
+    for (const view of ['Сейчас', 'Доска', 'Все задачи', 'Настройки']) {
+      fireEvent.click(screen.getByRole('button', { name: view }));
+      expectNamedControls();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Сегодня' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Открыть задачу: accessibility-task',
+      }),
+    );
+    expectNamedControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Закрыть карточку задачи' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    expectNamedControls();
+  });
+  it('returns focus to the quick-add trigger when its dialog closes', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const trigger = screen.getByRole('button', { name: 'Задача' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByLabelText('Что нужно сделать?')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() => {
+      expect(trigger).toHaveFocus();
+    });
+  });
+  it('hides the sidebar with a toggle, keeps it out of the tab order and remembers the choice', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const sidebar = screen.getByRole('complementary', {
+      name: 'Основная панель',
+    });
+    expect(sidebar).not.toHaveAttribute('inert');
+    const hide = screen.getByRole('button', {
+      name: 'Скрыть боковую панель',
+    });
+    expect(hide).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(hide);
+
+    expect(sidebar).toHaveAttribute('inert');
+    const show = screen.getByRole('button', {
+      name: 'Показать боковую панель',
+    });
+    expect(show).toHaveAttribute('aria-expanded', 'false');
+    expect(window.localStorage.getItem('flowpilot.sidebar')).toBe('hidden');
+
+    cleanup();
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(
+      screen.getByRole('complementary', { name: 'Основная панель' }),
+    ).toHaveAttribute('inert');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Показать боковую панель' }),
+    );
+    expect(
+      screen.getByRole('complementary', { name: 'Основная панель' }),
+    ).not.toHaveAttribute('inert');
+    expect(window.localStorage.getItem('flowpilot.sidebar')).toBe('shown');
   });
 });

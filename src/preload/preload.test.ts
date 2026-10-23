@@ -33,8 +33,11 @@ describe('preload bridge', () => {
       'ai',
       'app',
       'appearance',
+      'attachments',
+      'backup',
       'catalog',
       'commands',
+      'history',
       'rules',
       'settings',
       'snapshot',
@@ -68,6 +71,18 @@ describe('preload bridge', () => {
       key: 'theme',
       value: 'light',
       expectedRevision: 4,
+    });
+  });
+  it('routes history listing through the strict history channel', async () => {
+    bridgeState.invoke.mockResolvedValue({ ok: true, value: [] });
+    const { api } = bridgeState.captured;
+    if (!api) throw new Error('Preload API was not exposed');
+
+    await expect(api.history.list()).resolves.toEqual({ ok: true, value: [] });
+
+    expect(bridgeState.invoke).toHaveBeenCalledWith('history.list', {
+      limit: 50,
+      before: undefined,
     });
   });
 });

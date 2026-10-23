@@ -38,7 +38,7 @@ export function BoardRiskMark({
       <span className="risk-icon" aria-hidden="true">
         {isRisk ? '!' : 'i'}
       </span>
-      {title && <strong>{title}: </strong>}
+      {title && <strong>{title}</strong>}
       {message}
     </p>
   );
@@ -69,7 +69,10 @@ function toDomainTask(task: BoardTask): Task {
       : {}),
     ...(task.estimate ? { estimate: task.estimate } : {}),
     subtasks: task.subtasks,
-    comments: task.comments,
+    comments: task.comments.map(({ createdAt, ...comment }) => ({
+      ...comment,
+      createdAt: createdAt === null ? null : Temporal.Instant.from(createdAt),
+    })),
     attachments: task.attachments,
     ...(task.rolledOverFrom
       ? { rolledOverFrom: Temporal.PlainDate.from(task.rolledOverFrom) }

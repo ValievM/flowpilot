@@ -1,16 +1,18 @@
 import React from 'react';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
-import { TaskSummary } from './components/task-summary';
+import { AllTasksScreen } from './screens/all-tasks-screen';
 import { BoardScreen } from './screens/board-screen';
 import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
-import { taskSummaryData } from './task-summary-data';
 import type { MotionChoice } from './use-reduced-motion';
-import type { ThemeChoice } from '../shared/contracts';
+import type {
+  FlowPilotApi,
+  IpcSnapshot,
+  ThemeChoice,
+} from '../shared/contracts';
 import type { View } from './types';
-
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -29,8 +31,13 @@ export interface ScreenProps {
     workdays: ReadonlySet<number>,
   ) => Promise<boolean>;
   readonly saveError: string | undefined;
-  readonly onViewChange: (view: View) => void;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
+  readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
   readonly onStart: (task: Task) => void;
+  readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -44,7 +51,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         workdays={props.workdays}
         today={props.today}
         todayLabel={props.todayLabel}
-        onViewChange={props.onViewChange}
+        onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />
     );
@@ -58,35 +65,33 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         hasUndatedTasks={props.hasUndatedTasks}
         workdays={props.workdays}
         isLoading={props.loading}
+        onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />
     );
-  if (props.view === 'board') return <BoardScreen today={props.today} />;
+  if (props.view === 'board')
+    return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')
     return (
-      <section className="simple-screen">
-        <p className="eyebrow">ЛИЧНОЕ / ВСЕ ЗАДАЧИ</p>
-        <h1>Все задачи</h1>
-        <div className="all-task-list">
-          {props.tasks.map((task) => (
-            <TaskSummary
-              key={task.id}
-              task={taskSummaryData(task, props.today, props.workdays)}
-            />
-          ))}
-        </div>
-      </section>
+      <AllTasksScreen
+        tasks={props.tasks}
+        today={props.today}
+        workdays={props.workdays}
+        onOpenTask={props.onOpenTask}
+      />
     );
   return (
     <SettingsScreen
       theme={props.theme}
       onThemeChange={props.onThemeChange}
-      workdays={props.workdays}
-      onWorkdaysChange={props.onWorkdaysChange}
       motionChoice={props.motionChoice}
       onMotionChoiceChange={props.onMotionChoiceChange}
+      workdays={props.workdays}
+      onWorkdaysChange={props.onWorkdaysChange}
       loading={props.loading}
       saveError={props.saveError}
+      backup={props.backup}
+      onSnapshotRefresh={props.onSnapshotRefresh}
     />
   );
 }

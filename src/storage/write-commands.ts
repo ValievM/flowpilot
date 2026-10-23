@@ -3,6 +3,7 @@ import { executeColumnCommand } from './column-commands';
 import { snapshotEntity, type EntitySnapshot } from './history-entities';
 import { affectedEntities } from './affected-entities';
 import { writeHistory } from './history-log';
+import { executeSeriesCommand } from './series-persistence';
 import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
 import { executeRulesCommand } from './rules-commands';
@@ -66,6 +67,20 @@ function applyTransaction(
     options.commands.forEach((command, index) => {
       captureAndExecute(database, command, { index, options }, changes);
     });
+    const changed = [...changes.values()].some(
+      ({ before, after }) => JSON.stringify(before) !== JSON.stringify(after),
+    );
+    if (!changed) {
+      const revision = readRevision(database);
+      if (options.proposalId)
+        recordAppliedProposal(
+          database,
+          options.proposalId,
+          revision,
+          options.rejectedCommands,
+        );
+      return { revision, replayed: false };
+    }
     database
       .prepare(
         'UPDATE metadata SET revision = revision + 1 WHERE singleton = 1',
@@ -157,6 +172,10 @@ function executeCommand(
     return;
   }
   if (executeRulesCommand(database, command, options.now)) return;
+  if (isSeriesCommand(command)) {
+    executeSeriesCommand(database, command, options.now);
+    return;
+  }
   if (isColumnCommand(command)) executeColumnCommand(database, command);
   else executeTaskCommand(database, command, options.now);
 }
@@ -227,6 +246,11 @@ function isColumnCommand(
   { kind: 'column.create' | 'column.rename' | 'column.delete' | 'setting.set' }
 > {
   return command.kind.startsWith('column.') || command.kind === 'setting.set';
+}
+function isSeriesCommand(
+  command: StorageCommand,
+): command is Extract<StorageCommand, { kind: `series.${string}` }> {
+  return command.kind.startsWith('series.');
 }
 
 function errorMessage(error: unknown): string {
