@@ -1,5 +1,6 @@
 import type {
   BackupVerifyResult,
+  ExportInfo,
   IpcHistoryEntry,
   IpcSnapshot,
 } from '../shared/contracts';
@@ -15,7 +16,7 @@ export type HistoryFileHandlers = {
   attachmentsAdd(request: unknown): Promise<Result<IpcSnapshot>>;
   attachmentsOpen(request: unknown): Promise<Result<null>>;
   attachmentsRemove(request: unknown): Result<IpcSnapshot>;
-  backupExport(request: unknown): Promise<Result<null>>;
+  backupExport(request: unknown): Promise<Result<ExportInfo>>;
   backupVerify(request: unknown): Promise<BackupVerifyResult>;
   backupRestore(request: unknown): Result<IpcSnapshot>;
 };

@@ -211,6 +211,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onMotionChoiceChange: model.setMotionChoice,
     onWorkdaysChange: (workdays) => state.updateWorkdays(workdays),
     saveError: state.settingsError,
+    backup: window.flowpilot.backup,
+    onSnapshotRefresh: () => state.refresh(),
     onViewChange: model.setView,
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,

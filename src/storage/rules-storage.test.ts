@@ -249,9 +249,10 @@ describe('rule and catalog storage', () => {
     expect(exported.ok).toBe(true);
     repository.close();
     if (!exported.ok) throw new Error(exported.error);
-    const verification = verifyPackage(exported.value);
+    const exportPath = exported.value.folderPath;
+    const verification = verifyPackage(exportPath);
     if (!verification.ok) throw new Error(JSON.stringify(verification));
-    expect(restore(exported.value, path, clock).ok).toBe(true);
+    expect(restore(exportPath, path, clock).ok).toBe(true);
     const restored = new Repository(path, clock);
     expect(restored.load().rules[0]).toMatchObject({
       status: 'active',
@@ -259,7 +260,7 @@ describe('rule and catalog storage', () => {
       versions: [{ version: 1 }],
     });
     restored.close();
-    const oldDataPath = join(exported.value, 'data.json');
+    const oldDataPath = join(exportPath, 'data.json');
     const oldData = JSON.parse(readFileSync(oldDataPath, 'utf8')) as {
       task_types?: unknown;
       disciplines?: unknown;
@@ -277,7 +278,7 @@ describe('rule and catalog storage', () => {
     }
     const oldDataContents = JSON.stringify(oldData);
     writeFileSync(oldDataPath, oldDataContents);
-    const manifestPath = join(exported.value, 'manifest.json');
+    const manifestPath = join(exportPath, 'manifest.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
       files: { path: string; sha256: string; sizeBytes: number }[];
     };
@@ -290,9 +291,9 @@ describe('rule and catalog storage', () => {
       .digest('hex');
     dataFile.sizeBytes = Buffer.byteLength(oldDataContents);
     writeFileSync(manifestPath, JSON.stringify(manifest));
-    expect(verifyPackage(exported.value).ok).toBe(true);
+    expect(verifyPackage(exportPath).ok).toBe(true);
     const oldPath = join(directory, 'old-profile.sqlite');
-    const oldRestore = restore(exported.value, oldPath, clock);
+    const oldRestore = restore(exportPath, oldPath, clock);
     if (!oldRestore.ok) throw new Error(oldRestore.error);
     const restoredOld = new Repository(oldPath, clock);
     expect(restoredOld.load()).toMatchObject({
@@ -320,7 +321,8 @@ describe('rule and catalog storage', () => {
     const exported = exportTo(directory, path, clock);
     repository.close();
     if (!exported.ok) throw new Error(exported.error);
-    const dataPath = join(exported.value, 'data.json');
+    const exportPath = exported.value.folderPath;
+    const dataPath = join(exportPath, 'data.json');
     const data = JSON.parse(readFileSync(dataPath, 'utf8')) as {
       tasks: { type_id: string | null }[];
     };
@@ -329,7 +331,7 @@ describe('rule and catalog storage', () => {
     storedTask.type_id = 'missing-type';
     const dataContents = JSON.stringify(data);
     writeFileSync(dataPath, dataContents);
-    const manifestPath = join(exported.value, 'manifest.json');
+    const manifestPath = join(exportPath, 'manifest.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
       files: { path: string; sha256: string; sizeBytes: number }[];
     };
@@ -340,7 +342,7 @@ describe('rule and catalog storage', () => {
     dataFile.sha256 = createHash('sha256').update(dataContents).digest('hex');
     dataFile.sizeBytes = Buffer.byteLength(dataContents);
     writeFileSync(manifestPath, JSON.stringify(manifest));
-    const verification = verifyPackage(exported.value);
+    const verification = verifyPackage(exportPath);
     expect(verification.ok).toBe(false);
     if (verification.ok) throw new Error('Expected catalog reference error');
     expect(

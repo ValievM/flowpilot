@@ -11,6 +11,17 @@ export type RestoredProfileBackup = Readonly<{
   db: string;
   attachments: string | undefined;
 }>;
+export type ExportInfo = Readonly<{
+  folderPath: string;
+  exportedAt: string;
+}>;
+export type ExportResult =
+  | { readonly ok: true; readonly value: ExportInfo }
+  | {
+      readonly ok: false;
+      readonly kind: 'AlreadyExists' | 'OperationalFailure';
+      readonly error: string;
+    };
 export type BackupResult =
   | {
       readonly ok: true;

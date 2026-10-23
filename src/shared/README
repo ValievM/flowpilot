@@ -16,12 +16,14 @@ with `Result<T, ErrorCode>` and `ErrorCode` in `ipc-result.ts`.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes
 include `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`,
-`AlreadyUndone`, `NotUndoable`, `FileNotFound`, `TooLarge`, `NotReadable`,
-`MissingFile`, `PackageInvalid`, `Cancelled`, and `InternalError`. Schemas reject
-unknown fields. Settings writes use the same expected-revision transaction as
-commands. No filesystem paths cross the bridge; main resolves
-`<profile>/flowpilot.db` and owns the single writer.
-`IpcSnapshot` carries dates and times as ISO strings for safe IPC serialization.
+`AlreadyUndone`, `NotUndoable`, `FileNotFound`, `TooLarge`, `AlreadyExists`,
+`NotReadable`, `MissingFile`, `PackageInvalid`, `Cancelled`, and `InternalError`.
+Schemas reject unknown fields. Settings writes use the same expected-revision
+transaction as commands. Filesystem paths do not cross the bridge except the
+display-only export folder returned by `backup.export()`; renderer requests do
+not accept paths. Main resolves `<profile>/flowpilot.db` and owns the single
+writer. `IpcSnapshot` carries dates and times as ISO strings for safe IPC
+serialization.
 AI proposals use a separate strict command contract in `ai-commands.ts`.
 `task.classify`, `rule.import`, `rule.activate`, `rule.deactivate`, and
 `rule.bind` are internal main-to-storage commands and are intentionally absent
@@ -73,8 +75,9 @@ are rejected. `attachments.open({ attachmentId })` resolves only a path from the
 repository, and `attachments.remove({ attachmentId })` records the change through
 the repository transaction.
 
-`backup.export()` opens a folder dialog. `backup.verify()` opens a package-folder
-dialog and returns validation problems or an opaque package token. Only that
-token is accepted by `backup.restore(packageToken)`. Package paths and contents
-remain in main; restore closes and reopens the repository around the storage
-restore operation.
+`backup.export()` opens a folder dialog and returns the selected export folder
+and its ISO export timestamp for display only; its request is empty and strict.
+`backup.verify()` opens a package-folder dialog and returns validation problems
+or an opaque package token. Only that token is accepted by
+`backup.restore(packageToken)`. Package paths and contents remain in main;
+restore closes and reopens the repository around the storage restore operation.

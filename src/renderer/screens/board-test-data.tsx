@@ -152,7 +152,15 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       ),
     },
     backup: {
-      export: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+      export: vi.fn(() =>
+        Promise.resolve({
+          ok: true as const,
+          value: {
+            folderPath: '/tmp/FlowPilot-export-2026-10-05',
+            exportedAt: '2026-10-05T12:00:00Z',
+          },
+        }),
+      ),
       verify: vi.fn(() =>
         Promise.resolve({
           ok: true as const,
