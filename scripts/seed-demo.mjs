@@ -1,6 +1,12 @@
 /* global window -- these callbacks run inside the Electron renderer */
 import { _electron as electron } from '@playwright/test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
@@ -31,6 +37,92 @@ function task(id, title, extra) {
       ...extra,
     },
   };
+}
+
+/** The one scripted answer of the fake AI in the demo: "what now?" points at the first task. */
+export const DEMO_AI_REPLY = {
+  action: { taskId: 'demo-risk-tight' },
+  reason: 'Срок в пятницу, а работы ещё около пяти дней: запас почти исчерпан.',
+};
+
+const DEMO_CALENDAR = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:demo-math-1
+SUMMARY:Математика
+LOCATION:аудитория 204
+DTSTART:20261005T143000Z
+DTEND:20261005T160000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:demo-design-1
+SUMMARY:Проектирование
+LOCATION:аудитория 308
+DTSTART:20261005T161500Z
+DTEND:20261005T174500Z
+END:VEVENT
+BEGIN:VEVENT
+UID:demo-math-2
+SUMMARY:Математика
+LOCATION:аудитория 204
+DTSTART:20261007T143000Z
+DTEND:20261007T160000Z
+END:VEVENT
+END:VCALENDAR
+`;
+
+function ruleJson(id, title, typeIds, reason) {
+  return JSON.stringify({
+    schema_version: 'v1',
+    id,
+    title,
+    scope: { task_type_ids: typeIds },
+    rules: [{ id: `${id}-priority`, kind: 'priority', level: 'high', reason }],
+    guidance: 'Учебный пример: начинать большие работы заранее.',
+  });
+}
+
+/** Release 2 data: catalog, bound tasks, rules, a schedule. Fictional, like the rest. */
+export function catalogCommands() {
+  return [
+    {
+      kind: 'taskType.create',
+      taskType: { id: 'demo-type-course', name: 'Курсовая' },
+    },
+    {
+      kind: 'taskType.create',
+      taskType: { id: 'demo-type-lab', name: 'Лабораторная' },
+    },
+    {
+      kind: 'discipline.create',
+      discipline: {
+        id: 'demo-disc-design',
+        name: 'Проектирование',
+        color: 'study',
+      },
+    },
+    {
+      kind: 'discipline.create',
+      discipline: { id: 'demo-disc-physics', name: 'Физика', color: 'study' },
+    },
+  ];
+}
+
+export function classifyCommands() {
+  return [
+    {
+      kind: 'task.classify',
+      taskId: 'demo-risk-tight',
+      typeId: 'demo-type-course',
+      disciplineId: 'demo-disc-design',
+    },
+    {
+      kind: 'task.classify',
+      taskId: 'demo-risk-short',
+      typeId: 'demo-type-lab',
+      disciplineId: 'demo-disc-physics',
+    },
+  ];
 }
 
 /** Fictional data: AC-09 rows 2, 4, 10, 12; AC-03; AC-04; AC-05; AC-01. */
@@ -179,8 +271,90 @@ async function seed(profilePath) {
     );
     if (!applied.ok)
       throw new Error(`Demo seeding failed: ${JSON.stringify(applied)}`);
+    await seedRelease2(app, page);
   } finally {
     await app.close();
+  }
+}
+
+async function chooseFile(app, file) {
+  await app.evaluate(({ dialog }, selected) => {
+    Object.assign(dialog, {
+      showOpenDialog: () =>
+        Promise.resolve({ canceled: false, filePaths: [selected] }),
+    });
+  }, file);
+}
+
+function writeTemp(directory, name, content) {
+  const file = join(directory, name);
+  writeFileSync(file, content);
+  return file;
+}
+
+async function applyCommands(page, commands) {
+  const result = await page.evaluate(async (list) => {
+    const snapshot = await window.flowpilot.snapshot.load();
+    if (!snapshot.ok) return { ok: false };
+    return window.flowpilot.commands.apply({
+      expectedRevision: snapshot.value.revision,
+      commands: list,
+    });
+  }, commands);
+  if (!result.ok)
+    throw new Error(`Demo seeding failed: ${JSON.stringify(result)}`);
+}
+
+async function seedRelease2(app, page) {
+  await applyCommands(page, catalogCommands());
+  await applyCommands(page, classifyCommands());
+  const directory = mkdtempSync(join(tmpdir(), 'flowpilot-demo-files-'));
+  try {
+    for (const [id, title, types, reason] of [
+      [
+        'demo-rule-study',
+        'Учебные проекты',
+        ['demo-type-course'],
+        'Крупные учебные работы важнее обычной практики.',
+      ],
+      [
+        'demo-rule-personal',
+        'Личные проекты',
+        [],
+        'Личные дела без жёсткого срока.',
+      ],
+    ]) {
+      await chooseFile(
+        app,
+        writeTemp(directory, `${id}.json`, ruleJson(id, title, types, reason)),
+      );
+      const imported = await page.evaluate(() =>
+        window.flowpilot.rules.importFile(),
+      );
+      if (!imported.ok)
+        throw new Error(`Demo rule import failed: ${JSON.stringify(imported)}`);
+    }
+    const activated = await page.evaluate(() =>
+      window.flowpilot.rules.activate({ id: 'demo-rule-study' }),
+    );
+    if (!activated.ok)
+      throw new Error(
+        `Demo rule activation failed: ${JSON.stringify(activated)}`,
+      );
+    await chooseFile(app, writeTemp(directory, 'demo.ics', DEMO_CALENDAR));
+    const preview = await page.evaluate(() =>
+      window.flowpilot.schedule.importFile(),
+    );
+    if (!preview.ok)
+      throw new Error(`Demo schedule failed: ${JSON.stringify(preview)}`);
+    const confirmed = await page.evaluate(
+      (token) => window.flowpilot.schedule.confirmImport({ token }),
+      preview.value.token,
+    );
+    if (!confirmed.ok)
+      throw new Error(`Demo schedule failed: ${JSON.stringify(confirmed)}`);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 }
 
@@ -203,7 +377,10 @@ async function main() {
   console.log(`Демо-профиль готов: ${profilePath}`);
   console.log('Запуск приложения с этим профилем:');
   console.log(
-    `FLOWPILOT_TEST=1 FLOWPILOT_TEST_PROFILE='${profilePath}' FLOWPILOT_TEST_NOW='${DEMO_NOW}' npm start`,
+    `FLOWPILOT_TEST=1 FLOWPILOT_TEST_PROFILE='${profilePath}' FLOWPILOT_TEST_NOW='${DEMO_NOW}' FLOWPILOT_TEST_AI_REPLY='${JSON.stringify(DEMO_AI_REPLY)}' npm start`,
+  );
+  console.log(
+    'Фейковый AI в демо отвечает один раз («Что делать сейчас?»), дальше сообщает, что недоступен.',
   );
 }
 

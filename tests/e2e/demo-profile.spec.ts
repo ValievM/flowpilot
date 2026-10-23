@@ -48,6 +48,29 @@ test('seed:demo builds a profile that opens with the expected AC data', async ()
         : undefined;
     });
     expect(snapshot).toEqual({ tasks: 9, series: 2, outcomes: 9 });
+    const release2 = await page.evaluate(async () => {
+      const rules = await window.flowpilot.rules.list();
+      const catalog = await window.flowpilot.catalog.list();
+      const schedule = await window.flowpilot.schedule.list();
+      return {
+        rules: rules.ok
+          ? rules.value.map(({ id, status }) => `${id}:${status}`).sort()
+          : [],
+        types: catalog.ok ? catalog.value.taskTypes.length : -1,
+        disciplines: catalog.ok ? catalog.value.disciplines.length : -1,
+        sources: schedule.ok
+          ? schedule.value.map(
+              ({ source, events }) => `${source}:${events.length.toString()}`,
+            )
+          : [],
+      };
+    });
+    expect(release2).toEqual({
+      rules: ['demo-rule-personal:draft', 'demo-rule-study:active'],
+      types: 2,
+      disciplines: 2,
+      sources: ['ics:3'],
+    });
     await page
       .getByRole('navigation', { name: 'Представления' })
       .getByRole('button', { name: 'Сегодня' })
@@ -76,7 +99,7 @@ test('seeding twice into the same path gives the same clean profile', async () =
         ? { tasks: result.value.tasks.length, revision: result.value.revision }
         : undefined;
     });
-    expect(snapshot).toEqual({ tasks: 9, revision: 1 });
+    expect(snapshot).toEqual({ tasks: 9, revision: 7 });
   } finally {
     await app.close();
   }
