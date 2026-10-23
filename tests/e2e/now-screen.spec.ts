@@ -150,3 +150,42 @@ test('a repeat keeps title and time on the left and actions on the right, and st
   const narrowDone = await box(row.getByRole('button', { name: 'Выполнено' }));
   expect(narrowDone.y).toBeGreaterThan(narrowTitle.y + narrowTitle.height - 1);
 });
+
+test('the open reschedule form uses the app control style, with labels above their fields', async () => {
+  await showNow(1280);
+  const row = page.getByRole('listitem').filter({ hasText: 'Зарядка' });
+  await row.getByText('Перенести').click();
+  const label = await box(row.getByText('Новая дата'));
+  const date = await box(row.getByLabel('Новая дата'));
+  const time = await box(row.getByLabel('Новое время'));
+  expect(date.y).toBeGreaterThanOrEqual(label.y + label.height);
+  expect(date.y - (label.y + label.height)).toBeLessThanOrEqual(12);
+  expect(time.x).toBeGreaterThanOrEqual(date.x + date.width + 8);
+  const style = await row.getByLabel('Новая дата').evaluate((element) => {
+    const css = getComputedStyle(element);
+    return {
+      height: css.height,
+      radius: css.borderTopLeftRadius,
+      border: css.borderTopWidth,
+    };
+  });
+  expect(style.height).toBe('36px');
+  expect(style.border).toBe('1px');
+  expect(parseFloat(style.radius)).toBeGreaterThan(4);
+});
+
+test('native date and time pickers follow the dark theme', async () => {
+  await page.getByRole('button', { name: 'Настройки' }).click();
+  await page.getByRole('combobox', { name: 'Тема' }).selectOption('dark');
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+  ).toBe('dark');
+  await page.getByRole('combobox', { name: 'Тема' }).selectOption('light');
+  expect(
+    await page.evaluate(
+      () => getComputedStyle(document.documentElement).colorScheme,
+    ),
+  ).toBe('light');
+});

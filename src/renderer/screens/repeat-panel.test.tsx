@@ -270,4 +270,17 @@ describe('repeat schedule UI', () => {
       screen.queryByRole('button', { name: 'Пропустить' }),
     ).not.toBeInTheDocument();
   });
+  it('groups each reschedule label with its own field', () => {
+    renderPanel({ time: Temporal.PlainTime.from('18:00') });
+    fireEvent.click(screen.getByText('Перенести'));
+    for (const name of ['Новая дата', 'Новое время']) {
+      const field = screen.getByLabelText(name);
+      const group = field.closest('.repeat-field');
+      expect(group).not.toBeNull();
+      expect(group).toContainElement(screen.getByText(name));
+    }
+    expect(
+      screen.getByLabelText('Новая дата').closest('.repeat-field'),
+    ).not.toBe(screen.getByLabelText('Новое время').closest('.repeat-field'));
+  });
 });

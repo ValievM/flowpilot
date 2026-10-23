@@ -32,6 +32,15 @@ select {
   font: inherit;
 }
 
+/* Native pickers and scrollbars follow the chosen theme. */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
 button:focus-visible,
 a:focus-visible,
 select:focus-visible,

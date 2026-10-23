@@ -115,32 +115,48 @@ function RepeatInstance({
       {state === 'pending' && time && (
         <details className="repeat-reschedule">
           <summary>Перенести</summary>
-          <label htmlFor={`repeat-date-${series.id}`}>Новая дата</label>
-          <input
-            id={`repeat-date-${series.id}`}
-            type="date"
-            value={newDate}
-            onChange={(event) => {
-              setNewDate(event.target.value);
-            }}
-          />
-          <label htmlFor={`repeat-time-${series.id}`}>Новое время</label>
-          <input
-            id={`repeat-time-${series.id}`}
-            type="time"
-            value={newTime}
-            onChange={(event) => {
-              setNewTime(event.target.value);
-            }}
-          />
-          <button
-            className="button"
-            type="button"
-            disabled={!newDate || !newTime}
-            onClick={move}
-          >
-            Подтвердить перенос
-          </button>
+          <div className="repeat-reschedule-form">
+            <div className="repeat-field">
+              <label
+                className="repeat-field-label"
+                htmlFor={`repeat-date-${series.id}`}
+              >
+                Новая дата
+              </label>
+              <input
+                id={`repeat-date-${series.id}`}
+                type="date"
+                value={newDate}
+                onChange={(event) => {
+                  setNewDate(event.target.value);
+                }}
+              />
+            </div>
+            <div className="repeat-field">
+              <label
+                className="repeat-field-label"
+                htmlFor={`repeat-time-${series.id}`}
+              >
+                Новое время
+              </label>
+              <input
+                id={`repeat-time-${series.id}`}
+                type="time"
+                value={newTime}
+                onChange={(event) => {
+                  setNewTime(event.target.value);
+                }}
+              />
+            </div>
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={!newDate || !newTime}
+              onClick={move}
+            >
+              Подтвердить перенос
+            </button>
+          </div>
         </details>
       )}
     </li>

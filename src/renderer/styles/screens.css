@@ -450,6 +450,39 @@
   gap: var(--space-8);
 }
 
+.repeat-reschedule summary {
+  cursor: pointer;
+}
+
+.repeat-reschedule-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-12) var(--space-16);
+  padding-top: var(--space-12);
+}
+
+.repeat-field {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.repeat-field-label {
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-strong);
+}
+
+.repeat-field input {
+  box-sizing: border-box;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--inset);
+  color: var(--ink);
+}
+
 .all-tasks-screen .task-copy h2 {
   margin: 0;
   font-size: var(--type-task);
