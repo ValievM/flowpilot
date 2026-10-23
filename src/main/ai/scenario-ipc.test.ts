@@ -12,6 +12,7 @@ function fakeUseCases(overrides: Partial<Record<string, unknown>> = {}) {
     replan: vi.fn(),
     editRule: vi.fn(),
     confirm: vi.fn(),
+    cancel: vi.fn(),
     reject: vi.fn(() => ({
       kind: 'rejected',
       error: { kind: 'Declined', message: 'Предложение отклонено.' },
@@ -74,6 +75,15 @@ describe('AI scenario IPC', () => {
       ok: true,
       value: { diff: { changes: [{ after: '2026-10-06' }] } },
     });
+  });
+
+  it('cancels whatever the AI is running right now', async () => {
+    const useCases = fakeUseCases();
+
+    const result = await runAiScenario({ scenario: 'cancel' }, useCases);
+
+    expect(useCases.cancel).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: true, value: null });
   });
 
   it('rejects a malformed request without calling any use case', async () => {

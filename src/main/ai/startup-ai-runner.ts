@@ -10,6 +10,9 @@ import type { AiProvider } from './ai-provider';
 import { FakeAiProvider, type FakeAiStep } from './fake-ai-provider';
 import { selectAiProvider } from './provider-selection';
 
+// Copying the request out and pasting the reply back takes minutes, not seconds.
+const MANUAL_EXCHANGE_TIMEOUT_MS = 10 * 60_000;
+
 export function createStartupAiRunner(
   isPackaged: boolean,
   environment: RuntimeEnvironment,
@@ -21,6 +24,7 @@ export function createStartupAiRunner(
   );
   return new AiRunner(
     selectAiProvider({ isPackaged, environment, manualProvider, fakeProvider }),
+    MANUAL_EXCHANGE_TIMEOUT_MS,
   );
 }
 

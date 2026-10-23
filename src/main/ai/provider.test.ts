@@ -168,6 +168,22 @@ describe('AI provider contract', () => {
     expect(await runner.run(request)).toEqual({ ok: true, value: proposal });
   });
 
+  it('cancels every running operation at once', async () => {
+    const provider = new FakeAiProvider([
+      { scenario: 'timeout', proposal },
+      { scenario: 'timeout', proposal },
+    ]);
+    const runner = new AiRunner(provider, 1000);
+    const first = runner.run(request);
+    const second = runner.run({ ...request, operationId: 'operation-2' });
+    await Promise.resolve();
+
+    runner.cancelAll();
+
+    expect(await first).toEqual({ ok: false, error: { kind: 'Aborted' } });
+    expect(await second).toEqual({ ok: false, error: { kind: 'Aborted' } });
+  });
+
   it('returns ProviderUnavailable as a value without throwing', async () => {
     const result = await fake('unavailable').ask(
       request,

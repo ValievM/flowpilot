@@ -34,6 +34,9 @@ async function runScenario(
       return useCases.editRule(parsed.data.instruction, parsed.data.document);
     case 'confirm':
       return { ok: true, value: useCases.confirm(parsed.data.proposalId) };
+    case 'cancel':
+      useCases.cancel();
+      return { ok: true, value: null };
     case 'reject':
       return { ok: true, value: useCases.reject(parsed.data.proposalId) };
   }

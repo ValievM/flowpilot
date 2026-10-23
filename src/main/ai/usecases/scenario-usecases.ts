@@ -151,6 +151,10 @@ export class AiUseCases {
     return this.dependencies.application.confirmProposal(proposalId);
   }
 
+  cancel(): void {
+    this.dependencies.runner.cancelAll();
+  }
+
   reject(proposalId: string): ProposalScenarioResult {
     return this.dependencies.application.rejectProposal(proposalId);
   }

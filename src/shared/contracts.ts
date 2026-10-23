@@ -210,6 +210,7 @@ export const aiScenarioRequestSchema = z.discriminatedUnion('scenario', [
     .object({ scenario: z.literal('createFromText'), text: z.string() })
     .strict(),
   z.object({ scenario: z.literal('replan') }).strict(),
+  z.object({ scenario: z.literal('cancel') }).strict(),
   z
     .object({
       scenario: z.literal('editRule'),

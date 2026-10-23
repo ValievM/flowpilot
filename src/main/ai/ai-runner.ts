@@ -33,6 +33,10 @@ export class AiRunner {
     }
   }
 
+  cancelAll(): void {
+    for (const controller of this.active.values()) controller.abort();
+  }
+
   cancel(operationId: string): void {
     this.active.get(operationId)?.abort();
   }
