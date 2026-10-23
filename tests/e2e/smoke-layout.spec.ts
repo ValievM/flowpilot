@@ -8,6 +8,31 @@ import {
   TEST_NOW,
 } from './smoke-fixtures';
 
+function relativeLuminance(color: string): number {
+  const channels = color
+    .match(/[\d.]+/g)
+    ?.slice(0, 3)
+    .map(Number);
+  if (!channels || channels.length !== 3)
+    throw new Error(`Не удалось разобрать цвет: ${color}`);
+  const linear = channels.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const [red, green, blue] = linear;
+  if (red === undefined || green === undefined || blue === undefined)
+    throw new Error(`Не удалось разобрать цвет: ${color}`);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(first: string, second: string): number {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 let app: ElectronApplication | undefined;
 let page: Page;
 let profilePath: string;
@@ -98,6 +123,69 @@ test('has no horizontal overflow at 900 pixels with a long task title', async ()
       level: 3,
     }),
   ).toBeVisible();
+});
+test('keeps the Today screen usable at 200% zoom at supported widths', async () => {
+  for (const width of [900, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    await app?.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(2);
+    });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    expect(await page.evaluate(() => window.innerWidth)).toBeLessThan(width);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
+    await app?.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1);
+    });
+  }
+});
+test('measures real hover, focus, and disabled contrast in both themes', async () => {
+  for (const theme of ['light', 'dark']) {
+    await page.getByRole('button', { name: 'Настройки' }).click();
+    await page.getByRole('combobox', { name: 'Тема' }).selectOption(theme);
+    await page.getByRole('button', { name: 'Сегодня' }).first().click();
+    const navigation = page.getByRole('navigation', {
+      name: 'Представления',
+    });
+    const target = navigation.getByRole('button', { name: 'Сейчас' });
+    await target.hover();
+    await page.waitForTimeout(200);
+    const hover = await target.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { foreground: style.color, background: style.backgroundColor };
+    });
+    await navigation.getByRole('button', { name: 'Сегодня' }).focus();
+    await page.keyboard.press('Tab');
+    const focus = await target.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const sidebar = element.closest('.sidebar');
+      if (!sidebar) throw new Error('Боковая панель не найдена.');
+      return {
+        outline: style.outlineColor,
+        surface: getComputedStyle(sidebar).backgroundColor,
+      };
+    });
+    const disabled = await page
+      .getByRole('button', { name: 'Отменить' })
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          foreground: style.color,
+          background: style.backgroundColor,
+        };
+      });
+    expect(
+      contrastRatio(hover.foreground, hover.background),
+      `Контраст hover: ${hover.foreground} на ${hover.background}`,
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(disabled.foreground, disabled.background),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(focus.outline, focus.surface)).toBeGreaterThanOrEqual(
+      3,
+    );
+  }
 });
 
 test('keeps the titlebar drag region away from actions at the minimum width', async () => {
