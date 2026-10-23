@@ -1,3 +1,4 @@
+import { toWireCommands } from './wire-commands';
 import React from 'react';
 import type { Outcome, Series, Task } from '../domain';
 import { parsedSeries } from './parse-ipc-repeats';
@@ -105,7 +106,7 @@ async function applyAfterStale(
   fresh: IpcSnapshot,
 ): Promise<IpcSnapshot> {
   const retry = await api.commands.apply({
-    commands,
+    commands: toWireCommands(commands),
     expectedRevision: fresh.revision,
   });
   if (!retry.ok) throw new Error('retry');
@@ -129,7 +130,7 @@ function useCommandApply(
       controls.setSaved(false);
       try {
         const result = await api.commands.apply({
-          commands,
+          commands: toWireCommands(commands),
           expectedRevision: snapshot.revision,
         });
         if (!result.ok && result.error !== 'StaleRevision') {
@@ -173,7 +174,7 @@ function useTaskCardApply(
       controls.setSaved(false);
       try {
         const result = await api.commands.apply({
-          commands,
+          commands: toWireCommands(commands),
           expectedRevision: snapshot.revision,
         });
         if (!result.ok && result.error === 'StaleRevision') {
