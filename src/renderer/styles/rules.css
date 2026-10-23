@@ -1,0 +1,153 @@
+.rules-screen {
+  display: grid;
+  gap: var(--space-16);
+  max-width: var(--size-focus);
+}
+
+.rules-screen h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: var(--type-action-title);
+}
+
+.rules-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.rules-attention {
+  min-width: var(--space-24);
+  padding: 0 var(--space-8);
+  border-radius: var(--r1);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-weight: var(--type-weight-strong);
+  text-align: center;
+}
+
+.rules-empty,
+.rules-uncovered,
+.rules-screen p {
+  margin: 0;
+}
+
+.rules-empty,
+.rules-uncovered {
+  color: var(--muted);
+}
+
+.rules-error {
+  padding: var(--space-12) var(--space-16);
+  border-left: var(--selection-stroke) solid var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.rules-error ul {
+  margin: var(--space-8) 0 0;
+  padding-left: var(--space-16);
+}
+
+.rule-card {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-16) var(--space-24);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+  background: var(--panel);
+}
+
+.rule-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.rule-card h3 {
+  margin: 0;
+  font-size: var(--type-task);
+}
+
+.rule-status {
+  padding: 0 var(--space-8);
+  border-radius: var(--r1);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--type-secondary);
+}
+
+.rule-meta {
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.rule-details {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding-left: var(--space-16);
+}
+
+.rule-note {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+  padding: var(--space-12) var(--space-16);
+  border-left: var(--selection-stroke) solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.rule-note p {
+  margin: 0;
+}
+
+.rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.rule-bind {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.rule-bind fieldset {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+}
+
+.rule-bind label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-count.is-attention {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  min-width: var(--space-16);
+  height: var(--space-16);
+  padding: 0 var(--space-4);
+  place-items: center;
+  border-radius: var(--space-8);
+  background: var(--warning);
+  color: var(--bg);
+  font-size: var(--type-caption);
+  font-weight: var(--type-weight-strong);
+  line-height: 1;
+}

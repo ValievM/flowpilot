@@ -17,6 +17,7 @@ import type { View } from './types';
 import { useAppAi } from './chat/chat-bridge';
 import { CatalogProvider } from './catalog/catalog-context';
 import { useCatalogSync } from './catalog/use-catalog-sync';
+import { useRuleProblems } from './rules/use-rule-problems';
 import { localDateLabel } from './today-copy';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
@@ -115,6 +116,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
         hidden={sidebar.hidden}
         view={view}
         availableCount={views.available.length}
+        ruleProblems={useRuleProblems(state.revision)}
         theme={model.theme}
         onViewChange={model.setView}
         onThemeCycle={model.cycleTheme}
