@@ -4,6 +4,7 @@ import type { UndoOutcome } from '../use-history';
 import type { WhatNowView } from '../what-now/what-now-outcome';
 import { requestWhatNow } from '../what-now/use-what-now';
 import { callScenario as call } from './scenario-call';
+import { usePendingExchange } from './use-pending-exchange';
 import { errorText } from './chat-copy';
 import {
   parseChatOutcome,
@@ -59,8 +60,6 @@ export interface ChatModel {
   readonly loadMode: () => void;
   readonly replyManually: (turnId: number, text: string) => Promise<boolean>;
 }
-
-const POLL_MS = 200;
 
 function outcomeState(value: ChatOutcome | undefined): ChatTurn['state'] {
   if (!value) return { phase: 'error', message: errorText('InvalidReply') };
@@ -143,18 +142,13 @@ function useTurns(): {
     );
   }, []);
   const runningId = turns.find((turn) => turn.state.phase === 'running')?.id;
-  React.useEffect(() => {
-    if (runningId === undefined) return;
-    const timer = setInterval(() => {
-      void window.flowpilot.ai.pending().then((result) => {
-        const first = result.ok ? result.value[0] : undefined;
-        if (first) patch(runningId, { manual: first });
-      });
-    }, POLL_MS);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [runningId, patch]);
+  const found = React.useCallback(
+    (exchange: { operationId: string; prompt: string }) => {
+      if (runningId !== undefined) patch(runningId, { manual: exchange });
+    },
+    [runningId, patch],
+  );
+  usePendingExchange(runningId !== undefined, found);
   return { turns, setTurns, patch };
 }
 
@@ -226,7 +220,11 @@ function useRequests(
   finish: (id: number, result: AiScenarioResult) => Promise<void>,
 ): Pick<ChatModel, 'send' | 'askWhatNow'> {
   const nextId = React.useRef(1);
-  const start = (text: string): number => {
+  // A ref, not state: two presses can land before the screen has re-drawn.
+  const inflight = React.useRef(false);
+  const start = (text: string): number | undefined => {
+    if (running || inflight.current) return undefined;
+    inflight.current = true;
     const id = nextId.current++;
     setTurns((current) => [
       ...current,
@@ -234,29 +232,34 @@ function useRequests(
     ]);
     return id;
   };
+  const release = (): void => {
+    inflight.current = false;
+  };
   return {
     send: (text) => {
       const trimmed = text.trim();
-      if (!trimmed || running) return;
-      const id = start(trimmed);
-      void call({ scenario: 'createFromText', text: trimmed }).then((result) =>
-        finish(id, result),
-      );
+      const id = trimmed ? start(trimmed) : undefined;
+      if (id === undefined) return;
+      void call({ scenario: 'createFromText', text: trimmed })
+        .then((result) => finish(id, result))
+        .finally(release);
     },
     askWhatNow: () => {
-      if (running) return;
       const id = start('Что делать сейчас?');
-      void requestWhatNow().then((next) => {
-        patch(id, {
-          state:
-            next.phase === 'answer'
-              ? { phase: 'whatNow', view: next.view }
-              : {
-                  phase: 'error',
-                  message: next.phase === 'error' ? next.message : '',
-                },
-        });
-      });
+      if (id === undefined) return;
+      void requestWhatNow()
+        .then((next) => {
+          patch(id, {
+            state:
+              next.phase === 'answer'
+                ? { phase: 'whatNow', view: next.view }
+                : {
+                    phase: 'error',
+                    message: next.phase === 'error' ? next.message : '',
+                  },
+          });
+        })
+        .finally(release);
     },
   };
 }

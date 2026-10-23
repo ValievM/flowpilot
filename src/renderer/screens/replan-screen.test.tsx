@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -119,6 +120,18 @@ describe('Replan screen', () => {
     });
     fireEvent.click(force);
     fireEvent.click(force);
+    expect(scenario).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks once even when two runs land before the screen has re-drawn', () => {
+    const { scenario } = setup();
+    const force = screen.getByRole('button', {
+      name: 'Запустить принудительно',
+    });
+    act(() => {
+      force.click();
+      force.click();
+    });
     expect(scenario).toHaveBeenCalledTimes(1);
   });
 

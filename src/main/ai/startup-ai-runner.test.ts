@@ -26,6 +26,23 @@ function runner(environment: Record<string, string>, isPackaged = false) {
   );
 }
 
+const callsKey = '__FLOWPILOT_TEST_AI_CALLS__';
+
+describe('provider call log for tests', () => {
+  it('is exposed only in an unpackaged test build, and counts every provider call', async () => {
+    Reflect.deleteProperty(globalThis, callsKey);
+    runner({ FLOWPILOT_TEST: '1' }, true);
+    expect(Reflect.has(globalThis, callsKey)).toBe(false);
+
+    const test = runner({ FLOWPILOT_TEST: '1' });
+    const calls = Reflect.get(globalThis, callsKey) as unknown[];
+    expect(calls).toEqual([]);
+    await test.run(request);
+    expect(calls).toHaveLength(1);
+    Reflect.deleteProperty(globalThis, callsKey);
+  });
+});
+
 describe('startup AI runner scripted reply', () => {
   it('hands a scenario answer that is not a proposal to the use case unchanged', async () => {
     const answer = { action: null, reason: 'Нет доступных задач' };
