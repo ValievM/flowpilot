@@ -17,7 +17,7 @@ export function TaskSummary({ task }: { task: TodayTask }): React.JSX.Element {
           data-risk-kind={task.riskKind}
           title={task.riskTitle}
         >
-          {task.riskTitle && <strong>{task.riskTitle}: </strong>}
+          {task.riskTitle && <strong>{task.riskTitle}</strong>}
           {task.risk}
         </p>
       )}

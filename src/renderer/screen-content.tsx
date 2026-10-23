@@ -36,7 +36,6 @@ export interface ScreenProps {
     'export' | 'verify' | 'restore'
   >;
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
-  readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
@@ -52,7 +51,6 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         workdays={props.workdays}
         today={props.today}
         todayLabel={props.todayLabel}
-        onViewChange={props.onViewChange}
         onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />

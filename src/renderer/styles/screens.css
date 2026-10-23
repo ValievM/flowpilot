@@ -315,10 +315,9 @@
   background: transparent;
 }
 
-.repeat-panel,
-.missed-repeats {
+.repeat-panel {
   display: grid;
-  gap: var(--space-12);
+  gap: var(--space-8);
   margin-top: var(--space-24);
   padding: var(--space-16);
   border: var(--stroke) solid var(--line);
@@ -326,17 +325,25 @@
   background: var(--panel);
 }
 
+/* Inside the repeat panel everything is a plain row: one frame, hairlines only. */
+.missed-repeats {
+  display: grid;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+  border-top: var(--stroke) solid var(--line);
+}
+
 .repeat-panel h2,
 .missed-repeats h2,
 .repeat-editor h3 {
   margin: 0;
-  font-size: var(--type-section);
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-strong);
 }
 
 .repeat-instances,
 .missed-repeats ul {
   display: grid;
-  gap: var(--space-8);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -347,10 +354,19 @@
 .missed-repeat-date {
   display: grid;
   min-width: 0;
-  gap: var(--space-8);
-  padding: var(--space-12);
-  border: var(--stroke) solid var(--line);
-  border-radius: var(--r2);
+  gap: var(--space-4);
+  padding: var(--space-12) 0;
+  border-top: var(--stroke) solid var(--line);
+}
+
+.missed-repeat-group {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.repeat-instance:first-child,
+.missed-repeat-group:first-child {
+  border-top: 0;
 }
 
 .repeat-instance-heading,
@@ -359,6 +375,18 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-8);
+}
+
+.repeat-actions .button,
+.missed-repeat-date .button,
+.missed-repeat-group > .button {
+  min-height: 0;
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--type-secondary);
+}
+
+.missed-repeat-group > ul {
+  grid-column: 1 / -1;
 }
 
 .repeat-title-button,
@@ -382,8 +410,9 @@
 }
 
 .missed-repeat-date {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
+  padding-left: var(--space-16);
 }
 
 .repeat-reschedule,

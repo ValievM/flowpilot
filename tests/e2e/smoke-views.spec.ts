@@ -66,13 +66,13 @@ test('follows the visual Today navigation order with Tab', async () => {
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: /Тема:/ })).toBeFocused();
   await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Скрыть боковую панель' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'История' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Задача' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(
-    page.getByRole('button', { name: 'Сегодня', exact: true }).last(),
-  ).toBeFocused();
 });
 
 test('shows neutral unknown and danger risk colors on Board and All in Electron', async () => {
@@ -137,7 +137,9 @@ test('shows neutral unknown and danger risk colors on Board and All in Electron'
       unknown: await unknown.evaluate(
         (element) => getComputedStyle(element).color,
       ),
-      tight: await tight.evaluate((element) => getComputedStyle(element).color),
+      tight: await tight
+        .locator('strong')
+        .evaluate((element) => getComputedStyle(element).color),
       expected: await page.evaluate(() => {
         const measure = (token: string): string => {
           const probe = document.createElement('span');

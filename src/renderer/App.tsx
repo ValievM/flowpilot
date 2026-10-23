@@ -6,6 +6,7 @@ import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
+import { useSidebarVisibility } from './use-sidebar-visibility';
 import { ScreenContent } from './screen-content';
 import type { ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
@@ -191,6 +192,7 @@ function MainContent({
 }
 
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
+  const sidebar = useSidebarVisibility();
   const { state, view, views } = model;
   const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
@@ -213,13 +215,13 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     saveError: state.settingsError,
     backup: window.flowpilot.backup,
     onSnapshotRefresh: () => state.refresh(),
-    onViewChange: model.setView,
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
   };
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>
       <Sidebar
+        hidden={sidebar.hidden}
         view={view}
         availableCount={views.available.length}
         theme={model.theme}
@@ -229,6 +231,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
       <div className="workspace">
         <TopBar
           view={view}
+          sidebarHidden={sidebar.hidden}
+          onToggleSidebar={sidebar.toggle}
           saved={state.isSaved}
           undoDisabled={
             !model.history.entries.some(

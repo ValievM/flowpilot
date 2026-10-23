@@ -1098,4 +1098,39 @@ describe('persisted today and now screens', () => {
       expect(trigger).toHaveFocus();
     });
   });
+  it('hides the sidebar with a toggle, keeps it out of the tab order and remembers the choice', async () => {
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    const sidebar = screen.getByRole('complementary', {
+      name: 'Основная панель',
+    });
+    expect(sidebar).not.toHaveAttribute('inert');
+    const hide = screen.getByRole('button', {
+      name: 'Скрыть боковую панель',
+    });
+    expect(hide).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(hide);
+
+    expect(sidebar).toHaveAttribute('inert');
+    const show = screen.getByRole('button', {
+      name: 'Показать боковую панель',
+    });
+    expect(show).toHaveAttribute('aria-expanded', 'false');
+    expect(window.localStorage.getItem('flowpilot.sidebar')).toBe('hidden');
+
+    cleanup();
+    renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    expect(
+      screen.getByRole('complementary', { name: 'Основная панель' }),
+    ).toHaveAttribute('inert');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Показать боковую панель' }),
+    );
+    expect(
+      screen.getByRole('complementary', { name: 'Основная панель' }),
+    ).not.toHaveAttribute('inert');
+    expect(window.localStorage.getItem('flowpilot.sidebar')).toBe('shown');
+  });
 });

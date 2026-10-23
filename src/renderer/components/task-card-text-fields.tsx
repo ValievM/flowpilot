@@ -42,7 +42,7 @@ export function TaskCardTextFields({
       />
       {riskText && (
         <p className={`risk-label${isRisk ? ' is-risk' : ''}`}>
-          {riskTitle && <strong>{riskTitle}: </strong>}
+          {riskTitle && <strong>{riskTitle}</strong>}
           {riskText}
         </p>
       )}
