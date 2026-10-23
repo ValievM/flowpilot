@@ -7,6 +7,9 @@ import {
 import type { Series, Task, TaskComment, TaskStatus } from '../domain';
 import type { ExportInfo, HistoryEntry, Snapshot } from '../storage';
 import type { Result } from './ipc-result';
+import type { CatalogApi, RulesApi } from './rule-contracts';
+
+export * from './rule-contracts';
 export type { ExportInfo } from '../storage';
 import type {
   AiCommand,
@@ -97,10 +100,16 @@ export type IpcSnapshot = Omit<
   readonly series: readonly SerializedSeries[];
   readonly outcomes: readonly SerializedOutcome[];
 };
-
 export const ipcChannels = {
   snapshotLoad: 'snapshot.load',
   commandsApply: 'commands.apply',
+  catalogList: 'catalog.list',
+  rulesList: 'rules.list',
+  rulesImportFile: 'rules.importFile',
+  rulesExportFile: 'rules.exportFile',
+  rulesActivate: 'rules.activate',
+  rulesDeactivate: 'rules.deactivate',
+  rulesBind: 'rules.bind',
   settingsGet: 'settings.get',
   settingsSet: 'settings.set',
   appInfo: 'app.info',
@@ -255,6 +264,8 @@ export type FlowPilotApi = {
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
   };
+  catalog: CatalogApi;
+  rules: RulesApi;
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;
     set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;

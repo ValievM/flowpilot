@@ -13,12 +13,27 @@ with `Result<T, ErrorCode>` and `ErrorCode` in `ipc-result.ts`.
   `{ key, value, expectedRevision }`; returns the updated `IpcSnapshot`.
 - `app.info()` (`app.info`): empty strict request; returns `{ name, version, now }`,
   where `now` is the ISO timestamp from the main-process clock.
+- `catalog.list()` (`catalog.list`): empty strict request; returns task types and
+  disciplines. Catalog mutations use the validated `commands.apply()` channel.
+- `rules.list()` (`rules.list`): empty strict request; returns rule documents,
+  status, validation errors, diagnostics, and accepted versions.
+- `rules.importFile()` (`rules.importFile`): empty strict request; main opens a
+  JSON file dialog, checks the 1 MiB limit before reading, validates the file,
+  and returns a draft or path-specific `RuleInvalid` errors.
+- `rules.exportFile({ id })` (`rules.exportFile`): main opens a save dialog and
+  writes only the accepted rule version. `rules.activate`, `rules.deactivate`,
+  and `rules.bind` accept strict rule-id/scope requests and return the updated
+  rule. Cancellation and activation conflicts are explicit result errors.
 
 Every reply is `{ ok: true, value }` or `{ ok: false, error }`. Error codes
 include `StaleRevision`, `ValidationFailed`, `UndoConflict`, `NotFound`,
 `AlreadyUndone`, `NotUndoable`, `FileNotFound`, `TooLarge`, `AlreadyExists`,
 `NotReadable`, `MissingFile`, `PackageInvalid`, `Cancelled`, and `InternalError`.
-Schemas reject unknown fields. Settings writes use the same expected-revision
+The rule API (`catalog.list` and every `rules.*` method) uses `IpcRuleResult<T>`
+instead: failures have an `error` object with `kind` equal to `ValidationFailed`,
+`Cancelled`, `NotFound`, `RuleConflict`, or `InternalError`, or
+`{ kind: 'RuleInvalid', errors }`, where each error has `path`, `code`, `reason`,
+and `suggestion` strings. Schemas reject unknown fields. Settings writes use the same expected-revision
 transaction as commands. Filesystem paths do not cross the bridge except the
 display-only export folder returned by `backup.export()`; renderer requests do
 not accept paths. Main resolves `<profile>/flowpilot.db` and owns the single

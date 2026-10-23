@@ -1,3 +1,4 @@
+import { createFileDialogs, createRuleDialogs } from './dialogs';
 import {
   app,
   BrowserWindow,
@@ -62,6 +63,7 @@ if (!app.requestSingleInstanceLock()) {
       );
       registerIpcHandlers(ipcMain, {
         repository,
+        ruleDialogs: createRuleDialogs(dialog),
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
@@ -73,20 +75,7 @@ if (!app.requestSingleInstanceLock()) {
         onRepositoryReplaced: (next) => {
           repository = next;
         },
-        dialogs: {
-          pickFile: async () => {
-            const choice = await dialog.showOpenDialog({
-              properties: ['openFile'],
-            });
-            return choice.canceled ? undefined : choice.filePaths[0];
-          },
-          pickFolder: async () => {
-            const choice = await dialog.showOpenDialog({
-              properties: ['openDirectory'],
-            });
-            return choice.canceled ? undefined : choice.filePaths[0];
-          },
-        },
+        dialogs: createFileDialogs(dialog),
         shell: { open: (filePath) => shell.openPath(filePath) },
         profilePath: path.join(runtime.profilePath, 'flowpilot.db'),
         clock: runtime.clock,

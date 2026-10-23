@@ -190,3 +190,7 @@ for (const screen of ['today', 'now'] as const) {
     }
   }
 }
+test('lists rules through the restricted preload API', async () => {
+  const result = await page.evaluate(() => window.flowpilot.rules.list());
+  expect(result).toMatchObject({ ok: true, value: expect.any(Array) });
+});

@@ -6,6 +6,7 @@ import type {
   SettingsSetRequest,
 } from '../../shared/contracts';
 import type { Result } from '../../shared/ipc-result';
+import { fakeCatalogApi, fakeRulesApi } from './fake-catalog-rules';
 import {
   createFakeAppApi,
   createFakeHistoryFileApi,
@@ -247,6 +248,8 @@ function fakeApiFor(
     },
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
+    catalog: fakeCatalogApi,
+    rules: fakeRulesApi,
     settings: {
       get: () => Promise.resolve({ ok: true, value: state.current.settings }),
       set: (request) => apiSetSetting(state, request),

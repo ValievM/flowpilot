@@ -2,27 +2,19 @@ import { nativeTheme, type IpcMain } from 'electron';
 import { ipcChannels } from '../shared/contracts';
 import type { Clock, Repository } from '../storage';
 import { applyAppearanceTheme, initializeAppearanceTheme } from './appearance';
+import { applyCommands, loadSnapshot } from './handlers';
 import type { AiRunner } from './ai/ai-runner';
-import {
-  cancelAiRequest,
-  getManualPrompt,
-  runAiRequest,
-  submitManualReply,
-} from './ai/ipc';
 import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
-import {
-  applyCommands,
-  getAppInfo,
-  getSettings,
-  loadSnapshot,
-  setSetting,
-} from './handlers';
 import {
   createHistoryFileHandlers,
   type HistoryFileHandlers,
 } from './history-file-handlers';
+import { registerFeatureIpcHandlers } from './ipc-feature-handlers';
+import type { RuleFileDependencies } from './rules-handlers';
+
 export type RegistrationDependencies = {
   repository: Repository;
+  readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly appInfo: {
     getName(): string;
     getVersion(): string;
@@ -60,7 +52,6 @@ export function registerIpcHandlers(
     clock: deps.clock,
   });
   registerCoreChannels(ipc, deps);
-  registerAiChannels(ipc, deps);
   registerHistoryFileChannels(ipc, historyFiles);
 }
 
@@ -97,33 +88,7 @@ function registerCoreChannels(
   ipc.handle(ipcChannels.commandsApply, (_event, request: unknown) =>
     applyCommands(request, deps),
   );
-  ipc.handle(ipcChannels.settingsGet, (_event, request: unknown) =>
-    getSettings(request, deps),
-  );
-  ipc.handle(ipcChannels.settingsSet, (_event, request: unknown) =>
-    setSetting(request, deps),
-  );
-  ipc.handle(ipcChannels.appInfo, (_event, request: unknown) =>
-    getAppInfo(request, deps.appInfo),
-  );
-}
-
-function registerAiChannels(
-  ipc: IpcRegistrar,
-  deps: RegistrationDependencies,
-): void {
-  ipc.handle(ipcChannels.aiRun, (_event, request: unknown) =>
-    runAiRequest(request, deps.aiRunner, deps.repository.load()),
-  );
-  ipc.handle(ipcChannels.aiCancel, (_event, request: unknown) =>
-    cancelAiRequest(request, deps.aiRunner),
-  );
-  ipc.handle(ipcChannels.aiPrompt, (_event, request: unknown) =>
-    getManualPrompt(request, deps.manualProvider),
-  );
-  ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
-    submitManualReply(request, deps.manualProvider),
-  );
+  registerFeatureIpcHandlers(ipc, deps);
 }
 
 function registerHistoryFileChannels(
