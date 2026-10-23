@@ -101,3 +101,72 @@ for (const width of [900, 1280]) {
     });
   }
 }
+
+for (const width of [900, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`matches ${theme} task card with data at ${width.toString()}px`, async () => {
+      await page.setViewportSize({ width, height: 1180 });
+      const created = await page.evaluate(async () => {
+        const result = await window.flowpilot.commands.apply({
+          expectedRevision: 0,
+          commands: [
+            {
+              kind: 'task.create',
+              task: {
+                id: 'card-with-data',
+                title: 'Курсовая: собрать рабочий прототип',
+                description:
+                  'Собрать минимальный прототип каталога книг. Сначала проверить, что поиск и карточка книги работают вместе.',
+                status: { kind: 'todo' },
+                columnId: 'todo',
+                day: '2026-10-05',
+                deadline: '2026-10-09',
+                estimate: { unit: 'workdays', value: 5 },
+                subtasks: [
+                  {
+                    id: 's1',
+                    title: 'Выбрать структуру данных',
+                    completed: true,
+                  },
+                  {
+                    id: 's2',
+                    title: 'Собрать поиск и карточку книги',
+                    completed: false,
+                  },
+                ],
+                comments: [
+                  {
+                    id: 'c1',
+                    text: 'Структура готова. Следующий шаг: поиск по названию.',
+                  },
+                ],
+                attachments: [],
+                addedOrder: 1,
+              },
+            },
+          ],
+        });
+        return result.ok;
+      });
+      expect(created).toBe(true);
+      await page.reload();
+      await page.getByRole('button', { name: 'Настройки' }).click();
+      await page.getByRole('combobox', { name: 'Тема' }).selectOption(theme);
+      await page.getByRole('button', { name: 'Сегодня' }).click();
+      await page
+        .getByRole('button', { name: 'Открыть задачу' })
+        .first()
+        .click();
+      await expect(page.locator('.task-card')).toBeVisible();
+      await expect(page.locator('.task-card')).toContainText('Риск не успеть');
+      await page.evaluate(() => {
+        window.getSelection()?.removeAllRanges();
+        if (document.activeElement instanceof HTMLElement)
+          document.activeElement.blur();
+      });
+      await expect(page.locator('.task-card')).toHaveScreenshot(
+        `task-card-data-${theme}-${width.toString()}.png`,
+      );
+    });
+  }
+}

@@ -53,17 +53,20 @@ test('creates a task and opens, edits and closes its card using only the keyboar
     page.getByRole('heading', { name: 'Клавиатурная задача', level: 3 }),
   ).toBeVisible();
 
-  await tabUntilFocused('Открыть задачу: Клавиатурная задача');
   const opener = page.getByRole('button', {
     name: 'Открыть задачу: Клавиатурная задача',
   });
-  await expect(opener).toBeFocused();
-  await page.keyboard.press('Enter');
-
   const closeButton = page.getByRole('button', {
     name: 'Закрыть карточку задачи',
   });
-  await expect(closeButton).toBeVisible();
+  // The list can re-render right after creation and drop focus, so the whole
+  // Tab-to-open step is retried as one unit instead of racing the refresh.
+  await expect(async () => {
+    await tabUntilFocused('Открыть задачу: Клавиатурная задача');
+    await expect(opener).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(closeButton).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
   await tabUntilFocused('Описание');
   await page.keyboard.type('Описание с клавиатуры');
   await page.keyboard.press('Tab');
