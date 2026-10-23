@@ -101,3 +101,15 @@ test('the top bar with status, undo, history and add stays visible while the pag
     page.getByRole('button', { name: 'История', exact: true }),
   ).toBeInViewport();
 });
+
+test('the sticky next-step panel stays below the fixed top bar', async () => {
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  });
+  const topbar = await page.locator('.topbar').boundingBox();
+  const next = await page.locator('.next-step').boundingBox();
+  expect(topbar).not.toBeNull();
+  expect(next?.y).toBeGreaterThanOrEqual(
+    (topbar?.y ?? 0) + (topbar?.height ?? 0),
+  );
+});
