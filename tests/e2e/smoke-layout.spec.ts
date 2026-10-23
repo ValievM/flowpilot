@@ -131,7 +131,9 @@ test('keeps the Today screen usable at 200% zoom at supported widths', async () 
       BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(2);
     });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    expect(await page.evaluate(() => window.innerWidth)).toBeLessThan(width);
+    await expect
+      .poll(() => page.evaluate(() => window.innerWidth))
+      .toBeLessThan(width);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
