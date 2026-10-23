@@ -3,11 +3,8 @@ import React from 'react';
 import type { Outcome, Series, Task } from '../domain';
 import { parsedSeries } from './parse-ipc-repeats';
 import { parsedTasks } from './parse-ipc-tasks';
-import type {
-  CommandsApplyRequest,
-  FlowPilotApi,
-  IpcSnapshot,
-} from '../shared/contracts';
+import type { CommandsApplyRequest, IpcSnapshot } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 
 export interface PersistedState {
   readonly tasks: readonly Task[];

@@ -1,9 +1,6 @@
 import React from 'react';
-import type {
-  FlowPilotApi,
-  IpcSnapshot,
-  ThemeChoice,
-} from '../../shared/contracts';
+import type { IpcSnapshot, ThemeChoice } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { BackupRestorePanel } from '../components/backup-restore-panel';
 import { isThemeChoice } from '../theme/use-theme';
 import { isMotionChoice, type MotionChoice } from '../use-reduced-motion';

@@ -36,7 +36,7 @@ function fake(scenario: FakeAiScenario) {
 }
 
 describe('AI provider contract', () => {
-  it('returns a valid proposal only after an explicit ask', async () => {
+  it('returns a raw reply only after an explicit ask', async () => {
     const provider = fake('success');
     expect(provider.calls).toEqual([]);
 
@@ -46,18 +46,43 @@ describe('AI provider contract', () => {
     expect(provider.calls).toEqual([request]);
   });
 
-  it.each(['malformed', 'extra-fields', 'hallucinated-id'] as const)(
-    'rejects the fake %s reply as InvalidReply',
+  it.each(['extra-fields', 'hallucinated-id'] as const)(
+    'leaves the fake %s response for scenario validation',
     async (scenario) => {
       const result = await fake(scenario).ask(
         request,
         new AbortController().signal,
       );
-      expect(result).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
+      expect(result.ok).toBe(true);
     },
   );
 
-  it('formats context and strict schema for manual exchange and validates pasted replies', async () => {
+  it('rejects a malformed JSON response at the provider boundary', async () => {
+    expect(
+      await fake('malformed').ask(request, new AbortController().signal),
+    ).toEqual({ ok: false, error: { kind: 'InvalidReply' } });
+  });
+
+  it('passes valid JSON without imposing a scenario response shape', async () => {
+    const provider = new ManualExchangeProvider();
+    const waiting = provider.ask(request, new AbortController().signal);
+    await Promise.resolve();
+    expect(provider.provideReply('operation-1', '{"answer":"raw"}')).toBe(true);
+    expect(await waiting).toEqual({ ok: true, value: { answer: 'raw' } });
+  });
+
+  it('rejects manual replies larger than one mebibyte', async () => {
+    const provider = new ManualExchangeProvider();
+    const waiting = provider.ask(request, new AbortController().signal);
+    await Promise.resolve();
+    provider.provideReply('operation-1', `"${'x'.repeat(1024 * 1024)}"`);
+    expect(await waiting).toEqual({
+      ok: false,
+      error: { kind: 'InvalidReply' },
+    });
+  });
+
+  it('formats context and strict schema for manual exchange and returns raw replies', async () => {
     const provider = new ManualExchangeProvider();
     const controller = new AbortController();
     const waiting = provider.ask(request, controller.signal);
@@ -73,7 +98,7 @@ describe('AI provider contract', () => {
     expect(await waiting).toEqual({ ok: true, value: proposal });
   });
 
-  it('rejects malformed pasted replies through the same reply validator', async () => {
+  it('rejects malformed pasted JSON at the provider boundary', async () => {
     const provider = new ManualExchangeProvider();
     const waiting = provider.ask(request, new AbortController().signal);
     await Promise.resolve();

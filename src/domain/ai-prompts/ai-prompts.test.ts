@@ -316,6 +316,7 @@ describe('AI prompt templates', () => {
     ).toBeTruthy();
     expect(
       renderRuleEditPrompt({
+        instruction: 'Повышай приоритет при приближении срока.',
         document: { schema_version: 'v1' },
         taskIds: ['task-1'],
         taskTypeIds: ['type-1'],
@@ -342,6 +343,7 @@ describe('AI prompt templates', () => {
       renderCreateCardsPrompt({ text: '', knownTaskIds: [] }),
       renderReplanPrompt({ context: context([]), columnIds: [] }),
       renderRuleEditPrompt({
+        instruction: 'Измени приоритет.',
         document: {},
         taskIds: [],
         taskTypeIds: [],

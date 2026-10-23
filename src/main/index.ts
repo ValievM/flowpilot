@@ -15,6 +15,7 @@ import { selectRuntimeOptions, selectWindowOptions } from './runtime';
 import { initialAppearanceTheme, isTrustedNavigation } from './appearance';
 import { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { createStartupAiRunner } from './ai/startup-ai-runner';
+import { createAiUseCases } from './ai/usecases/startup';
 import {
   createWindowStartupGate,
   type WindowStartupGate,
@@ -61,6 +62,7 @@ if (!app.requestSingleInstanceLock()) {
         process.env,
         manualProvider,
       );
+      const aiUseCases = createAiUseCases(repository, aiRunner, runtime.clock);
       registerIpcHandlers(ipcMain, {
         repository,
         ruleDialogs: createRuleDialogs(dialog),
@@ -70,6 +72,7 @@ if (!app.requestSingleInstanceLock()) {
           getNow: () => runtime.clock.now().toString(),
         },
         aiRunner,
+        aiUseCases,
         manualProvider,
         onAppearanceReady: () => windowStartupGate?.ready(),
         onRepositoryReplaced: (next) => {
@@ -81,9 +84,7 @@ if (!app.requestSingleInstanceLock()) {
         clock: runtime.clock,
       });
       createWindow();
-      app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
-      });
+      app.on('activate', activateWindow);
     })
     .catch((error: unknown) => {
       reportStartupFailure(error, {
@@ -107,6 +108,10 @@ app.on('will-quit', () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+function activateWindow(): void {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+}
 
 function createWindow(): void {
   windowStartupGate?.stop();

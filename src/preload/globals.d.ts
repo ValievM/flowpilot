@@ -1,4 +1,4 @@
-import type { FlowPilotApi } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 
 declare global {
   interface Window {

@@ -1,11 +1,8 @@
 import { Temporal } from 'temporal-polyfill';
 import { render } from '@testing-library/react';
 import { vi, type Mock } from 'vitest';
-import type {
-  CommandsApplyRequest,
-  FlowPilotApi,
-  IpcSnapshot,
-} from '../../shared/contracts';
+import type { CommandsApplyRequest, IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { BoardScreen } from './board-screen';
 import { featureMocks } from './board-test-feature-mocks';
 
@@ -125,6 +122,15 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
       ),
     },
     ai: {
+      scenario: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: {
+            kind: 'ProviderUnavailable',
+            message: 'AI is unavailable in this test.',
+          },
+        }),
+      ),
       run: vi.fn(() =>
         Promise.resolve({
           ok: false as const,

@@ -1,14 +1,12 @@
-import type { Proposal } from '../../shared/ai-commands';
 import type { AiProvider, AiRequest, ProviderResult } from './ai-provider';
-import { parseProviderText } from './provider-reply';
 
 interface ManualSession {
   readonly prompt: string;
-  readonly resolve: (result: ProviderResult<Proposal>) => void;
-  readonly context: unknown;
-  readonly referenceIndex: AiRequest['referenceIndex'];
+  readonly resolve: (result: ProviderResult<unknown>) => void;
   readonly signal: AbortSignal;
 }
+
+const MAX_REPLY_BYTES = 1024 * 1024;
 
 export class ManualExchangeProvider implements AiProvider {
   private readonly sessions = new Map<string, ManualSession>();
@@ -16,20 +14,18 @@ export class ManualExchangeProvider implements AiProvider {
   ask(
     request: AiRequest,
     signal: AbortSignal,
-  ): Promise<ProviderResult<Proposal>> {
+  ): Promise<ProviderResult<unknown>> {
     if (signal.aborted || this.sessions.has(request.operationId)) {
       return Promise.resolve({ ok: false, error: { kind: 'Aborted' } });
     }
-    let settle: ((result: ProviderResult<Proposal>) => void) | undefined;
-    const promise = new Promise<ProviderResult<Proposal>>((resolve) => {
+    let settle: ((result: ProviderResult<unknown>) => void) | undefined;
+    const promise = new Promise<ProviderResult<unknown>>((resolve) => {
       settle = resolve;
     });
     const session = {
       prompt: formatManualRequest(request),
-      resolve: (result: ProviderResult<Proposal>) => settle?.(result),
+      resolve: (result: ProviderResult<unknown>) => settle?.(result),
       signal,
-      context: request.context,
-      referenceIndex: request.referenceIndex,
     };
     this.sessions.set(request.operationId, session);
     signal.addEventListener(
@@ -51,10 +47,20 @@ export class ManualExchangeProvider implements AiProvider {
     const session = this.sessions.get(operationId);
     if (!session || session.signal.aborted) return false;
     this.sessions.delete(operationId);
-    session.resolve(
-      parseProviderText(text, session.context, session.referenceIndex),
-    );
+    session.resolve(parseRawReply(text));
     return true;
+  }
+}
+
+function parseRawReply(text: string): ProviderResult<unknown> {
+  if (new TextEncoder().encode(text).byteLength > MAX_REPLY_BYTES) {
+    return { ok: false, error: { kind: 'InvalidReply' } };
+  }
+  try {
+    const value: unknown = JSON.parse(text);
+    return { ok: true, value };
+  } catch {
+    return { ok: false, error: { kind: 'InvalidReply' } };
   }
 }
 

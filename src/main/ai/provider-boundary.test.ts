@@ -1,4 +1,3 @@
-import { Temporal } from 'temporal-polyfill';
 import { createAiReferenceIndex } from '../../shared/ai-reference-index';
 import { describe, expect, it } from 'vitest';
 import type { Proposal } from '../../shared/ai-commands';
@@ -445,7 +444,7 @@ describe('AI provider boundary', () => {
     });
   });
 
-  it('returns parsed Temporal task fields from the runner for IPC serialization', async () => {
+  it('returns raw provider JSON for the scenario parser', async () => {
     const provider = new ManualExchangeProvider();
     const runner = new AiRunner(provider);
     const resultPromise = runner.run({
@@ -478,14 +477,19 @@ describe('AI provider boundary', () => {
         }),
       ),
     ).toBe(true);
-    const result = await resultPromise;
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const command = result.value.commands[0];
-    expect(command?.kind).toBe('task.create');
-    if (command?.kind !== 'task.create') return;
-    expect(command.task.day).toBeInstanceOf(Temporal.PlainDate);
-    expect(command.task.time).toBeInstanceOf(Temporal.PlainTime);
-    expect(command.task.deadline).toBeInstanceOf(Temporal.PlainDate);
+    expect(await resultPromise).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          {
+            task: {
+              day: '2026-10-06',
+              time: '09:30',
+              deadline: '2026-10-09',
+            },
+          },
+        ],
+      },
+    });
   });
 });

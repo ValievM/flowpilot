@@ -1,4 +1,4 @@
-import type { FlowPilotApi } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 
 export const fakeCatalogApi: FlowPilotApi['catalog'] = {
   list: () =>

@@ -9,6 +9,7 @@ import {
   createHistoryFileHandlers,
   type HistoryFileHandlers,
 } from './history-file-handlers';
+import type { AiUseCases } from './ai/usecases';
 import { registerFeatureIpcHandlers } from './ipc-feature-handlers';
 import type { RuleFileDependencies } from './rules-handlers';
 
@@ -22,6 +23,7 @@ export type RegistrationDependencies = {
   };
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
+  readonly aiUseCases: AiUseCases;
   readonly onAppearanceReady: () => void;
   readonly onRepositoryReplaced: (repository: Repository) => void;
   readonly dialogs: {

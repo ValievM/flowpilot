@@ -1,9 +1,6 @@
 import React from 'react';
-import type {
-  BackupVerifyResult,
-  FlowPilotApi,
-  IpcSnapshot,
-} from '../../shared/contracts';
+import type { BackupVerifyResult, IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { BackupRestoreFeedback } from './backup-restore-feedback';
 import { BackupExportControl } from './backup-export-control';
 import { BackupRestoreConfirmation } from './backup-restore-confirmation';

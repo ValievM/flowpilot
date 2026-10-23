@@ -1,4 +1,5 @@
-import type { FlowPilotApi, IpcSnapshot } from '../../shared/contracts';
+import type { IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 
 export function createFakeHistoryFileApi(
   current: () => IpcSnapshot,

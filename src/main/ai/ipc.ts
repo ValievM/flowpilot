@@ -21,6 +21,7 @@ import {
 import type { Result } from '../../shared/ipc-result';
 import type { AiRunner } from './ai-runner';
 import type { ManualExchangeProvider } from './manual-exchange-provider';
+import { validateProviderReply } from './provider-reply';
 
 export async function runAiRequest(
   input: unknown,
@@ -29,18 +30,25 @@ export async function runAiRequest(
 ): Promise<AiIpcResult> {
   const parsed = aiRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'ValidationFailed' };
+  const referenceIndex = createAiReferenceIndex({
+    columns: snapshot.columns,
+    tasks: snapshot.tasks,
+    taskTypes: [],
+    disciplines: [],
+    rules: [],
+  });
   const result = await runner.run({
     ...parsed.data,
-    referenceIndex: createAiReferenceIndex({
-      columns: snapshot.columns,
-      tasks: snapshot.tasks,
-      taskTypes: [],
-      disciplines: [],
-      rules: [],
-    }),
+    referenceIndex,
   });
   if (!result.ok) return { ok: false, error: result.error.kind };
-  return { ok: true, value: serializeProposal(result.value) };
+  const proposal = validateProviderReply(
+    result.value,
+    parsed.data.context,
+    referenceIndex,
+  );
+  if (!proposal.ok) return { ok: false, error: proposal.error.kind };
+  return { ok: true, value: serializeProposal(proposal.value) };
 }
 
 function serializeProposal(proposal: Proposal): AiIpcProposal {

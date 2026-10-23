@@ -5,9 +5,7 @@ import {
   validateGenericSettingValue,
 } from './command-schema';
 import type { Series, Task, TaskComment, TaskStatus } from '../domain';
-import type { ExportInfo, HistoryEntry, Snapshot } from '../storage';
-import type { Result } from './ipc-result';
-import type { CatalogApi, RulesApi } from './rule-contracts';
+import type { HistoryEntry, Snapshot } from '../storage';
 
 export * from './rule-contracts';
 export type { ExportInfo } from '../storage';
@@ -118,6 +116,7 @@ export const ipcChannels = {
   aiPrompt: 'ai.prompt',
   aiReply: 'ai.reply',
   appearanceSetTheme: 'appearance.set-theme',
+  aiScenario: 'ai.scenario',
   appearanceInitialize: 'appearance.initialize',
   appearanceReady: 'appearance.ready',
   historyList: 'history.list',
@@ -204,6 +203,30 @@ export const aiCancelRequestSchema = z
 export const aiReplyRequestSchema = z
   .object({ operationId: z.string().min(1), text: z.string() })
   .strict();
+export const aiScenarioRequestSchema = z.discriminatedUnion('scenario', [
+  z.object({ scenario: z.literal('whatNow') }).strict(),
+  z
+    .object({ scenario: z.literal('createFromText'), text: z.string() })
+    .strict(),
+  z.object({ scenario: z.literal('replan') }).strict(),
+  z
+    .object({
+      scenario: z.literal('editRule'),
+      instruction: z.string(),
+      document: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({ scenario: z.literal('confirm'), proposalId: z.string().min(1) })
+    .strict(),
+]);
+export type AiScenarioRequest = z.infer<typeof aiScenarioRequestSchema>;
+export type AiScenarioResult =
+  | { readonly ok: true; readonly value: unknown }
+  | {
+      readonly ok: false;
+      readonly error: { readonly kind: string; readonly message: string };
+    };
 export type AiIpcRequest = z.infer<typeof aiRequestSchema>;
 export type AiIpcResult =
   | { readonly ok: true; readonly value: AiIpcProposal }
@@ -251,52 +274,3 @@ export type AppInfo = z.infer<typeof appInfoResponseSchema>;
 export type CommandsApplyRequest = z.input<typeof commandsApplyRequestSchema>;
 export type SettingsSetRequest = z.input<typeof settingsSetRequestSchema>;
 export type ThemeChoiceRequest = z.infer<typeof appearanceThemeRequestSchema>;
-
-export type FlowPilotApi = {
-  appearance: {
-    initialize(
-      request: AppearanceInitializeRequest,
-    ): Promise<Result<ThemeChoice>>;
-    ready(): Promise<void>;
-    setTheme(request: ThemeChoiceRequest): Promise<Result<null>>;
-  };
-  snapshot: { load(): Promise<Result<IpcSnapshot>> };
-  commands: {
-    apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
-  };
-  catalog: CatalogApi;
-  rules: RulesApi;
-  settings: {
-    get(): Promise<Result<Readonly<Record<string, unknown>>>>;
-    set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
-  };
-  history: {
-    list(
-      limit?: number,
-      before?: string,
-    ): Promise<Result<readonly IpcHistoryEntry[]>>;
-    undo(entryId?: string): Promise<Result<IpcSnapshot>>;
-  };
-  attachments: {
-    add(request: AttachmentAddRequest): Promise<Result<IpcSnapshot>>;
-    open(request: AttachmentOpenRequest): Promise<Result<null>>;
-    remove(request: AttachmentRemoveRequest): Promise<Result<IpcSnapshot>>;
-  };
-  backup: {
-    export(): Promise<Result<ExportInfo>>;
-    verify(): Promise<BackupVerifyResult>;
-    restore(packageToken: string): Promise<Result<IpcSnapshot>>;
-  };
-  ai: {
-    run(request: AiIpcRequest): Promise<AiIpcResult>;
-    cancel(request: { operationId: string }): Promise<AiCancelResult>;
-    prompt(request: { operationId: string }): Promise<Result<string>>;
-    reply(request: {
-      operationId: string;
-      text: string;
-    }): Promise<AiManualReplyResult>;
-  };
-  app: {
-    info(): Promise<Result<AppInfo>>;
-  };
-};

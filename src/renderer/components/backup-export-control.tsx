@@ -1,5 +1,5 @@
 import React from 'react';
-import type { FlowPilotApi } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 
 interface BackupExportControlProps {
   readonly backup: Pick<FlowPilotApi['backup'], 'export'>;

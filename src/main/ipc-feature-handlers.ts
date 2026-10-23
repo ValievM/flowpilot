@@ -9,6 +9,8 @@ import {
   submitManualReply,
 } from './ai/ipc';
 import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
+import { runAiScenario } from './ai/scenario-ipc';
+import type { AiUseCases } from './ai/usecases';
 import {
   activateRule,
   bindRule,
@@ -31,6 +33,7 @@ type FeatureDependencies = {
   };
   readonly aiRunner: AiRunner;
   readonly manualProvider: ManualExchangeProvider;
+  readonly aiUseCases: AiUseCases;
 };
 
 export function registerFeatureIpcHandlers(
@@ -65,6 +68,9 @@ export function registerFeatureIpcHandlers(
   );
   ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
     submitManualReply(request, deps.manualProvider),
+  );
+  ipc.handle(ipcChannels.aiScenario, (_event, request: unknown) =>
+    runAiScenario(request, deps.aiUseCases),
   );
 }
 function registerRulesHandlers(

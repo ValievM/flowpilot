@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AttachmentMetadata, Task } from '../../domain';
-import type { FlowPilotApi } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { PersistedState } from '../use-persisted-tasks';
 
 const MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;

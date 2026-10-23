@@ -7,7 +7,8 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AttachmentMetadata, Task } from '../../domain';
-import type { FlowPilotApi, IpcSnapshot } from '../../shared/contracts';
+import type { IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { TaskAttachments, formatAttachmentSize } from './task-attachments';
 
 afterEach(() => {

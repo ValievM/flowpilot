@@ -1,4 +1,3 @@
-import type { Proposal } from '../../shared/ai-commands';
 import type {
   AiProvider,
   AiRequest,
@@ -8,7 +7,7 @@ import type {
 
 export type RunnerError = ProviderError | { readonly kind: 'AlreadyRunning' };
 export type RunnerResult =
-  | { readonly ok: true; readonly value: Proposal }
+  | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly error: RunnerError };
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -69,7 +68,7 @@ export class AiRunner {
   }
 }
 
-function mapProviderResult(result: ProviderResult<Proposal>): RunnerResult {
+function mapProviderResult(result: ProviderResult<unknown>): RunnerResult {
   if (result.ok) return result;
   return { ok: false, error: result.error };
 }

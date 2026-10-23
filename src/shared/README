@@ -1,8 +1,9 @@
 # IPC contract
 
 Renderer access uses only `window.flowpilot`; Node, Electron, filesystem, and
-SQLite are not exposed. The API is defined by `FlowPilotApi` in `contracts.ts`,
-with `Result<T, ErrorCode>` and `ErrorCode` in `ipc-result.ts`.
+SQLite are not exposed. The API is defined by `FlowPilotApi` in
+`flowpilot-api.ts`, with `Result<T, ErrorCode>` and `ErrorCode` in
+`ipc-result.ts`.
 
 - `snapshot.load()` (`snapshot.load`): empty strict request; returns
   an `IpcSnapshot`.

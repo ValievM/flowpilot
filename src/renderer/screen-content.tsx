@@ -7,11 +7,8 @@ import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
 import type { MotionChoice } from './use-reduced-motion';
-import type {
-  FlowPilotApi,
-  IpcSnapshot,
-  ThemeChoice,
-} from '../shared/contracts';
+import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
 export interface ScreenProps {
   readonly view: View;

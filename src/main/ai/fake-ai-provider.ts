@@ -1,6 +1,5 @@
 import type { Proposal } from '../../shared/ai-commands';
 import type { AiProvider, AiRequest, ProviderResult } from './ai-provider';
-import { validateProviderReply } from './provider-reply';
 
 export type FakeAiScenario =
   | 'success'
@@ -12,7 +11,8 @@ export type FakeAiScenario =
 
 export interface FakeAiStep {
   readonly scenario: FakeAiScenario;
-  readonly proposal: Proposal;
+  readonly proposal?: Proposal;
+  readonly reply?: unknown;
   readonly wait?: () => Promise<void>;
 }
 
@@ -25,7 +25,7 @@ export class FakeAiProvider implements AiProvider {
   async ask(
     request: AiRequest,
     signal: AbortSignal,
-  ): Promise<ProviderResult<Proposal>> {
+  ): Promise<ProviderResult<unknown>> {
     this.calls.push(request);
     const step = this.steps[this.stepIndex];
     this.stepIndex += 1;
@@ -33,17 +33,19 @@ export class FakeAiProvider implements AiProvider {
       return { ok: false, error: { kind: 'ProviderUnavailable' } };
     }
     if (step.scenario === 'timeout') return waitForAbort(signal);
+    if (step.scenario === 'malformed') {
+      return { ok: false, error: { kind: 'InvalidReply' } };
+    }
     await step.wait?.();
-    return validateProviderReply(
-      fakeReply(step),
-      request.context,
-      request.referenceIndex,
-    );
+    return {
+      ok: true,
+      value: step.reply === undefined ? fakeReply(step) : step.reply,
+    };
   }
 }
 
 function fakeReply(step: FakeAiStep): unknown {
-  if (step.scenario === 'malformed') return '{invalid';
+  if (!step.proposal) return null;
   if (step.scenario === 'extra-fields')
     return { ...step.proposal, injected: true };
   if (step.scenario === 'hallucinated-id') {
@@ -54,7 +56,8 @@ function fakeReply(step: FakeAiStep): unknown {
   }
   return step.proposal;
 }
-function waitForAbort(signal: AbortSignal): Promise<ProviderResult<Proposal>> {
+
+function waitForAbort(signal: AbortSignal): Promise<ProviderResult<unknown>> {
   if (signal.aborted) {
     return Promise.resolve({ ok: false, error: { kind: 'Aborted' } });
   }

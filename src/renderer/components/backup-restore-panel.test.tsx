@@ -6,11 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type {
-  BackupVerifyResult,
-  FlowPilotApi,
-  IpcSnapshot,
-} from '../../shared/contracts';
+import type { BackupVerifyResult, IpcSnapshot } from '../../shared/contracts';
+import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { Result } from '../../shared/ipc-result';
 import { fakeApi } from '../test-support/fake-flowpilot';
 import { BackupRestorePanel } from './backup-restore-panel';

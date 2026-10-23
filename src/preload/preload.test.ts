@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FlowPilotApi } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 
 const bridgeState = vi.hoisted(() => {
   const captured: {
