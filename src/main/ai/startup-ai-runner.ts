@@ -22,6 +22,9 @@ export function createStartupAiRunner(
   const fakeProvider = new FakeAiProvider(
     testEnabled ? testReplyStep(environment.FLOWPILOT_TEST_AI_REPLY) : [],
   );
+  // Tests read this to prove the AI is never called unasked (F-07); never set in a real build.
+  if (testEnabled)
+    Reflect.set(globalThis, '__FLOWPILOT_TEST_AI_CALLS__', fakeProvider.calls);
   return new AiRunner(
     selectAiProvider({ isPackaged, environment, manualProvider, fakeProvider }),
     MANUAL_EXCHANGE_TIMEOUT_MS,

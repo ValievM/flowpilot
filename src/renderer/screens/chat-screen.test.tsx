@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -128,6 +129,20 @@ describe('AI chat', () => {
       scenario: 'createFromText',
       text: 'Подготовить доклад к пятнице',
     });
+  });
+
+  it('asks once even when two presses land before the screen has re-drawn', () => {
+    const chat = setup();
+    chat.view();
+    fireEvent.change(screen.getByLabelText('Сообщение помощнику'), {
+      target: { value: 'Подготовить доклад' },
+    });
+    const send = screen.getByRole('button', { name: 'Отправить' });
+    act(() => {
+      send.click();
+      send.click();
+    });
+    expect(chat.scenario).toHaveBeenCalledTimes(1);
   });
 
   it('cancels a running request and leaves the data alone', async () => {

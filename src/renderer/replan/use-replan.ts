@@ -75,10 +75,23 @@ function toState(result: Result, builtAt: number): ReplanState {
   };
 }
 
+function markUndone(state: ReplanState): ReplanState {
+  return state.phase === 'applied' ? { ...state, undone: true } : state;
+}
+
+async function runOnce(
+  builtAt: number,
+  finish: (result: Result, builtAt: number) => Promise<void>,
+): Promise<void> {
+  await finish(await callScenario({ scenario: 'replan' }), builtAt);
+}
+
 /** Replanning runs only when asked: opening any screen never calls it. */
 export function useReplan(deps: ReplanDeps): ReplanModel {
   const [state, setState] = React.useState<ReplanState>({ phase: 'idle' });
   const latest = React.useRef(deps);
+  // A ref, not state: two presses can land before the screen has re-drawn.
+  const inflight = React.useRef(false);
   React.useEffect(() => {
     latest.current = deps;
   });
@@ -99,12 +112,12 @@ export function useReplan(deps: ReplanDeps): ReplanModel {
     state,
     stale: state.phase === 'proposal' && state.builtAt !== deps.revision,
     run: () => {
-      if (state.phase === 'running') return;
+      if (inflight.current) return;
+      inflight.current = true;
       setState({ phase: 'running' });
-      const builtAt = latest.current.revision;
-      void callScenario({ scenario: 'replan' }).then((result) =>
-        finish(result, builtAt),
-      );
+      void runOnce(latest.current.revision, finish).finally(() => {
+        inflight.current = false;
+      });
     },
     apply: () => {
       settle('confirm');
@@ -114,12 +127,7 @@ export function useReplan(deps: ReplanDeps): ReplanModel {
     },
     undo: () => {
       void deps.undo().then((outcome) => {
-        if (outcome === 'ok')
-          setState((current) =>
-            current.phase === 'applied'
-              ? { ...current, undone: true }
-              : current,
-          );
+        if (outcome === 'ok') setState(markUndone);
       });
     },
     cancel: () => void callScenario({ scenario: 'cancel' }),
