@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { TaskCreationDraft, TaskStatus } from '../domain';
 import type { StorageCommand } from './types';
-import { dateText, timeText } from './sql-values';
+import { dateText, optionalDateText, timeText } from './sql-values';
 
 type TaskChanges = Extract<StorageCommand, { kind: 'task.update' }>['changes'];
 
@@ -175,10 +175,10 @@ function taskFieldValues(changes: TaskChanges) {
   return {
     title: changes.title,
     description: changes.description,
-    day: dateText(changes.day),
-    time: timeText(changes.time),
-    deadline: dateText(changes.deadline),
-    rolled_over_from: dateText(changes.rolledOverFrom),
+    day: optionalDateText(changes.day),
+    time: optionalDateText(changes.time),
+    deadline: optionalDateText(changes.deadline),
+    rolled_over_from: optionalDateText(changes.rolledOverFrom),
     position: changes.addedOrder,
   };
 }

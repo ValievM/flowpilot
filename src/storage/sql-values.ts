@@ -14,3 +14,8 @@ export function dateText(value: unknown): string | null {
 export function timeText(value: unknown): string | null {
   return dateText(value);
 }
+
+/** For partial updates: `undefined` means "leave the column", `null` means "clear it". */
+export function optionalDateText(value: unknown): string | null | undefined {
+  return value === undefined ? undefined : dateText(value);
+}
