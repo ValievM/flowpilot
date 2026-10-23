@@ -14,6 +14,7 @@ npm start
 Демо-профиль с вымышленными данными для приёмки: `npm run seed:demo` создаёт
 временный профиль (не трогает настоящие данные) и печатает команду запуска.
 Чек-лист приёмки: [docs/process/release-1-checklist.md](docs/process/release-1-checklist.md).
+Чек-лист выпуска 2 (AI, правила, расписание): [docs/process/release-2-checklist.md](docs/process/release-2-checklist.md); демо-профиль уже содержит правила, типы, расписание и фейковый AI.
 
 ## Основной сценарий В1
 
