@@ -16,7 +16,8 @@ import { useTheme } from './theme/use-theme';
 import type { View } from './types';
 import { useAppAi } from './chat/chat-bridge';
 import { CatalogProvider } from './catalog/catalog-context';
-import { useCatalogSync } from './catalog/use-catalog-sync';
+import { useReferenceSync } from './use-reference-sync';
+import { ScheduleProvider } from './schedule/schedule-context';
 import { useRuleProblems } from './rules/use-rule-problems';
 import { localDateLabel } from './today-copy';
 import { addTask, startTask } from './task-commands';
@@ -81,7 +82,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
 
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const sidebar = useSidebarVisibility();
-  useCatalogSync(model.state.revision);
+  useReferenceSync(model.state.revision);
   const { state, view, views } = model;
   const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
@@ -92,6 +93,10 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     ),
     tasks: view === 'board' || view === 'all' ? views.all : views.todayTasks,
     today: views.today,
+    now: views.now,
+    onOpenSources: () => {
+      model.setView('settings');
+    },
     todayLabel: localDateLabel(views.today),
     available: views.available,
     workdays: state.workdays,
@@ -200,7 +205,9 @@ export function App({
 }): React.JSX.Element {
   return (
     <CatalogProvider>
-      <AppLayout model={useAppModel(initialTheme)} />
+      <ScheduleProvider>
+        <AppLayout model={useAppModel(initialTheme)} />
+      </ScheduleProvider>
     </CatalogProvider>
   );
 }

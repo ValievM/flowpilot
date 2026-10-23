@@ -17,6 +17,8 @@ export interface PersistedState {
   readonly commandError: string | undefined;
   readonly settingsError: string | undefined;
   readonly isLoading: boolean;
+  /** True once the first snapshot has arrived: later refreshes must not blank the screen. */
+  readonly isLoaded: boolean;
   readonly isSaved: boolean;
   refresh(): Promise<IpcSnapshot | undefined>;
   updateWorkdays(workdays: ReadonlySet<number>): Promise<boolean>;
@@ -247,6 +249,7 @@ export function usePersistedTasks(
     commandError,
     settingsError,
     isLoading,
+    isLoaded: snapshot !== undefined,
     isSaved,
     refresh,
     updateWorkdays,

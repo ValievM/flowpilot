@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { ScheduleSourceSnapshot } from '../storage';
 
+export type {
+  ManualScheduleEvent,
+  ScheduleEvent,
+  ScheduleSourceSnapshot,
+} from '../storage';
+
 export const scheduleEmptyRequestSchema = z.object({}).strict();
 export const scheduleConfirmRequestSchema = z
   .object({ token: z.string().min(1) })

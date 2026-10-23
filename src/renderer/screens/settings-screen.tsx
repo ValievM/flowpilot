@@ -2,6 +2,8 @@ import React from 'react';
 import type { IpcSnapshot, ThemeChoice } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { CatalogSettings } from './catalog-settings';
+import { ScheduleSources } from './schedule-sources';
+import type { Temporal } from 'temporal-polyfill';
 import type { Task } from '../../domain';
 import type { CommandsApplyRequest } from '../../shared/contracts';
 import { BackupRestorePanel } from '../components/backup-restore-panel';
@@ -35,6 +37,7 @@ interface SettingsScreenProps {
   >;
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
   readonly tasks: readonly Task[];
+  readonly today: Temporal.PlainDate;
   readonly onApply: (
     commands: CommandsApplyRequest['commands'],
   ) => Promise<boolean>;
@@ -52,6 +55,7 @@ export function SettingsScreen({
   backup,
   onSnapshotRefresh,
   tasks,
+  today,
   onApply,
 }: SettingsScreenProps): React.JSX.Element {
   const [workdaysError, setWorkdaysError] = React.useState<string>();
@@ -144,6 +148,11 @@ export function SettingsScreen({
           </p>
         )}
       </section>
+      <ScheduleSources
+        today={today}
+        onApply={onApply}
+        onChanged={onSnapshotRefresh}
+      />
       <CatalogSettings tasks={tasks} onApply={onApply} />
       <BackupRestorePanel backup={backup} onRestored={onSnapshotRefresh} />
     </section>

@@ -29,6 +29,7 @@ function renderNow(current: Task | undefined, onStart = vi.fn()) {
       task={current}
       allTasks={current ? [current] : []}
       today={today}
+      now={Temporal.PlainTime.from('12:00')}
       workdays={workdays}
       isLoading={false}
       hasTasks={current !== undefined}

@@ -1,0 +1,184 @@
+.schedule-strip {
+  display: grid;
+  gap: var(--space-12);
+  margin-block: var(--space-16);
+  padding-block: var(--space-16);
+  border-block: var(--stroke) solid var(--line);
+}
+
+.schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16) var(--space-24);
+  align-items: flex-start;
+}
+
+.schedule-source,
+.schedule-item {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.schedule-source h2 {
+  margin: 0;
+  font-size: var(--type-body);
+}
+
+.schedule-source p,
+.schedule-item span,
+.schedule-item strong {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.schedule-source p {
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.schedule-item {
+  padding-left: var(--space-12);
+  border-left: var(--stroke) solid var(--line);
+}
+
+.schedule-item span {
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.schedule-time {
+  font-family: var(--mono);
+}
+
+.schedule-banner {
+  padding: var(--space-12) var(--space-16);
+  border-left: var(--selection-stroke) solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.schedule-banner p {
+  margin: var(--space-4) 0 0;
+}
+
+.schedule-conflict {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--r2);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--type-secondary);
+}
+
+.next-class {
+  margin: var(--space-16) 0 0;
+  color: var(--muted);
+}
+
+.schedule-preview,
+.manual-events {
+  display: grid;
+  gap: var(--space-12);
+  justify-items: start;
+}
+
+.schedule-preview ul,
+.manual-events ul,
+.schedule-source-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manual-events li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.manual-events h3 {
+  margin: 0;
+  font-size: var(--type-body);
+}
+
+.manual-form {
+  display: grid;
+  gap: var(--space-12);
+  width: 100%;
+  padding: var(--space-16);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+}
+
+.manual-form label {
+  display: grid;
+  gap: var(--space-4);
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-strong);
+}
+
+.manual-form fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin: 0;
+  padding: var(--space-8) var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+}
+
+.manual-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.manual-form input:not([type='checkbox']) {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--inset);
+  color: var(--ink);
+  font: inherit;
+}
+
+.manual-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
+.manual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.schedule-strip.is-empty {
+  margin-block: var(--space-8) var(--space-16);
+  padding-block: 0;
+  border-block: 0;
+}
+
+.schedule-strip.is-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.schedule-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
