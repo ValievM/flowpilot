@@ -225,7 +225,39 @@ describe('Rules screen', () => {
       name: 'Учебные проекты',
     });
     expect(card).toHaveTextContent('Курсовая, Лабораторная');
-    expect(card).toHaveTextContent('Отключено');
+    expect(card).toHaveTextContent('Активно · есть черновик');
+  });
+
+  it('keeps a document active, and says so, when a later import did not pass the checks', async () => {
+    setup([
+      rule({
+        id: 'r-typo',
+        status: 'draft',
+        document: null,
+        errors: [{ path: 'scope.task_type_ids[0]' }],
+      }),
+    ]);
+    const card = await screen.findByRole('article', {
+      name: 'Учебные проекты',
+    });
+    expect(card).toHaveTextContent('Активно · новая версия не прошла проверку');
+    expect(card).toHaveTextContent('Курсовая');
+    expect(
+      screen.getByRole('button', { name: 'Отключить: Учебные проекты' }),
+    ).toBeVisible();
+  });
+
+  it('offers to accept a draft and to switch off the active version at the same time', async () => {
+    const base = rule({ id: 'r-both' });
+    setup([rule({ id: 'r-both', status: 'draft', document: base.document })]);
+    expect(
+      await screen.findByRole('button', {
+        name: 'Активировать: Учебные проекты',
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Отключить: Учебные проекты' }),
+    ).toBeVisible();
   });
 
   it('offers no export for a document that has no accepted version yet', async () => {

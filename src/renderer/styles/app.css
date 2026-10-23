@@ -296,6 +296,15 @@ svg {
   filter: brightness(0.94);
 }
 
+.button:disabled,
+.button-primary:disabled {
+  border-color: var(--line);
+  background: var(--subtle);
+  color: var(--muted);
+  cursor: not-allowed;
+  filter: none;
+}
+
 .add-icon {
   font-size: var(--type-section);
   line-height: 1;

@@ -48,7 +48,11 @@ export function TopBar({
       : 'Сохраняем…';
   return (
     <header className="topbar drag-region">
-      <div className="breadcrumbs" aria-label="Хлебные крошки">
+      <div
+        className="breadcrumbs"
+        aria-label="Хлебные крошки"
+        data-long={labels[view].length > 14}
+      >
         <button
           className="button icon-button no-drag sidebar-toggle"
           type="button"

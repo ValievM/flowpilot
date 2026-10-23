@@ -34,10 +34,18 @@ export function ruleTitle(rule: IpcStoredRule): string {
   return currentDocument(rule)?.title ?? rule.id;
 }
 
+/**
+ * `activeDocument` is the accepted version the app really uses. A draft next to it
+ * (a rebind, or an import that failed the checks) waits for activation and changes nothing yet.
+ */
 export function statusText(rule: IpcStoredRule): string {
-  if (rule.status === 'active') return 'Активно';
-  if (rule.errors.length > 0) return 'Не прошло проверку';
-  return rule.activeDocument ? 'Отключено' : 'Черновик';
+  if (rule.activeDocument) {
+    if (rule.status === 'active') return 'Активно';
+    return rule.errors.length > 0
+      ? 'Активно · новая версия не прошла проверку'
+      : 'Активно · есть черновик';
+  }
+  return rule.errors.length > 0 ? 'Не прошло проверку' : 'Черновик';
 }
 
 export function ruleCountText(count: number): string {
