@@ -1,6 +1,9 @@
 import React from 'react';
 import type { IpcSnapshot, ThemeChoice } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
+import { CatalogSettings } from './catalog-settings';
+import type { Task } from '../../domain';
+import type { CommandsApplyRequest } from '../../shared/contracts';
 import { BackupRestorePanel } from '../components/backup-restore-panel';
 import { isThemeChoice } from '../theme/use-theme';
 import { isMotionChoice, type MotionChoice } from '../use-reduced-motion';
@@ -31,6 +34,10 @@ interface SettingsScreenProps {
     'export' | 'verify' | 'restore'
   >;
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
+  readonly tasks: readonly Task[];
+  readonly onApply: (
+    commands: CommandsApplyRequest['commands'],
+  ) => Promise<boolean>;
 }
 
 export function SettingsScreen({
@@ -44,6 +51,8 @@ export function SettingsScreen({
   saveError,
   backup,
   onSnapshotRefresh,
+  tasks,
+  onApply,
 }: SettingsScreenProps): React.JSX.Element {
   const [workdaysError, setWorkdaysError] = React.useState<string>();
   const [saving, setSaving] = React.useState(false);
@@ -135,6 +144,7 @@ export function SettingsScreen({
           </p>
         )}
       </section>
+      <CatalogSettings tasks={tasks} onApply={onApply} />
       <BackupRestorePanel backup={backup} onRestored={onSnapshotRefresh} />
     </section>
   );

@@ -314,14 +314,15 @@ describe('AI proposal contract', () => {
     });
   });
 
-  it('does not expose internal AI-only commands through renderer IPC', () => {
+  it('lets the card classify a task, but keeps rules and ranking commands AI-only', () => {
+    // C-13: choosing a type or discipline is a person's action (#42), not only an AI one.
     expect(
       ipcCommandSchema.safeParse({
         kind: 'task.classify',
         taskId: 'task-1',
         typeId: 'type-1',
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       ipcCommandSchema.safeParse({ kind: 'rule.import', documentJson: '{}' })
         .success,

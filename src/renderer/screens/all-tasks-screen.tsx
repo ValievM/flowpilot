@@ -1,4 +1,5 @@
 import React from 'react';
+import { DisciplineTag } from '../catalog/catalog-context';
 import { laterView, todayView } from '../../domain/views';
 import type { Task } from '../../domain/task';
 import { taskSummaryData } from '../task-summary-data';
@@ -95,14 +96,12 @@ function TaskCopy({
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }): React.JSX.Element {
   const summary = taskSummaryData(task, today, workdays);
-  const metadata = [
-    ...(task.disciplineId ? [task.disciplineId] : []),
-    `Срок: ${summary.due}`,
-  ];
+  const metadata = [`Срок: ${summary.due}`];
   return (
     <div className="task-copy">
       <TaskTitleButton task={task} onOpenTask={onOpenTask} />
       <div className="task-meta">
+        <DisciplineTag id={task.disciplineId} />
         {metadata.map((value, itemIndex) => (
           <React.Fragment key={value}>
             {itemIndex > 0 && <span aria-hidden="true">·</span>}

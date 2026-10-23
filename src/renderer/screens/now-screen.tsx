@@ -1,4 +1,5 @@
 import React from 'react';
+import { DisciplineTag } from '../catalog/catalog-context';
 import { Temporal } from 'temporal-polyfill';
 import type { DeadlineRiskResult } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
@@ -141,6 +142,7 @@ export function NowScreen({
             {task.title}
           </button>
         </h2>
+        <DisciplineTag id={task.disciplineId} />
         <DeadlineBadge risk={risk} />
         <button
           className="button button-primary start-button"

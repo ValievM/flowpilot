@@ -1,50 +1,29 @@
 import React from 'react';
 import type { ThemeChoice } from '../shared/contracts';
-import type { Task } from '../domain';
 import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
 import { useSidebarVisibility } from './use-sidebar-visibility';
-import { ScreenContent, type ScreenProps } from './screen-content';
+import type { ScreenProps } from './screen-content';
+import type { AppModel } from './app-model';
+import { MainContent } from './main-content';
 import { taskViews } from './task-views';
-import { useCurrentTime, type LocalClock } from './use-current-time';
-import { useReducedMotion, type MotionChoice } from './use-reduced-motion';
+import { useCurrentTime } from './use-current-time';
+import { useReducedMotion } from './use-reduced-motion';
 import { usePersistedTasks } from './use-persisted-tasks';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
 import { useAppAi } from './chat/chat-bridge';
+import { CatalogProvider } from './catalog/catalog-context';
+import { useCatalogSync } from './catalog/use-catalog-sync';
 import { localDateLabel } from './today-copy';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
 import { HistoryPanel } from './components/history-panel';
-import { useHistory, type HistoryState } from './use-history';
+import { useHistory } from './use-history';
 import { RepeatSchedule } from './screens/repeat-schedule';
 import { createSeries } from './create-series';
-
-interface AppModel {
-  readonly theme: ThemeChoice;
-  readonly setTheme: (theme: ThemeChoice) => void;
-  readonly motionChoice: MotionChoice;
-  readonly setMotionChoice: (choice: MotionChoice) => void;
-  readonly view: View;
-  readonly setView: (view: View) => void;
-  readonly quickAddOpen: boolean;
-  readonly setQuickAddOpen: (open: boolean) => void;
-  readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
-  readonly historyButtonRef: React.RefObject<HTMLButtonElement | null>;
-  readonly history: HistoryState;
-  readonly ai: ReturnType<typeof useAppAi>;
-  readonly state: ReturnType<typeof usePersistedTasks>;
-  readonly views: ReturnType<typeof taskViews>;
-  readonly clock: LocalClock;
-  readonly cycleTheme: () => void;
-  readonly startTask: (task: Task) => Promise<void>;
-  readonly addTask: (title: string) => Promise<boolean>;
-  readonly taskCardId: string | undefined;
-  readonly openTask: (taskId: string, trigger: HTMLElement) => void;
-  readonly closeTask: () => void;
-}
 
 function useAppModel(initialTheme: ThemeChoice): AppModel {
   const [theme, setTheme] = useTheme(initialTheme);
@@ -99,96 +78,9 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   };
 }
 
-function LoadingState(): React.JSX.Element {
-  return (
-    <section className="loading-state" role="status">
-      <h1>Загружаем сохранённые задачи…</h1>
-      <p>Ваши дела появятся здесь после чтения приложения.</p>
-    </section>
-  );
-}
-
-function ErrorState({
-  error,
-  onRetry,
-}: {
-  readonly error: string;
-  readonly onRetry: () => void;
-}): React.JSX.Element {
-  return (
-    <section className="error-state" role="alert">
-      <p>{error}</p>
-      <button className="button" type="button" onClick={onRetry}>
-        Повторить загрузку
-      </button>
-    </section>
-  );
-}
-
-function shouldShowLoading(model: AppModel): boolean {
-  const { state } = model;
-  return (
-    (!model.clock.isReady && !model.clock.error) ||
-    (state.isLoading && state.tasks.length === 0)
-  );
-}
-function MainContent({
-  model,
-  screenProps,
-}: {
-  readonly model: AppModel;
-  readonly screenProps: ScreenProps;
-}): React.JSX.Element {
-  const { state } = model;
-  if (shouldShowLoading(model)) return <LoadingState />;
-  if (state.loadError && state.tasks.length === 0)
-    return (
-      <ErrorState
-        error={state.loadError}
-        onRetry={() => {
-          void state.refresh();
-        }}
-      />
-    );
-  return (
-    <>
-      <ScreenContent {...screenProps} />
-      {model.clock.error && (
-        <p className="load-error" role="alert">
-          {model.clock.error}
-          <button className="button" type="button" onClick={model.clock.retry}>
-            Повторить получение времени
-          </button>
-        </p>
-      )}
-      {state.isLoading && (
-        <p className="refresh-status" role="status">
-          Обновляем данные…
-        </p>
-      )}
-      {state.loadError && (
-        <p className="load-error" role="alert">
-          {state.loadError}
-          <button
-            className="button"
-            type="button"
-            onClick={() => void state.refresh()}
-          >
-            Повторить загрузку
-          </button>
-        </p>
-      )}
-      {state.commandError && (
-        <p className="save-error" role="alert">
-          {state.commandError}
-        </p>
-      )}
-    </>
-  );
-}
-
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const sidebar = useSidebarVisibility();
+  useCatalogSync(model.state.revision);
   const { state, view, views } = model;
   const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
@@ -215,6 +107,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onOpenTask: model.openTask,
     allTasks: views.all,
     ai: model.ai,
+    onApply: (commands) => state.apply(commands),
   };
   return (
     <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>
@@ -303,5 +196,9 @@ export function App({
 }: {
   readonly initialTheme?: ThemeChoice;
 }): React.JSX.Element {
-  return <AppLayout model={useAppModel(initialTheme)} />;
+  return (
+    <CatalogProvider>
+      <AppLayout model={useAppModel(initialTheme)} />
+    </CatalogProvider>
+  );
 }

@@ -250,6 +250,74 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('lets the renderer classify a task with catalog values, and refuses unknown ones', () => {
+    const repository = openRepository();
+    const created = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'taskType.create',
+            taskType: { id: 'type-1', name: 'Курсовая' },
+          },
+          {
+            kind: 'discipline.create',
+            discipline: { id: 'discipline-1', name: 'Математика' },
+          },
+          {
+            kind: 'task.create',
+            task: {
+              id: 'task-class',
+              title: 'Работа',
+              status: { kind: 'todo' as const },
+              columnId: 'todo',
+              subtasks: [],
+              comments: [],
+              attachments: [],
+              addedOrder: 0,
+            },
+          },
+        ],
+        expectedRevision: 0,
+      },
+      { repository },
+    );
+    expect(created.ok).toBe(true);
+    const revision = repository.load().revision;
+
+    const classified = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'task.classify',
+            taskId: 'task-class',
+            typeId: 'type-1',
+            disciplineId: 'discipline-1',
+          },
+        ],
+        expectedRevision: revision,
+      },
+      { repository },
+    );
+
+    expect(classified.ok).toBe(true);
+    expect(repository.load().tasks[0]).toMatchObject({
+      typeId: 'type-1',
+      disciplineId: 'discipline-1',
+    });
+    const unknown = applyCommands(
+      {
+        commands: [
+          { kind: 'task.classify', taskId: 'task-class', typeId: 'nope' },
+        ],
+        expectedRevision: repository.load().revision,
+      },
+      { repository },
+    );
+    expect(unknown.ok).toBe(false);
+    expect(repository.load().tasks[0]?.typeId).toBe('type-1');
+    repository.close();
+  });
+
   it('rejects duplicate and out-of-range workdays through both IPC channels', () => {
     const repository = openRepository();
     for (const value of [[], [1, 1], [8]]) {

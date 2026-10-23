@@ -1,0 +1,116 @@
+.discipline-tag {
+  display: inline-block;
+  padding: 0 var(--space-8);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r1);
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-medium);
+}
+
+.discipline-tag.is-study {
+  color: var(--category-study);
+}
+
+.discipline-tag.is-health {
+  color: var(--category-health);
+}
+
+.discipline-tag.is-personal {
+  color: var(--category-personal);
+}
+
+.task-card-field label,
+.catalog-create label,
+.catalog-dialog label {
+  display: grid;
+  gap: var(--space-8);
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-strong);
+}
+
+.catalog-list {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.catalog-list h3 {
+  margin: 0;
+  font-size: var(--type-body);
+}
+
+.catalog-list ul {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalog-list + .catalog-list {
+  padding-top: var(--space-16);
+  border-top: var(--stroke) solid var(--line);
+}
+
+.catalog-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--control-height);
+}
+
+.catalog-list li > span {
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.catalog-create {
+  display: grid;
+  gap: var(--space-8);
+  justify-items: start;
+}
+
+.catalog-list .catalog-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.catalog-list .catalog-create label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.catalog-create input,
+.catalog-list li input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+  background: var(--inset);
+  color: var(--ink);
+  font: inherit;
+}
+
+.catalog-dialog {
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+  background: var(--subtle);
+}
+
+.catalog-dialog p {
+  margin: 0;
+}
+
+.catalog-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}

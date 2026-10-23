@@ -1,4 +1,5 @@
 import React from 'react';
+import { DisciplineTag } from '../catalog/catalog-context';
 import { Temporal } from 'temporal-polyfill';
 import { deadlineRisk } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
@@ -66,6 +67,7 @@ function TaskRow({
           </button>
         </h3>
         <div className="task-meta">
+          <DisciplineTag id={task.disciplineId} />
           {task.status.kind === 'waiting' && (
             <span>Ожидание: {task.status.reason}</span>
           )}
