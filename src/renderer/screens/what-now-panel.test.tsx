@@ -38,6 +38,7 @@ function setup(replies: AiScenarioResult[], tasks: Task[] = [task()]) {
       task={tasks[0]}
       allTasks={tasks}
       today={Temporal.PlainDate.from('2026-10-05')}
+      now={Temporal.PlainTime.from('12:00')}
       workdays={new Set([1, 2, 3, 4, 5])}
       isLoading={false}
       hasTasks

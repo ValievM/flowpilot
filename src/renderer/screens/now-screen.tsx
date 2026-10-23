@@ -6,6 +6,8 @@ import type { Task } from '../../domain/task';
 import { deadlineRisk } from '../../domain/risk/risk';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 import { WhatNowPanel } from './what-now-panel';
+import { useSchedulePlan } from '../schedule/schedule-context';
+import { ConflictNote, NextClass } from './schedule-notes';
 
 const SELECTION_RULE =
   'Выбрано по ближайшему сроку, затем по порядку добавления.';
@@ -14,6 +16,7 @@ interface NowScreenProps {
   readonly task: Task | undefined;
   readonly allTasks: readonly Task[];
   readonly today: Temporal.PlainDate;
+  readonly now: Temporal.PlainTime;
   readonly workdays: ReadonlySet<number>;
   readonly isLoading: boolean;
   readonly hasTasks: boolean;
@@ -106,6 +109,7 @@ export function NowScreen({
   task,
   allTasks,
   today,
+  now,
   workdays,
   isLoading,
   onStart,
@@ -113,6 +117,7 @@ export function NowScreen({
   hasTasks,
   hasUndatedTasks,
 }: NowScreenProps): React.JSX.Element {
+  const plan = useSchedulePlan(today, now);
   if (!task)
     return (
       <>
@@ -121,6 +126,7 @@ export function NowScreen({
           hasTasks={hasTasks}
           hasUndatedTasks={hasUndatedTasks}
         />
+        <NextClass plan={plan} />
         <WhatNowPanel tasks={allTasks} onStart={onStart} />
       </>
     );
@@ -144,6 +150,7 @@ export function NowScreen({
         </h2>
         <DisciplineTag id={task.disciplineId} />
         <DeadlineBadge risk={risk} />
+        <ConflictNote task={task} today={today} plan={plan} />
         <button
           className="button button-primary start-button"
           type="button"
@@ -155,6 +162,7 @@ export function NowScreen({
         </button>
         <WhyThisTask risk={risk} />
       </article>
+      <NextClass plan={plan} />
       <WhatNowPanel tasks={allTasks} onStart={onStart} />
     </section>
   );

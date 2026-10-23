@@ -28,11 +28,13 @@ function ErrorState({
   );
 }
 
-function shouldShowLoading(model: AppModel): boolean {
+export function shouldShowLoading(
+  model: Pick<AppModel, 'state' | 'clock'>,
+): boolean {
   const { state } = model;
   return (
     (!model.clock.isReady && !model.clock.error) ||
-    (state.isLoading && state.tasks.length === 0)
+    (state.isLoading && !state.isLoaded)
   );
 }
 export function MainContent({

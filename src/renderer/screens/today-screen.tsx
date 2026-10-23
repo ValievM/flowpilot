@@ -5,6 +5,10 @@ import { deadlineRisk } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 import { taskCountPhrase } from '../today-copy';
+import { useSchedulePlan } from '../schedule/schedule-context';
+import type { SchedulePlan } from '../schedule/schedule-model';
+import { ConflictNote } from './schedule-notes';
+import { ScheduleStrip } from './schedule-strip';
 
 interface TodayScreenProps {
   readonly tasks: readonly Task[];
@@ -13,6 +17,8 @@ interface TodayScreenProps {
   readonly available: readonly Task[];
   readonly workdays: ReadonlySet<number>;
   readonly today: Temporal.PlainDate;
+  readonly now: Temporal.PlainTime;
+  readonly onOpenSources: () => void;
   readonly todayLabel: string;
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
@@ -34,12 +40,14 @@ function taskState(task: Task): string {
 function TaskRow({
   task,
   today,
+  plan,
   workdays,
   index,
   onOpenTask,
 }: {
   readonly task: Task;
   readonly today: Temporal.PlainDate;
+  readonly plan: SchedulePlan;
   readonly workdays: ReadonlySet<number>;
   readonly index: number;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
@@ -79,6 +87,7 @@ function TaskRow({
           )}
           {task.rolledOverFrom && <span>Перенесено со вчера</span>}
         </div>
+        <ConflictNote task={task} today={today} plan={plan} />
         {riskText && (
           <p className={`risk-label${isRisk ? ' is-risk' : ''}`}>
             <span className="risk-icon" aria-hidden="true">
@@ -142,10 +151,20 @@ export function TodayScreen({
   available,
   workdays,
   today,
+  now,
+  onOpenSources,
   todayLabel,
   onStart,
   onOpenTask,
 }: TodayScreenProps): React.JSX.Element {
+  const plan = useSchedulePlan(today, now);
+  const zoned = today.toZonedDateTime({
+    timeZone: Temporal.Now.timeZoneId(),
+    plainTime: now,
+  });
+  const strip = (
+    <ScheduleStrip plan={plan} now={zoned} onOpenSources={onOpenSources} />
+  );
   const nextTask = available[0];
   const nextRisk = nextTask
     ? deadlineRisk(nextTask, today, workdays)
@@ -155,12 +174,14 @@ export function TodayScreen({
     return (
       <>
         <TodayHeading todayLabel={todayLabel} />
+        {strip}
         <EmptyDay blocked={hasTasks} hasUndatedTasks={hasUndatedTasks} />
       </>
     );
   return (
     <>
       <TodayHeading todayLabel={todayLabel} />
+      {strip}
       <div className="today-layout">
         <section className="queue" aria-labelledby="queue-heading">
           <div className="queue-heading">
@@ -175,6 +196,7 @@ export function TodayScreen({
                 key={task.id}
                 task={task}
                 today={today}
+                plan={plan}
                 workdays={workdays}
                 index={index}
                 onOpenTask={onOpenTask}

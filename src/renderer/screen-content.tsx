@@ -24,6 +24,8 @@ export interface ScreenProps {
   readonly hasTasks: boolean;
   readonly hasUndatedTasks: boolean;
   readonly today: TemporalTypes.PlainDate;
+  readonly now: TemporalTypes.PlainTime;
+  readonly onOpenSources: () => void;
   readonly todayLabel: string;
   readonly available: readonly Task[];
   readonly workdays: ReadonlySet<number>;
@@ -60,6 +62,8 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         available={props.available}
         workdays={props.workdays}
         today={props.today}
+        now={props.now}
+        onOpenSources={props.onOpenSources}
         todayLabel={props.todayLabel}
         onOpenTask={props.onOpenTask}
         onStart={props.onStart}
@@ -72,6 +76,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         task={props.available[0]}
         allTasks={props.allTasks}
         today={props.today}
+        now={props.now}
         hasTasks={props.hasTasks}
         hasUndatedTasks={props.hasUndatedTasks}
         workdays={props.workdays}
@@ -122,6 +127,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
       backup={props.backup}
       onSnapshotRefresh={props.onSnapshotRefresh}
       tasks={props.allTasks}
+      today={props.today}
       onApply={props.onApply}
     />
   );
