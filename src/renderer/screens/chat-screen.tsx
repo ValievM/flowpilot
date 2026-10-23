@@ -6,11 +6,13 @@ import { ChatTurnView } from './chat-turn';
 interface ChatScreenProps {
   readonly tasks: readonly Task[];
   readonly chat: ChatModel;
+  readonly onStart: (task: Task) => void;
 }
 
 export function ChatScreen({
   tasks,
   chat,
+  onStart,
 }: ChatScreenProps): React.JSX.Element {
   const { loadMode } = chat;
   React.useEffect(loadMode, [loadMode]);
@@ -48,9 +50,23 @@ export function ChatScreen({
       </p>
       <ol className="chat-turns" aria-label="Диалог">
         {chat.turns.map((turn) => (
-          <ChatTurnView key={turn.id} turn={turn} tasks={tasks} chat={chat} />
+          <ChatTurnView
+            key={turn.id}
+            turn={turn}
+            tasks={tasks}
+            chat={chat}
+            onStart={onStart}
+          />
         ))}
       </ol>
+      <button
+        className="button chat-quick"
+        type="button"
+        disabled={chat.running}
+        onClick={chat.askWhatNow}
+      >
+        Что делать сейчас?
+      </button>
       <form
         className="chat-composer"
         onSubmit={(event) => {

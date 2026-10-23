@@ -179,6 +179,10 @@
   justify-self: start;
 }
 
+.chat-quick {
+  justify-self: start;
+}
+
 .chat-composer {
   display: grid;
   gap: var(--space-8);

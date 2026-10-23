@@ -80,15 +80,26 @@ function setup(aiMode: 'auto' | 'confirm' = 'confirm') {
   } as unknown as FlowPilotApi;
   const onApplied = vi.fn(() => Promise.resolve());
   const undo = vi.fn(() => Promise.resolve('ok' as const));
+  const onStart = vi.fn();
   function Harness({ tasks }: { tasks: Task[] }) {
     const chat = useChat({ onApplied, undo });
-    return <ChatScreen tasks={tasks} chat={chat} />;
+    return <ChatScreen tasks={tasks} chat={chat} onStart={onStart} />;
   }
   const view = (tasks: Task[] = []) => render(<Harness tasks={tasks} />);
   const answer = (result: AiScenarioResult): void => {
     waiting.shift()?.(result);
   };
-  return { scenario, pending, reply, apply, onApplied, undo, view, answer };
+  return {
+    scenario,
+    pending,
+    reply,
+    apply,
+    onApplied,
+    undo,
+    onStart,
+    view,
+    answer,
+  };
 }
 
 function send(text: string): void {
@@ -280,5 +291,34 @@ describe('AI chat', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /режим не изменён|Он не изменён/,
     );
+  });
+
+  it('has a quick phrase that asks what to do now, once, and offers to start the task', async () => {
+    const chat = setup();
+    const task = {
+      id: 'task-1',
+      title: 'Прочитать главу 3',
+      status: { kind: 'todo' },
+      columnId: 'todo',
+      subtasks: [],
+      comments: [],
+      attachments: [],
+      addedOrder: 1,
+    } as unknown as Task;
+    chat.view([task]);
+    expect(chat.scenario).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Что делать сейчас?' }));
+    expect(chat.scenario).toHaveBeenCalledTimes(1);
+    expect(chat.scenario).toHaveBeenCalledWith({ scenario: 'whatNow' });
+    chat.answer(
+      ok({
+        kind: 'recommendation',
+        answer: { action: { taskId: 'task-1' }, reason: 'Ближайший срок.' },
+      }),
+    );
+    const card = await screen.findByRole('article', { name: 'Совет AI' });
+    expect(card).toHaveTextContent('Прочитать главу 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Начать' }));
+    expect(chat.onStart).toHaveBeenCalledWith(task);
   });
 });
