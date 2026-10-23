@@ -28,6 +28,60 @@ import type {
   TaskStatus,
   WaitingDetails,
 } from '../domain';
+
+export type ScheduleSource = 'modeus' | 'ics';
+export type ScheduleEvent = {
+  readonly key: string;
+  readonly source: ScheduleSource;
+  readonly title: string;
+  readonly startUtc: string;
+  readonly endUtc: string;
+  readonly timeZone: string;
+  readonly place?: string;
+  readonly cancelled?: boolean;
+};
+export type ManualScheduleEvent = {
+  readonly id: string;
+  readonly title: string;
+  readonly timeZone: string;
+  readonly place?: string;
+  readonly weekdays: readonly number[];
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly fromDate: string;
+  readonly throughDate: string;
+};
+export type ScheduleSourceSnapshot = {
+  readonly source: 'modeus' | 'ics' | 'manual';
+  readonly fetchedAt: string;
+  readonly status: 'ok' | 'error';
+  readonly lastError: string | null;
+  readonly ageMilliseconds: number;
+  readonly events: readonly (ScheduleEvent | ManualScheduleEvent)[];
+};
+
+export type ScheduleCommand =
+  | {
+      kind: 'schedule.import';
+      source: ScheduleSource;
+      events: readonly ScheduleEvent[];
+      fetchedAt: string;
+    }
+  | {
+      kind: 'schedule.error';
+      source: ScheduleSource;
+      message: string;
+      at: string;
+    }
+  | { kind: 'schedule.manual.add'; event: ManualScheduleEvent; at: string }
+  | {
+      kind: 'schedule.manual.update';
+      id: string;
+      event: ManualScheduleEvent;
+      at: string;
+    }
+  | { kind: 'schedule.manual.remove'; id: string; at: string };
+
 export type HistoryEntry = {
   id: string;
   revision: number;
@@ -174,7 +228,8 @@ export type StorageCommand =
       kind: 'series.recordOutcome';
       seriesId: string;
       outcome: SeriesOutcomeInput<Outcome>;
-    };
+    }
+  | ScheduleCommand;
 
 export interface RejectedAiCommand {
   readonly index: number;

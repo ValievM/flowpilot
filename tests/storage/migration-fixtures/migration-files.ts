@@ -10,6 +10,7 @@ import rejectedAiCommands from '../../../src/storage/migrations/0009_rejected_ai
 import rulesStorage from '../../../src/storage/migrations/0010_rules_storage.sql?raw';
 import seriesStorage from '../../../src/storage/migrations/0011_series_storage.sql?raw';
 import commentCreatedAtNullable from '../../../src/storage/migrations/0012_comment_created_at_nullable.sql?raw';
+import scheduleStorage from '../../../src/storage/migrations/0013_schedule_storage.sql?raw';
 
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
@@ -59,6 +60,11 @@ export const migrationFiles = [
     version: 12,
     filename: '0012_comment_created_at_nullable.sql',
     sql: commentCreatedAtNullable,
+  },
+  {
+    version: 13,
+    filename: '0013_schedule_storage.sql',
+    sql: scheduleStorage,
   },
 ] as const;
 

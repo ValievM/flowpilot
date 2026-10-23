@@ -1250,4 +1250,96 @@ describe('backup package', () => {
     expect(current.load()).toEqual(original);
     current.close();
   });
+  it('restores imported events, manual events and the source snapshot, and still reads a package without schedule sections', () => {
+    const { root, profile, repository } = setup();
+    repository.schedule.importSchedule(
+      'ics',
+      [
+        {
+          key: 'class-1',
+          source: 'ics',
+          title: 'Лекция',
+          startUtc: '2026-10-07T09:00:00Z',
+          endUtc: '2026-10-07T10:30:00Z',
+          timeZone: 'Europe/Moscow',
+        },
+      ],
+      '2026-10-06T12:00:00Z',
+      0,
+    );
+    repository.schedule.addManualEvent(
+      {
+        id: 'manual-1',
+        title: 'Тренировка',
+        timeZone: 'Europe/Moscow',
+        weekdays: [1, 3],
+        startTime: '18:00',
+        endTime: '19:00',
+        fromDate: '2026-10-05',
+        throughDate: '2026-12-31',
+      },
+      1,
+    );
+    const before = repository.schedule.snapshots();
+    repository.close();
+    const packageDir = exportPackage(root, profile);
+
+    const restoredPath = join(root, 'restored.sqlite');
+    expect(restore(packageDir, restoredPath, clock).ok).toBe(true);
+    const restored = new Repository(restoredPath, clock);
+    expect(restored.schedule.snapshots()).toEqual(before);
+    restored.close();
+
+    const dataPath = join(packageDir, 'data.json');
+    const data = parsed(dataPath) as Record<string, unknown>;
+    delete data.schedule_events;
+    delete data.schedule_snapshots;
+    save(dataPath, data);
+    updateDataHash(packageDir);
+    const oldPath = join(root, 'from-old-package.sqlite');
+    expect(restore(packageDir, oldPath, clock).ok).toBe(true);
+    const fromOld = new Repository(oldPath, clock);
+    expect(fromOld.schedule.snapshots()).toEqual([]);
+    fromOld.close();
+  });
+  it('exports optional schedule data without changing the package format', () => {
+    const { root, profile, repository } = setup();
+    repository.close();
+    const database = new Database(profile);
+    database
+      .prepare(
+        `INSERT INTO schedule_events(
+        source_key,source,title,start_utc,end_utc,time_zone,place,cancelled,version
+      ) VALUES('class-1','ics','Лекция','2026-10-07T09:00:00Z',
+        '2026-10-07T10:30:00Z','Europe/Moscow',NULL,0,1)`,
+      )
+      .run();
+    database
+      .prepare(
+        `INSERT INTO schedule_snapshots(source,fetched_at,status,last_error,version)
+       VALUES('ics','2026-10-06T12:00:00Z','ok',NULL,1)`,
+      )
+      .run();
+    database.close();
+
+    const packageDir = exportPackage(root, profile);
+    const verification = verifyPackage(packageDir);
+    expect(verification).toMatchObject({
+      ok: true,
+      value: {
+        manifest: { formatVersion: 1 },
+        data: {
+          schedule_events: [
+            expect.objectContaining({
+              source_key: 'class-1',
+              start_utc: '2026-10-07T09:00:00Z',
+            }),
+          ],
+          schedule_snapshots: [
+            expect.objectContaining({ source: 'ics', status: 'ok' }),
+          ],
+        },
+      },
+    });
+  });
 });

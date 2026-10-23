@@ -8,6 +8,7 @@ import { executeTaskCommand } from './task-commands';
 import type { AttachmentRecord } from './attachments/attachment-store';
 import { executeRulesCommand } from './rules-commands';
 import type { ApplyResult, RejectedAiCommand, StorageCommand } from './types';
+import { executeScheduleCommand, isScheduleCommand } from './schedule-commands';
 
 type AttachmentFiles = {
   insert(record: AttachmentRecord): void;
@@ -174,6 +175,10 @@ function executeCommand(
   if (executeRulesCommand(database, command, options.now)) return;
   if (isSeriesCommand(command)) {
     executeSeriesCommand(database, command, options.now);
+    return;
+  }
+  if (isScheduleCommand(command)) {
+    executeScheduleCommand(database, command);
     return;
   }
   if (isColumnCommand(command)) executeColumnCommand(database, command);

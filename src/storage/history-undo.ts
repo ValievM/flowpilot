@@ -256,7 +256,8 @@ function entityKind(kind: string): EntitySnapshot['kind'] {
     kind === 'discipline' ||
     kind === 'rule' ||
     kind === 'series' ||
-    kind === 'series_outcome'
+    kind === 'series_outcome' ||
+    kind === 'schedule'
   )
     return kind;
   throw new Error('Unknown history entity');

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { scheduleEvent, scheduleSnapshot } from './schedule-schemas';
 import { Temporal } from 'temporal-polyfill';
 
 const plainDate = z.string().refine((value) => {
@@ -231,6 +232,8 @@ export const backupDataSchema = z
     rule_versions: z.array(ruleVersion).default([]),
     series: z.array(backupSeries).optional(),
     outcomes: z.array(backupOutcome).optional(),
+    schedule_events: z.array(scheduleEvent).optional(),
+    schedule_snapshots: z.array(scheduleSnapshot).optional(),
     revision: z.number().int().nonnegative(),
   })
   .strict()
