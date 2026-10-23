@@ -77,7 +77,7 @@ function TaskRisk({
       <span className="risk-icon" aria-hidden="true">
         !
       </span>
-      {riskTitle && <strong>{riskTitle}: </strong>}
+      {riskTitle && <strong>{riskTitle}</strong>}
       {risk}
     </p>
   );

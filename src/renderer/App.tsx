@@ -6,6 +6,7 @@ import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
+import { useSidebarVisibility } from './use-sidebar-visibility';
 import { ScreenContent } from './screen-content';
 import type { ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
@@ -21,6 +22,8 @@ import { useQuickAddShortcut } from './use-quick-add-shortcut';
 import { HistoryPanel } from './components/history-panel';
 import type { HistoryState } from './use-history';
 import { useHistory } from './use-history';
+import { RepeatSchedule } from './screens/repeat-schedule';
+import { createSeries } from './create-series';
 
 function localDateLabel(date: TemporalTypes.PlainDate): string {
   return `Сегодня, ${date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}`;
@@ -189,6 +192,7 @@ function MainContent({
 }
 
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
+  const sidebar = useSidebarVisibility();
   const { state, view, views } = model;
   const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {
@@ -209,13 +213,15 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onMotionChoiceChange: model.setMotionChoice,
     onWorkdaysChange: (workdays) => state.updateWorkdays(workdays),
     saveError: state.settingsError,
-    onViewChange: model.setView,
+    backup: window.flowpilot.backup,
+    onSnapshotRefresh: () => state.refresh(),
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
   };
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>
       <Sidebar
+        hidden={sidebar.hidden}
         view={view}
         availableCount={views.available.length}
         theme={model.theme}
@@ -225,6 +231,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
       <div className="workspace">
         <TopBar
           view={view}
+          sidebarHidden={sidebar.hidden}
+          onToggleSidebar={sidebar.toggle}
           saved={state.isSaved}
           undoDisabled={
             !model.history.entries.some(
@@ -245,6 +253,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
         />
         <main className="main-content" aria-busy={state.isLoading}>
           <MainContent model={model} screenProps={screenProps} />
+          <RepeatSchedule state={state} clock={model.clock} view={view} />
         </main>
         {model.history.notice && (
           <p className="history-notice" role="status">
@@ -267,6 +276,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
           model.setQuickAddOpen(false);
         }}
         onSubmit={model.addTask}
+        today={views.today}
+        onCreateSeries={(series) => createSeries(state, series)}
         addButtonRef={model.addButtonRef}
       />
       <HistoryPanel

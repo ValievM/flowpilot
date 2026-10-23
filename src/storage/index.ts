@@ -7,6 +7,8 @@ export {
 export type {
   BackupProblem,
   BackupResult,
+  ExportInfo,
+  ExportResult,
   RestoredProfileBackup,
   Verification,
 } from './backup';
@@ -24,4 +26,5 @@ export type {
   Snapshot,
   StorageCommand,
   UndoResult,
+  StoredRule,
 } from './types';

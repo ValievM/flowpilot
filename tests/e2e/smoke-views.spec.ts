@@ -54,6 +54,26 @@ test('shows a saved task and keyboard accessible navigation', async () => {
     page.getByRole('heading', { name: 'Задача из сохранённого снимка' }),
   ).toBeVisible();
 });
+test('follows the visual Today navigation order with Tab', async () => {
+  const navigation = page.getByRole('navigation', { name: 'Представления' });
+  await navigation.getByRole('button', { name: 'Сегодня' }).focus();
+  for (const name of ['Сейчас', 'Доска', 'Все задачи']) {
+    await page.keyboard.press('Tab');
+    await expect(navigation.getByRole('button', { name })).toBeFocused();
+  }
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Настройки' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: /Тема:/ })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Скрыть боковую панель' }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'История' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Задача' })).toBeFocused();
+});
 
 test('shows neutral unknown and danger risk colors on Board and All in Electron', async () => {
   const created = await page.evaluate(
@@ -117,7 +137,9 @@ test('shows neutral unknown and danger risk colors on Board and All in Electron'
       unknown: await unknown.evaluate(
         (element) => getComputedStyle(element).color,
       ),
-      tight: await tight.evaluate((element) => getComputedStyle(element).color),
+      tight: await tight
+        .locator('strong')
+        .evaluate((element) => getComputedStyle(element).color),
       expected: await page.evaluate(() => {
         const measure = (token: string): string => {
           const probe = document.createElement('span');

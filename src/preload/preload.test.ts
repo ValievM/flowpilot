@@ -35,10 +35,21 @@ describe('preload bridge', () => {
       'appearance',
       'attachments',
       'backup',
+      'catalog',
       'commands',
       'history',
+      'rules',
       'settings',
       'snapshot',
+    ]);
+    expect(Object.keys(api.catalog).sort()).toEqual(['list']);
+    expect(Object.keys(api.rules).sort()).toEqual([
+      'activate',
+      'bind',
+      'deactivate',
+      'exportFile',
+      'importFile',
+      'list',
     ]);
   });
 

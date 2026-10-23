@@ -15,7 +15,14 @@ export function createFakeHistoryFileApi(
       remove: () => Promise.resolve({ ok: true, value: current() }),
     },
     backup: {
-      export: () => Promise.resolve({ ok: true, value: null }),
+      export: () =>
+        Promise.resolve({
+          ok: true,
+          value: {
+            folderPath: '/tmp/FlowPilot-export-2026-10-05',
+            exportedAt: '2026-10-05T12:00:00Z',
+          },
+        }),
       verify: () => Promise.resolve({ ok: false, error: 'Cancelled' }),
       restore: () => Promise.resolve({ ok: true, value: current() }),
     },

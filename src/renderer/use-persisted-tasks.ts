@@ -1,11 +1,15 @@
+import { toWireCommands } from './wire-commands';
 import React from 'react';
-import type { Task } from '../domain';
+import type { Outcome, Series, Task } from '../domain';
+import { parsedSeries } from './parse-ipc-repeats';
 import { parsedTasks } from './parse-ipc-tasks';
 import type { CommandsApplyRequest, IpcSnapshot } from '../shared/contracts';
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 
 export interface PersistedState {
   readonly tasks: readonly Task[];
+  readonly series: readonly Series[];
+  readonly outcomes: readonly Outcome[];
   readonly columns: IpcSnapshot['columns'];
   readonly revision: number;
   readonly workdays: ReadonlySet<number>;
@@ -99,7 +103,7 @@ async function applyAfterStale(
   fresh: IpcSnapshot,
 ): Promise<IpcSnapshot> {
   const retry = await api.commands.apply({
-    commands,
+    commands: toWireCommands(commands),
     expectedRevision: fresh.revision,
   });
   if (!retry.ok) throw new Error('retry');
@@ -123,7 +127,7 @@ function useCommandApply(
       controls.setSaved(false);
       try {
         const result = await api.commands.apply({
-          commands,
+          commands: toWireCommands(commands),
           expectedRevision: snapshot.revision,
         });
         if (!result.ok && result.error !== 'StaleRevision') {
@@ -167,7 +171,7 @@ function useTaskCardApply(
       controls.setSaved(false);
       try {
         const result = await api.commands.apply({
-          commands,
+          commands: toWireCommands(commands),
           expectedRevision: snapshot.revision,
         });
         if (!result.ok && result.error === 'StaleRevision') {
@@ -236,7 +240,7 @@ export function usePersistedTasks(
   React.useEffect(() => {
     void refresh();
   }, [refresh]);
-  const parsed = parsedTasks(snapshot);
+  const parsed = { ...parsedTasks(snapshot), ...parsedSeries(snapshot) };
   return {
     ...parsed,
     loadError,

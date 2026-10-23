@@ -72,7 +72,7 @@ function setup(): { root: string; profile: string; repository: Repository } {
 function exportPackage(root: string, profile: string): string {
   const result = exportTo(root, profile, clock);
   if (!result.ok) throw new Error(result.error);
-  return result.value;
+  return result.value.folderPath;
 }
 
 afterEach(() => {

@@ -90,6 +90,28 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('applies catalog commands through the public commands channel', () => {
+    const repository = openRepository();
+    expect(
+      applyCommands(
+        {
+          commands: [
+            {
+              kind: 'taskType.create',
+              taskType: { id: 'study', name: 'Учёба' },
+            },
+          ],
+          expectedRevision: 0,
+        },
+        { repository },
+      ),
+    ).toMatchObject({ ok: true });
+    expect(repository.load().taskTypes).toEqual([
+      { id: 'study', name: 'Учёба' },
+    ]);
+    repository.close();
+  });
+
   it('rejects unexpected command fields without touching storage', () => {
     const repository = openRepository();
     expect(
@@ -288,6 +310,10 @@ describe('IPC handlers', () => {
       { handle: (channel) => channels.push(channel) },
       {
         repository,
+        ruleDialogs: {
+          openRulesFile: () => Promise.resolve(undefined),
+          saveRulesFile: () => Promise.resolve(undefined),
+        },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
@@ -317,6 +343,13 @@ describe('IPC handlers', () => {
       'appearance.set-theme',
       'snapshot.load',
       'commands.apply',
+      'catalog.list',
+      'rules.list',
+      'rules.importFile',
+      'rules.exportFile',
+      'rules.activate',
+      'rules.deactivate',
+      'rules.bind',
       'settings.get',
       'settings.set',
       'app.info',
@@ -396,6 +429,10 @@ describe('IPC handlers', () => {
       },
       {
         repository,
+        ruleDialogs: {
+          openRulesFile: () => Promise.resolve(undefined),
+          saveRulesFile: () => Promise.resolve(undefined),
+        },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',

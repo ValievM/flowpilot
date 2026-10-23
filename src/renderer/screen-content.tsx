@@ -7,7 +7,8 @@ import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
 import type { MotionChoice } from './use-reduced-motion';
-import type { ThemeChoice } from '../shared/contracts';
+import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
+import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
 export interface ScreenProps {
   readonly view: View;
@@ -27,7 +28,11 @@ export interface ScreenProps {
     workdays: ReadonlySet<number>,
   ) => Promise<boolean>;
   readonly saveError: string | undefined;
-  readonly onViewChange: (view: View) => void;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
+  readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
@@ -43,7 +48,6 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         workdays={props.workdays}
         today={props.today}
         todayLabel={props.todayLabel}
-        onViewChange={props.onViewChange}
         onOpenTask={props.onOpenTask}
         onStart={props.onStart}
       />
@@ -77,12 +81,14 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
     <SettingsScreen
       theme={props.theme}
       onThemeChange={props.onThemeChange}
-      workdays={props.workdays}
-      onWorkdaysChange={props.onWorkdaysChange}
       motionChoice={props.motionChoice}
       onMotionChoiceChange={props.onMotionChoiceChange}
+      workdays={props.workdays}
+      onWorkdaysChange={props.onWorkdaysChange}
       loading={props.loading}
       saveError={props.saveError}
+      backup={props.backup}
+      onSnapshotRefresh={props.onSnapshotRefresh}
     />
   );
 }

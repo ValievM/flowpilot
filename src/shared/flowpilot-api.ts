@@ -12,6 +12,7 @@ import type {
   AttachmentRemoveRequest,
   BackupVerifyResult,
   CommandsApplyRequest,
+  ExportInfo,
   IpcHistoryEntry,
   IpcSnapshot,
   SettingsSetRequest,
@@ -19,6 +20,7 @@ import type {
   ThemeChoiceRequest,
 } from './contracts';
 import type { Result } from './ipc-result';
+import type { CatalogApi, RulesApi } from './rule-contracts';
 
 export type FlowPilotApi = {
   appearance: {
@@ -32,6 +34,8 @@ export type FlowPilotApi = {
   commands: {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
   };
+  catalog: CatalogApi;
+  rules: RulesApi;
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;
     set(request: SettingsSetRequest): Promise<Result<IpcSnapshot>>;
@@ -49,7 +53,7 @@ export type FlowPilotApi = {
     remove(request: AttachmentRemoveRequest): Promise<Result<IpcSnapshot>>;
   };
   backup: {
-    export(): Promise<Result<null>>;
+    export(): Promise<Result<ExportInfo>>;
     verify(): Promise<BackupVerifyResult>;
     restore(packageToken: string): Promise<Result<IpcSnapshot>>;
   };

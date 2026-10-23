@@ -3,7 +3,6 @@ import { Temporal } from 'temporal-polyfill';
 import { deadlineRisk } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
-import type { View } from '../types';
 import { taskCountPhrase } from '../today-copy';
 
 interface TodayScreenProps {
@@ -14,7 +13,6 @@ interface TodayScreenProps {
   readonly workdays: ReadonlySet<number>;
   readonly today: Temporal.PlainDate;
   readonly todayLabel: string;
-  readonly onViewChange: (view: View) => void;
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
 }
@@ -84,7 +82,7 @@ function TaskRow({
             <span className="risk-icon" aria-hidden="true">
               {isRisk ? '!' : 'i'}
             </span>
-            {riskTitle && <strong>{riskTitle}: </strong>}
+            {riskTitle && <strong>{riskTitle}</strong>}
             {riskText}
           </p>
         )}
@@ -119,10 +117,8 @@ function EmptyDay({
 
 function TodayHeading({
   todayLabel,
-  onViewChange,
 }: {
   readonly todayLabel: string;
-  readonly onViewChange: (view: View) => void;
 }): React.JSX.Element {
   return (
     <div className="page-heading">
@@ -132,35 +128,6 @@ function TodayHeading({
         <p className="page-subtitle">
           Начни с доступного шага. Остальное — в своём порядке.
         </p>
-      </div>
-      <div className="view-tabs" role="group" aria-label="Режим просмотра">
-        <button
-          type="button"
-          aria-pressed="true"
-          onClick={() => {
-            onViewChange('today');
-          }}
-        >
-          Сегодня
-        </button>
-        <button
-          type="button"
-          aria-pressed="false"
-          onClick={() => {
-            onViewChange('board');
-          }}
-        >
-          Доска
-        </button>
-        <button
-          type="button"
-          aria-pressed="false"
-          onClick={() => {
-            onViewChange('now');
-          }}
-        >
-          Фокус
-        </button>
       </div>
     </div>
   );
@@ -174,7 +141,6 @@ export function TodayScreen({
   workdays,
   today,
   todayLabel,
-  onViewChange,
   onStart,
   onOpenTask,
 }: TodayScreenProps): React.JSX.Element {
@@ -186,13 +152,13 @@ export function TodayScreen({
   if (!nextTask)
     return (
       <>
-        <TodayHeading todayLabel={todayLabel} onViewChange={onViewChange} />
+        <TodayHeading todayLabel={todayLabel} />
         <EmptyDay blocked={hasTasks} hasUndatedTasks={hasUndatedTasks} />
       </>
     );
   return (
     <>
-      <TodayHeading todayLabel={todayLabel} onViewChange={onViewChange} />
+      <TodayHeading todayLabel={todayLabel} />
       <div className="today-layout">
         <section className="queue" aria-labelledby="queue-heading">
           <div className="queue-heading">

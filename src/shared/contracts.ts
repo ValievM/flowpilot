@@ -6,6 +6,9 @@ import {
 } from './command-schema';
 import type { Series, Task, TaskComment, TaskStatus } from '../domain';
 import type { HistoryEntry, Snapshot } from '../storage';
+
+export * from './rule-contracts';
+export type { ExportInfo } from '../storage';
 import type {
   AiCommand,
   AiTaskChanges,
@@ -95,10 +98,16 @@ export type IpcSnapshot = Omit<
   readonly series: readonly SerializedSeries[];
   readonly outcomes: readonly SerializedOutcome[];
 };
-
 export const ipcChannels = {
   snapshotLoad: 'snapshot.load',
   commandsApply: 'commands.apply',
+  catalogList: 'catalog.list',
+  rulesList: 'rules.list',
+  rulesImportFile: 'rules.importFile',
+  rulesExportFile: 'rules.exportFile',
+  rulesActivate: 'rules.activate',
+  rulesDeactivate: 'rules.deactivate',
+  rulesBind: 'rules.bind',
   settingsGet: 'settings.get',
   settingsSet: 'settings.set',
   appInfo: 'app.info',
