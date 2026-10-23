@@ -4,6 +4,8 @@ export { verifyPackage } from './package-verify';
 export type {
   BackupProblem,
   BackupResult,
+  ExportInfo,
+  ExportResult,
   RestoredProfileBackup,
   Verification,
 } from './backup-types';

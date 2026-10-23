@@ -283,6 +283,115 @@
   margin-top: var(--space-12);
 }
 
+.repeat-create-fields {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.repeat-create-fields fieldset,
+.repeat-editor fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-12);
+  padding: var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+}
+
+.repeat-create-fields fieldset label,
+.repeat-editor fieldset label,
+.repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.quick-dialog input[type='checkbox'],
+.repeat-create-fields input[type='checkbox'],
+.repeat-editor input[type='checkbox'] {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.repeat-panel,
+.missed-repeats {
+  display: grid;
+  gap: var(--space-12);
+  margin-top: var(--space-24);
+  padding: var(--space-16);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r3);
+  background: var(--panel);
+}
+
+.repeat-panel h2,
+.missed-repeats h2,
+.repeat-editor h3 {
+  margin: 0;
+  font-size: var(--type-section);
+}
+
+.repeat-instances,
+.missed-repeats ul {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repeat-instance,
+.missed-repeat-group,
+.missed-repeat-date {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--r2);
+}
+
+.repeat-instance-heading,
+.repeat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.repeat-title-button,
+.missed-repeat-toggle {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: var(--type-weight-strong);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.repeat-state,
+.repeat-date {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.missed-repeat-date {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+}
+
+.repeat-reschedule,
+.repeat-editor {
+  display: grid;
+  gap: var(--space-8);
+}
+
 .all-tasks-screen .task-copy h2 {
   margin: 0;
   font-size: var(--type-task);

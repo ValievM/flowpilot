@@ -668,6 +668,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={close}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -684,6 +686,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={close}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -699,6 +703,8 @@ describe('persisted today and now screens', () => {
         open
         onClose={vi.fn()}
         onSubmit={onSubmit}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        onCreateSeries={vi.fn().mockResolvedValue(true)}
         addButtonRef={addButtonRef}
       />,
     );
@@ -709,6 +715,80 @@ describe('persisted today and now screens', () => {
       'Не удалось сохранить задачу',
     );
     expect(field).not.toHaveAttribute('aria-invalid', 'true');
+  });
+  it('creates a weekday series from quick add and defaults its start date to today', async () => {
+    const onCreateSeries = vi.fn().mockResolvedValue(true);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        onCreateSeries={onCreateSeries}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        addButtonRef={createRef<HTMLButtonElement>()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Пробежка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    for (const day of ['Понедельник', 'Среда', 'Пятница'])
+      fireEvent.click(screen.getByRole('checkbox', { name: day }));
+    fireEvent.click(screen.getByRole('button', { name: 'Создать серию' }));
+    await waitFor(() => {
+      expect(onCreateSeries).toHaveBeenCalledWith({
+        title: 'Пробежка',
+        weekdays: [1, 3, 5],
+        startsOn: Temporal.PlainDate.from('2026-10-05'),
+      });
+    });
+  });
+  it('does not allow a repeat series without a selected weekday', () => {
+    const onCreateSeries = vi.fn().mockResolvedValue(true);
+    render(
+      <QuickAddDialog
+        open
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        onCreateSeries={onCreateSeries}
+        today={Temporal.PlainDate.from('2026-10-05')}
+        addButtonRef={createRef<HTMLButtonElement>()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Пробежка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    expect(
+      screen.getByRole('button', { name: 'Создать серию' }),
+    ).toBeDisabled();
+    expect(onCreateSeries).not.toHaveBeenCalled();
+  });
+  it('saves quick-add repeats through the application command API', async () => {
+    const app = renderApp();
+    await screen.findByRole('heading', { name: 'Сегодня пока пусто' });
+    fireEvent.click(screen.getByRole('button', { name: 'Задача' }));
+    fireEvent.change(screen.getByLabelText('Что нужно сделать?'), {
+      target: { value: 'Утренняя тренировка' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Повторять' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Понедельник' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Создать серию' }));
+    await screen.findByRole('heading', { name: 'Повторы сегодня' });
+    expect(app.calls[0]?.commands[0]).toMatchObject({
+      kind: 'series.create',
+      series: {
+        title: 'Утренняя тренировка',
+        weekdays: [1],
+        startsOn: Temporal.PlainDate.from('2026-10-05'),
+      },
+    });
+    expect(app.snapshot().series).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Выполнено' }));
+    await waitFor(() => {
+      expect(app.snapshot().outcomes[0]?.kind).toBe('done');
+    });
+    expect(app.snapshot().series).toHaveLength(1);
   });
   it('shows a stale-retry load error without reporting a save failure', async () => {
     const fake = renderApp();

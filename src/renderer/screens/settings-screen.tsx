@@ -1,6 +1,11 @@
 import React from 'react';
+import type {
+  FlowPilotApi,
+  IpcSnapshot,
+  ThemeChoice,
+} from '../../shared/contracts';
+import { BackupRestorePanel } from '../components/backup-restore-panel';
 import { isThemeChoice } from '../theme/use-theme';
-import type { ThemeChoice } from '../../shared/contracts';
 import { isMotionChoice, type MotionChoice } from '../use-reduced-motion';
 
 const WEEKDAYS = [
@@ -24,6 +29,11 @@ interface SettingsScreenProps {
   readonly onMotionChoiceChange: (choice: MotionChoice) => void;
   readonly loading: boolean;
   readonly saveError: string | undefined;
+  readonly backup: Pick<
+    FlowPilotApi['backup'],
+    'export' | 'verify' | 'restore'
+  >;
+  readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
 }
 
 export function SettingsScreen({
@@ -35,6 +45,8 @@ export function SettingsScreen({
   onMotionChoiceChange,
   loading,
   saveError,
+  backup,
+  onSnapshotRefresh,
 }: SettingsScreenProps): React.JSX.Element {
   const [workdaysError, setWorkdaysError] = React.useState<string>();
   const [saving, setSaving] = React.useState(false);
@@ -126,6 +138,7 @@ export function SettingsScreen({
           </p>
         )}
       </section>
+      <BackupRestorePanel backup={backup} onRestored={onSnapshotRefresh} />
     </section>
   );
 }

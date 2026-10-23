@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'NotUndoable'
   | 'FileNotFound'
   | 'TooLarge'
+  | 'AlreadyExists'
   | 'NotReadable'
   | 'MissingFile'
   | 'PackageInvalid'

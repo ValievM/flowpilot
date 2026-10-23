@@ -21,6 +21,8 @@ import { useQuickAddShortcut } from './use-quick-add-shortcut';
 import { HistoryPanel } from './components/history-panel';
 import type { HistoryState } from './use-history';
 import { useHistory } from './use-history';
+import { RepeatSchedule } from './screens/repeat-schedule';
+import { createSeries } from './create-series';
 
 function localDateLabel(date: TemporalTypes.PlainDate): string {
   return `Сегодня, ${date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}`;
@@ -209,6 +211,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onMotionChoiceChange: model.setMotionChoice,
     onWorkdaysChange: (workdays) => state.updateWorkdays(workdays),
     saveError: state.settingsError,
+    backup: window.flowpilot.backup,
+    onSnapshotRefresh: () => state.refresh(),
     onViewChange: model.setView,
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
@@ -245,6 +249,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
         />
         <main className="main-content" aria-busy={state.isLoading}>
           <MainContent model={model} screenProps={screenProps} />
+          <RepeatSchedule state={state} clock={model.clock} view={view} />
         </main>
         {model.history.notice && (
           <p className="history-notice" role="status">
@@ -267,6 +272,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
           model.setQuickAddOpen(false);
         }}
         onSubmit={model.addTask}
+        today={views.today}
+        onCreateSeries={(series) => createSeries(state, series)}
         addButtonRef={model.addButtonRef}
       />
       <HistoryPanel
