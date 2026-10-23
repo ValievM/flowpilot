@@ -356,6 +356,7 @@ describe('IPC handlers', () => {
       'ai.run',
       'ai.cancel',
       'ai.prompt',
+      'ai.pending',
       'ai.reply',
       'ai.scenario',
       'history.list',

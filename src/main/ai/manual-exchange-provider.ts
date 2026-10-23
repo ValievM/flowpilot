@@ -43,6 +43,13 @@ export class ManualExchangeProvider implements AiProvider {
     return this.sessions.get(operationId)?.prompt;
   }
 
+  pending(): { operationId: string; prompt: string }[] {
+    return [...this.sessions].map(([operationId, { prompt }]) => ({
+      operationId,
+      prompt,
+    }));
+  }
+
   provideReply(operationId: string, text: string): boolean {
     const session = this.sessions.get(operationId);
     if (!session || session.signal.aborted) return false;

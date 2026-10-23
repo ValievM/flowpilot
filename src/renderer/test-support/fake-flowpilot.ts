@@ -176,6 +176,7 @@ function fakeApiFor(
       run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
       cancel: () => Promise.resolve({ ok: false, error: 'ValidationFailed' }),
       prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),
+      pending: () => Promise.resolve({ ok: true, value: [] }),
       reply: () => Promise.resolve({ ok: false, error: 'NotFound' }),
     },
     app: createFakeAppApi(clock),

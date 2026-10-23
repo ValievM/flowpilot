@@ -151,6 +151,10 @@ export class AiUseCases {
     return this.dependencies.application.confirmProposal(proposalId);
   }
 
+  reject(proposalId: string): ProposalScenarioResult {
+    return this.dependencies.application.rejectProposal(proposalId);
+  }
+
   private state(): ScenarioRequestState {
     const snapshot = this.dependencies.repository.load();
     return {

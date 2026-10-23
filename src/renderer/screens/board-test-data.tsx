@@ -138,6 +138,7 @@ export function createBoardApi(initial = snapshot()): MockBoardApi {
         }),
       ),
       cancel: vi.fn(() => Promise.resolve({ ok: true as const, value: null })),
+      pending: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
       prompt: vi.fn(() =>
         Promise.resolve({
           ok: false as const,

@@ -62,6 +62,7 @@ export type FlowPilotApi = {
     scenario(request: AiScenarioRequest): Promise<AiScenarioResult>;
     cancel(request: { operationId: string }): Promise<AiCancelResult>;
     prompt(request: { operationId: string }): Promise<Result<string>>;
+    pending(): Promise<Result<{ operationId: string; prompt: string }[]>>;
     reply(request: {
       operationId: string;
       text: string;

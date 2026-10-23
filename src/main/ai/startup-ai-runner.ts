@@ -26,18 +26,26 @@ export function createStartupAiRunner(
 
 function testReplyStep(encodedReply: string | undefined): FakeAiStep[] {
   if (!encodedReply) return [];
+  let reply: unknown;
   try {
-    const parsed = proposalSchema.safeParse(JSON.parse(encodedReply));
-    if (!parsed.success) return [];
-    const commands: AiCommand[] = [];
-    for (const candidate of parsed.data.commands) {
-      const command = aiCommandSchema.safeParse(candidate);
-      if (!command.success) return [];
-      commands.push(command.data);
-    }
-    const proposal: Proposal = { ...parsed.data, commands };
-    return [{ scenario: 'success', proposal }];
+    reply = JSON.parse(encodedReply);
   } catch {
     return [];
   }
+  const proposal = scriptedProposal(reply);
+  return proposal
+    ? [{ scenario: 'success', proposal }]
+    : [{ scenario: 'success', reply }];
+}
+
+function scriptedProposal(reply: unknown): Proposal | undefined {
+  const parsed = proposalSchema.safeParse(reply);
+  if (!parsed.success) return undefined;
+  const commands: AiCommand[] = [];
+  for (const candidate of parsed.data.commands) {
+    const command = aiCommandSchema.safeParse(candidate);
+    if (!command.success) return undefined;
+    commands.push(command.data);
+  }
+  return { ...parsed.data, commands };
 }
