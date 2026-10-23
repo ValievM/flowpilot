@@ -79,7 +79,8 @@
 
 .task-card-section h2 {
   margin: 0;
-  font-size: var(--type-section);
+  font-size: var(--type-secondary);
+  font-weight: 600;
 }
 
 .task-attachments-heading {
