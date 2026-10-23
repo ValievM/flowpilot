@@ -1,4 +1,8 @@
-import { createFileDialogs, createRuleDialogs } from './dialogs';
+import {
+  createFileDialogs,
+  createRuleDialogs,
+  createScheduleDialogs,
+} from './dialogs';
 import {
   app,
   BrowserWindow,
@@ -66,6 +70,7 @@ if (!app.requestSingleInstanceLock()) {
       registerIpcHandlers(ipcMain, {
         repository,
         ruleDialogs: createRuleDialogs(dialog),
+        scheduleDialogs: createScheduleDialogs(dialog),
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),

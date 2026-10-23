@@ -318,6 +318,52 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('lets the renderer manage manual classes, but never write imported events directly', () => {
+    const repository = openRepository();
+    const manual = {
+      id: 'manual-1',
+      title: 'Тренировка',
+      timeZone: 'Europe/Moscow',
+      weekdays: [1, 3],
+      startTime: '18:00',
+      endTime: '19:00',
+      fromDate: '2026-10-05',
+      throughDate: '2026-12-31',
+    };
+    const added = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'schedule.manual.add',
+            event: manual,
+            at: '2026-10-05T12:00:00Z',
+          },
+        ],
+        expectedRevision: 0,
+      },
+      { repository },
+    );
+    expect(added.ok).toBe(true);
+    expect(repository.schedule.snapshots()[0]?.events).toHaveLength(1);
+
+    const forged = applyCommands(
+      {
+        commands: [
+          {
+            kind: 'schedule.import',
+            source: 'ics',
+            events: [],
+            fetchedAt: '2026-10-05T12:00:00Z',
+          },
+        ],
+        expectedRevision: repository.load().revision,
+      },
+      { repository },
+    );
+    expect(forged).toEqual({ ok: false, error: 'ValidationFailed' });
+    repository.close();
+  });
+
   it('rejects duplicate and out-of-range workdays through both IPC channels', () => {
     const repository = openRepository();
     for (const value of [[], [1, 1], [8]]) {
@@ -407,6 +453,7 @@ describe('IPC handlers', () => {
           openRulesFile: () => Promise.resolve(undefined),
           saveRulesFile: () => Promise.resolve(undefined),
         },
+        scheduleDialogs: { openIcsFile: () => Promise.resolve(undefined) },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
@@ -452,6 +499,9 @@ describe('IPC handlers', () => {
       'ai.pending',
       'ai.reply',
       'ai.scenario',
+      'schedule.list',
+      'schedule.importFile',
+      'schedule.confirmImport',
       'history.list',
       'history.undo',
       'attachments.add',
@@ -527,6 +577,7 @@ describe('IPC handlers', () => {
           openRulesFile: () => Promise.resolve(undefined),
           saveRulesFile: () => Promise.resolve(undefined),
         },
+        scheduleDialogs: { openIcsFile: () => Promise.resolve(undefined) },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',

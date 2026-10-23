@@ -23,6 +23,20 @@ export function createRuleDialogs(dialog: DialogApi): {
   };
 }
 
+export function createScheduleDialogs(dialog: DialogApi): {
+  openIcsFile(): Promise<string | undefined>;
+} {
+  return {
+    openIcsFile: async () => {
+      const choice = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'Календарь', extensions: ['ics'] }],
+      });
+      return choice.canceled ? undefined : choice.filePaths[0];
+    },
+  };
+}
+
 export function createFileDialogs(dialog: DialogApi): {
   pickFile(): Promise<string | undefined>;
   pickFolder(): Promise<string | undefined>;
