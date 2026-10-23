@@ -117,3 +117,14 @@ export const subtaskMoveSchema = z
     position: z.number().int().min(0),
   })
   .strict();
+
+/** What the interface itself may do with the catalog: classify, create, rename, delete. */
+export const catalogCommandSchemas = [
+  taskClassifySchema,
+  taskTypeCreateSchema,
+  taskTypeRenameSchema,
+  taskTypeDeleteSchema,
+  disciplineCreateSchema,
+  disciplineRenameSchema,
+  disciplineDeleteSchema,
+] as const;

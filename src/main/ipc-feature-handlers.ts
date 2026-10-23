@@ -1,6 +1,7 @@
 import { type IpcMain } from 'electron';
+import { Temporal } from 'temporal-polyfill';
 import { ipcChannels } from '../shared/contracts';
-import type { Repository } from '../storage';
+import type { Clock, Repository } from '../storage';
 import type { AiRunner } from './ai/ai-runner';
 import {
   cancelAiRequest,
@@ -23,10 +24,19 @@ import {
   type RuleFileDependencies,
 } from './rules-handlers';
 import { getAppInfo, getSettings, setSetting } from './handlers';
+import {
+  confirmIcsImport,
+  createPendingImports,
+  listSchedule,
+  previewIcsFile,
+  type ScheduleDependencies,
+} from './schedule-handlers';
 
 type FeatureDependencies = {
   readonly repository: Repository;
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
+  readonly scheduleDialogs: ScheduleDependencies['dialogs'];
+  readonly clock: Clock;
   readonly appInfo: {
     getName(): string;
     getVersion(): string;
@@ -76,6 +86,7 @@ export function registerFeatureIpcHandlers(
   ipc.handle(ipcChannels.aiScenario, (_event, request: unknown) =>
     runAiScenario(request, deps.aiUseCases),
   );
+  registerScheduleHandlers(ipc, deps);
 }
 function registerRulesHandlers(
   ipc: Pick<IpcMain, 'handle'>,
@@ -101,5 +112,29 @@ function registerRulesHandlers(
   );
   ipc.handle(ipcChannels.rulesBind, (_event, request: unknown) =>
     bindRule(request, deps),
+  );
+}
+
+function registerScheduleHandlers(
+  ipc: Pick<IpcMain, 'handle'>,
+  deps: FeatureDependencies,
+): void {
+  const scheduleDeps: ScheduleDependencies = {
+    get repository() {
+      return deps.repository;
+    },
+    dialogs: deps.scheduleDialogs,
+    clock: deps.clock,
+    timeZone: Temporal.Now.timeZoneId(),
+    pending: createPendingImports(),
+  };
+  ipc.handle(ipcChannels.scheduleList, (_event, request: unknown) =>
+    listSchedule(request, scheduleDeps),
+  );
+  ipc.handle(ipcChannels.scheduleImportFile, (_event, request: unknown) =>
+    previewIcsFile(request, scheduleDeps),
+  );
+  ipc.handle(ipcChannels.scheduleConfirmImport, (_event, request: unknown) =>
+    confirmIcsImport(request, scheduleDeps),
   );
 }

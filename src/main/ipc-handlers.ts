@@ -12,10 +12,12 @@ import {
 import type { AiUseCases } from './ai/usecases';
 import { registerFeatureIpcHandlers } from './ipc-feature-handlers';
 import type { RuleFileDependencies } from './rules-handlers';
+import type { ScheduleDependencies } from './schedule-handlers';
 
 export type RegistrationDependencies = {
   repository: Repository;
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
+  readonly scheduleDialogs: ScheduleDependencies['dialogs'];
   readonly appInfo: {
     getName(): string;
     getVersion(): string;

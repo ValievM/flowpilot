@@ -5,7 +5,11 @@ import type {
 } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { Result } from '../../shared/ipc-result';
-import { fakeCatalogApi, fakeRulesApi } from './fake-catalog-rules';
+import {
+  fakeCatalogApi,
+  fakeRulesApi,
+  fakeScheduleApi,
+} from './fake-catalog-rules';
 import {
   createFakeAppApi,
   createFakeHistoryFileApi,
@@ -158,6 +162,7 @@ function fakeApiFor(
     snapshot: { load: () => apiSnapshot(state) },
     commands: { apply: (request) => apiApply(state, request) },
     catalog: fakeCatalogApi,
+    schedule: fakeScheduleApi,
     rules: fakeRulesApi,
     settings: {
       get: () => Promise.resolve({ ok: true, value: state.current.settings }),

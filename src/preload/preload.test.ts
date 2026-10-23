@@ -39,10 +39,16 @@ describe('preload bridge', () => {
       'commands',
       'history',
       'rules',
+      'schedule',
       'settings',
       'snapshot',
     ]);
     expect(Object.keys(api.catalog).sort()).toEqual(['list']);
+    expect(Object.keys(api.schedule).sort()).toEqual([
+      'confirmImport',
+      'importFile',
+      'list',
+    ]);
     expect(Object.keys(api.rules).sort()).toEqual([
       'activate',
       'bind',

@@ -1,3 +1,4 @@
+import type { ScheduleApi } from './schedule-contracts';
 import type {
   AiCancelResult,
   AiIpcRequest,
@@ -35,6 +36,7 @@ export type FlowPilotApi = {
     apply(request: CommandsApplyRequest): Promise<Result<IpcSnapshot>>;
   };
   catalog: CatalogApi;
+  schedule: ScheduleApi;
   rules: RulesApi;
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;

@@ -1,4 +1,9 @@
 import type { FlowPilotApi } from '../shared/flowpilot-api';
+import type {
+  SchedulePreview,
+  ScheduleResult,
+  ScheduleSnapshots,
+} from '../shared/schedule-contracts';
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   ipcChannels,
@@ -58,6 +63,20 @@ const api: FlowPilotApi = Object.freeze({
     list: () =>
       ipcRenderer.invoke(ipcChannels.catalogList, {}) as Promise<
         IpcRuleResult<IpcCatalog>
+      >,
+  },
+  schedule: {
+    list: () =>
+      ipcRenderer.invoke(ipcChannels.scheduleList, {}) as Promise<
+        ScheduleResult<ScheduleSnapshots>
+      >,
+    importFile: () =>
+      ipcRenderer.invoke(ipcChannels.scheduleImportFile, {}) as Promise<
+        ScheduleResult<SchedulePreview>
+      >,
+    confirmImport: (request: { token: string }) =>
+      ipcRenderer.invoke(ipcChannels.scheduleConfirmImport, request) as Promise<
+        ScheduleResult<ScheduleSnapshots>
       >,
   },
   rules: {

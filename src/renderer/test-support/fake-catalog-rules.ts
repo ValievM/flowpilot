@@ -17,3 +17,11 @@ export const fakeRulesApi: FlowPilotApi['rules'] = {
   deactivate: () => Promise.resolve({ ok: false, error: { kind: 'NotFound' } }),
   bind: () => Promise.resolve({ ok: false, error: { kind: 'NotFound' } }),
 };
+
+export const fakeScheduleApi: FlowPilotApi['schedule'] = {
+  list: () => Promise.resolve({ ok: true, value: [] }),
+  importFile: () =>
+    Promise.resolve({ ok: false, error: { kind: 'Cancelled' } }),
+  confirmImport: () =>
+    Promise.resolve({ ok: false, error: { kind: 'NotFound' } }),
+};

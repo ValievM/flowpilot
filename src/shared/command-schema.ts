@@ -1,8 +1,10 @@
 import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
+import { scheduleManualCommandSchemas } from './schedule-command-schema';
 import {
   attachmentAddSchema,
   attachmentRemoveSchema,
+  catalogCommandSchemas,
 } from './storage-command-schemas';
 import {
   seriesCreateSchema,
@@ -300,11 +302,6 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   seriesStopSchema,
   seriesRecordOutcomeSchema,
   genericSettingCommandSchema,
-  taskClassifySchema,
-  taskTypeCreateSchema,
-  taskTypeRenameSchema,
-  taskTypeDeleteSchema,
-  disciplineCreateSchema,
-  disciplineRenameSchema,
-  disciplineDeleteSchema,
+  ...catalogCommandSchemas,
+  ...scheduleManualCommandSchemas,
 ]);

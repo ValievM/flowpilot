@@ -14,6 +14,26 @@ function catalogMocks() {
   };
 }
 
+function scheduleMocks() {
+  return {
+    schedule: {
+      list: vi.fn(() => Promise.resolve({ ok: true as const, value: [] })),
+      importFile: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'Cancelled' as const },
+        }),
+      ),
+      confirmImport: vi.fn(() =>
+        Promise.resolve({
+          ok: false as const,
+          error: { kind: 'NotFound' as const },
+        }),
+      ),
+    },
+  };
+}
+
 function ruleMocks() {
   return {
     rules: {
@@ -97,6 +117,7 @@ export function featureMocks(getCurrent: () => IpcSnapshot) {
   return {
     ...catalogMocks(),
     ...ruleMocks(),
+    ...scheduleMocks(),
     ...historyFileMocks(getCurrent),
   };
 }
