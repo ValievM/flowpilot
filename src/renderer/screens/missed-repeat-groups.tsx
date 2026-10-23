@@ -14,6 +14,7 @@ interface MissedGroupsProps {
   readonly outcomes: readonly Outcome[];
   readonly today: Temporal.PlainDate;
   readonly onOutcome: (seriesId: string, outcome: OutcomeInput) => void;
+  readonly onOpenEditor: (seriesId: string) => void;
 }
 
 export function MissedGroups({
@@ -21,6 +22,7 @@ export function MissedGroups({
   outcomes,
   today,
   onOutcome,
+  onOpenEditor,
 }: MissedGroupsProps): React.JSX.Element | null {
   const groups = skipGroups(series, outcomes, today);
   const [expanded, setExpanded] = React.useState<ReadonlySet<string>>(
@@ -51,6 +53,15 @@ export function MissedGroups({
                 }}
               >
                 {item.title} ×{group.count}
+              </button>
+              <button
+                className="button"
+                type="button"
+                onClick={() => {
+                  onOpenEditor(item.id);
+                }}
+              >
+                {`Настроить серию «${item.title}»`}
               </button>
               {isExpanded && (
                 <ul>

@@ -225,4 +225,29 @@ describe('repeat schedule UI', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Остановить серию' }));
     expect(onStop).toHaveBeenCalledWith('training', today);
   });
+
+  it('lets the series be stopped from the missed group after skipping its only available instance', () => {
+    const { onStop } = renderPanel({
+      series: [series({ startsOn: today })],
+      outcomes: [outcome('skipped', today)],
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Выполнено' }),
+    ).not.toBeInTheDocument();
+    const groups = screen.getByRole('region', { name: 'Пропуски' });
+    fireEvent.click(
+      within(groups).getByRole('button', {
+        name: 'Настроить серию «Тренировка»',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Остановить серию' }));
+    expect(onStop).toHaveBeenCalledWith('training', today);
+  });
+
+  it('does not offer a skipped instance in the now view', () => {
+    renderPanel({ outcomes: [outcome('skipped', today)], showNow: true });
+    expect(
+      screen.queryByRole('heading', { name: 'Повторы сейчас' }),
+    ).not.toBeInTheDocument();
+  });
 });

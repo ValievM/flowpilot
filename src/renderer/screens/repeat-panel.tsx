@@ -215,6 +215,7 @@ export function RepeatPanel(props: RepeatPanelProps): React.JSX.Element | null {
           outcomes={props.outcomes}
           today={props.today}
           onOutcome={props.onOutcome}
+          onOpenEditor={setEditingId}
         />
       )}
     </section>
