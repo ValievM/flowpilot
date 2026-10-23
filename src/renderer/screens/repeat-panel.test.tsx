@@ -250,4 +250,37 @@ describe('repeat schedule UI', () => {
       screen.queryByRole('heading', { name: 'Повторы сейчас' }),
     ).not.toBeInTheDocument();
   });
+  it('keeps a row short: the time is shown only when set, no filler words, no repeated date', () => {
+    const timed = series({ time: Temporal.PlainTime.from('18:00') });
+    const plain = series({ id: 'reading', title: 'Чтение' });
+    renderPanel({ series: [timed, plain] });
+    const rows = screen.getAllByRole('listitem');
+    const training = rows.find((row) => row.textContent.includes('Тренировка'));
+    const reading = rows.find((row) => row.textContent.includes('Чтение'));
+    expect(training).toHaveTextContent('18:00');
+    expect(reading).not.toHaveTextContent('Без времени');
+    expect(screen.queryByText('○ Запланировано')).not.toBeInTheDocument();
+    expect(screen.queryByText('5 октября')).not.toBeInTheDocument();
+  });
+
+  it('still names a finished instance so it is clear why the actions are gone', () => {
+    renderPanel({ outcomes: [outcome('done', today)] });
+    expect(screen.getByText(/Выполнено/)).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Пропустить' }),
+    ).not.toBeInTheDocument();
+  });
+  it('groups each reschedule label with its own field', () => {
+    renderPanel({ time: Temporal.PlainTime.from('18:00') });
+    fireEvent.click(screen.getByText('Перенести'));
+    for (const name of ['Новая дата', 'Новое время']) {
+      const field = screen.getByLabelText(name);
+      const group = field.closest('.repeat-field');
+      expect(group).not.toBeNull();
+      expect(group).toContainElement(screen.getByText(name));
+    }
+    expect(
+      screen.getByLabelText('Новая дата').closest('.repeat-field'),
+    ).not.toBe(screen.getByLabelText('Новое время').closest('.repeat-field'));
+  });
 });

@@ -247,8 +247,62 @@ h1 {
   color: var(--danger);
 }
 
+.main-content.is-focus {
+  width: min(100%, calc(var(--size-focus) + var(--space-32) * 2));
+}
+
+/* Now: the task is the heading, "Now" only names the screen. */
+.is-focus h1 {
+  font-size: var(--type-section);
+  color: var(--muted);
+}
+
+.now-screen {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.is-focus .simple-screen {
+  gap: var(--space-8);
+}
+
+.is-focus .simple-screen > p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .now-screen .next-step {
-  max-width: var(--panel-max);
+  position: static;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-12);
+}
+
+.now-screen .next-step h2 {
+  line-height: var(--type-line-display);
+}
+
+.now-note {
+  margin: 0;
+  font-size: var(--type-secondary);
+}
+
+.now-screen .start-button {
+  width: fit-content;
+  margin-top: var(--space-8);
+}
+
+.now-details {
+  color: var(--muted);
+  font-size: var(--type-secondary);
+}
+
+.now-details summary {
+  cursor: pointer;
+}
+
+.now-details-text {
+  margin: var(--space-8) 0 0;
 }
 
 .refresh-status {

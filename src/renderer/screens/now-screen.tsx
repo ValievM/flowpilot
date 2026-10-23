@@ -5,6 +5,9 @@ import type { Task } from '../../domain/task';
 import { deadlineRisk } from '../../domain/risk/risk';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 
+const SELECTION_RULE =
+  'Выбрано по ближайшему сроку, затем по порядку добавления.';
+
 interface NowScreenProps {
   readonly task: Task | undefined;
   readonly today: Temporal.PlainDate;
@@ -28,7 +31,6 @@ function NoAvailableTask({
   const isBlocked = hasTasks && !isLoading;
   return (
     <section className="simple-screen" aria-live="polite">
-      <p className="eyebrow">СЛЕДУЮЩЕЕ ДЕЙСТВИЕ</p>
       <h1>Сейчас</h1>
       <h2>
         {isLoading
@@ -50,20 +52,50 @@ function NoAvailableTask({
   );
 }
 
-function DeadlineWarning({
+function dayLabel(date: Temporal.PlainDate | undefined): string {
+  return (
+    date?.toLocaleString('ru-RU', { day: 'numeric', month: 'long' }) ??
+    'указанная дата'
+  );
+}
+
+/** One short line: what is wrong with the deadline. The calculation sits in the details. */
+function DeadlineBadge({
   risk,
 }: {
   readonly risk: DeadlineRiskResult;
 }): React.JSX.Element | null {
-  const message = deadlineMessage(risk);
+  if (!risk.ok) return null;
+  if (risk.risk === 'overdue')
+    return (
+      <p className="risk-label is-risk">
+        <strong>Просрочено · {dayLabel(risk.due)}</strong>
+      </p>
+    );
+  if (risk.risk === 'unknown')
+    return <p className="risk-label">Срок есть, объём неизвестен</p>;
   const title = deadlineTitle(risk);
-  if (!message) return null;
-  const isRisk = risk.ok && ['tight', 'short', 'overdue'].includes(risk.risk);
+  if (!title) return null;
   return (
-    <p className={`risk-label${isRisk ? ' is-risk' : ''}`}>
-      {title && <strong>{title}: </strong>}
-      {message}
+    <p className="risk-label is-risk">
+      <strong>{title}</strong>
     </p>
+  );
+}
+
+function WhyThisTask({
+  risk,
+}: {
+  readonly risk: DeadlineRiskResult;
+}): React.JSX.Element {
+  const hasEstimate = risk.ok && risk.risk !== 'overdue';
+  const message = hasEstimate ? deadlineMessage(risk) : undefined;
+  return (
+    <details className="now-details">
+      <summary>Почему эта задача</summary>
+      <p className="now-details-text">{SELECTION_RULE}</p>
+      {message && <p className="now-details-text">{message}</p>}
+    </details>
   );
 }
 
@@ -87,11 +119,10 @@ export function NowScreen({
     );
   const risk = deadlineRisk(task, today, workdays);
   return (
-    <section className="simple-screen now-screen">
-      <p className="eyebrow">СЛЕДУЮЩЕЕ ДЕЙСТВИЕ</p>
+    <section className="now-screen">
       <h1>Сейчас</h1>
       <article className="next-step" aria-labelledby="now-task-title">
-        {task.rolledOverFrom && <p>Перенесено со вчера.</p>}
+        {task.rolledOverFrom && <p className="now-note">Перенесено со вчера</p>}
         <h2 id="now-task-title">
           <button
             className="task-title-button"
@@ -104,8 +135,7 @@ export function NowScreen({
             {task.title}
           </button>
         </h2>
-        <p>Доступно сейчас: ближайший срок, затем порядок добавления.</p>
-        <DeadlineWarning risk={risk} />
+        <DeadlineBadge risk={risk} />
         <button
           className="button button-primary start-button"
           type="button"
@@ -115,6 +145,7 @@ export function NowScreen({
         >
           {task.status.kind === 'doing' ? 'Продолжить' : 'Взять в работу'}
         </button>
+        <WhyThisTask risk={risk} />
       </article>
     </section>
   );
