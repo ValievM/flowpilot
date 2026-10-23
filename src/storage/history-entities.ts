@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3';
 import { advanceColumnGeneration } from './column-generations';
 import {
+  restoreScheduleHistoryEntity,
+  snapshotScheduleHistoryEntity,
+} from './schedule-history';
+import {
   restoreSeriesHistoryEntity,
   snapshotSeriesHistoryEntity,
 } from './series-history';
@@ -9,6 +13,7 @@ export type EntityRef =
   | { kind: 'taskType'; id: string }
   | { kind: 'discipline'; id: string }
   | { kind: 'rule'; id: string }
+  | { kind: 'schedule'; id: string }
   | { kind: 'series' | 'series_outcome'; id: string };
 type Row = Record<string, string | number | null>;
 export type EntitySnapshot = EntityRef & {
@@ -30,6 +35,8 @@ export function snapshotEntity(
       version: row ? Number(row.version) : null,
     };
   }
+  if (ref.kind === 'schedule')
+    return snapshotScheduleHistoryEntity(database, ref);
   if (isSeriesEntity(ref)) return snapshotSeriesHistoryEntity(database, ref);
   if (ref.kind === 'column') return snapshotColumn(database, ref);
   if (isStoredEntity(ref)) return snapshotStorageEntity(database, ref);
@@ -126,6 +133,10 @@ export function restoreEntity(
         .prepare('INSERT INTO settings(key,value_json,version) VALUES(?,?,?)')
         .run(row.key, row.value_json, row.version);
     }
+    return;
+  }
+  if (snapshot.kind === 'schedule') {
+    restoreScheduleHistoryEntity(database, snapshot);
     return;
   }
   if (snapshot.kind === 'series' || snapshot.kind === 'series_outcome') {

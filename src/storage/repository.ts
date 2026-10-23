@@ -7,12 +7,13 @@ import {
 } from './attachments/attachment-store';
 import { readHistory } from './history-log';
 import { undoEntry } from './history-undo';
-import { commandSchema } from '../shared/command-schema';
 import { migrate } from './migrate';
 import { loadTask, type TaskRow } from './snapshot-tasks';
 import { applyCommands } from './write-commands';
 import { readRuleSnapshot } from './rules-snapshot';
 import { loadOutcomes, loadSeries } from './series-persistence';
+import { findInvalidCommand } from './command-validation';
+import { ScheduleStore } from './schedule-store';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
@@ -48,6 +49,7 @@ export class Repository {
   private readonly profilePath: string;
   private readonly database: Database.Database;
   private readonly attachments: AttachmentStore;
+  readonly schedule: ScheduleStore;
 
   constructor(
     path: string,
@@ -66,6 +68,7 @@ export class Repository {
         this.clock,
       );
       this.attachments.recoverInterruptedRemovals();
+      this.schedule = new ScheduleStore(this, this.database, this.clock);
     } catch (error) {
       this.database.close();
       throw error;
@@ -123,9 +126,7 @@ export class Repository {
         expectedRevision,
         options.rejectedCommands,
       );
-    const invalid = commands.find(
-      (command) => !commandSchema.safeParse(command).success,
-    );
+    const invalid = findInvalidCommand(commands);
     if (invalid)
       return {
         ok: false,

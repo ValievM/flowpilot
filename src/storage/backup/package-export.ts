@@ -261,11 +261,27 @@ function readProfile(path: string): BackupData {
       rule_versions: query('rule_versions'),
       series: query('series'),
       outcomes: query('series_outcomes'),
+      ...(hasTable(database, 'schedule_events')
+        ? { schedule_events: query('schedule_events') }
+        : {}),
+      ...(hasTable(database, 'schedule_snapshots')
+        ? { schedule_snapshots: query('schedule_snapshots') }
+        : {}),
       revision: metadata.revision,
     });
   } finally {
     database.close();
   }
+}
+
+function hasTable(database: Database.Database, table: string): boolean {
+  return (
+    database
+      .prepare(
+        'SELECT 1 AS present FROM sqlite_master WHERE type = ? AND name = ?',
+      )
+      .get('table', table) !== undefined
+  );
 }
 
 function hashFile(path: string): string {

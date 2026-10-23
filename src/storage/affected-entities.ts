@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type { StorageCommand } from './types';
 import type { EntityRef } from './history-entities';
+import { isScheduleCommand } from './schedule-commands';
 
 export function affectedEntities(
   database: Database.Database,
@@ -35,7 +36,15 @@ function affectedOtherEntities(
     return ruleEntities(database, command);
   if (command.kind === 'setting.set')
     return [{ kind: 'setting', id: command.key }];
-  return undefined;
+  return affectedScheduleEntities(command);
+}
+function affectedScheduleEntities(
+  command: StorageCommand,
+): EntityRef[] | undefined {
+  if (!isScheduleCommand(command)) return undefined;
+  return [
+    { kind: 'schedule', id: 'source' in command ? command.source : 'manual' },
+  ];
 }
 function affectedSeriesEntity(
   command: Extract<StorageCommand, { kind: `series.${string}` }>,

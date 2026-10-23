@@ -59,6 +59,10 @@ function populateDatabase(
       insertRows(db, 'rule_versions', data.rule_versions);
       insertRows(db, 'series', data.series ?? []);
       insertRows(db, 'series_outcomes', data.outcomes ?? []);
+      if (hasTable(db, 'schedule_events'))
+        insertRows(db, 'schedule_events', data.schedule_events ?? []);
+      if (hasTable(db, 'schedule_snapshots'))
+        insertRows(db, 'schedule_snapshots', data.schedule_snapshots ?? []);
       db.prepare('UPDATE metadata SET revision = ? WHERE singleton = 1').run(
         data.revision + 1,
       );
@@ -84,10 +88,21 @@ function clearProfileRows(db: Database.Database): void {
     'disciplines',
     'columns',
     'settings',
+    ...(hasTable(db, 'schedule_events') ? ['schedule_events'] : []),
+    ...(hasTable(db, 'schedule_snapshots') ? ['schedule_snapshots'] : []),
   ] as const)
     db.prepare(`DELETE FROM ${table}`).run();
 }
 
+function hasTable(db: Database.Database, table: string): boolean {
+  return (
+    db
+      .prepare(
+        'SELECT 1 AS present FROM sqlite_master WHERE type = ? AND name = ?',
+      )
+      .get('table', table) !== undefined
+  );
+}
 function addRestoreHistory(
   db: Database.Database,
   revision: number,
