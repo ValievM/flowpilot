@@ -1,3 +1,9 @@
+import type { Temporal } from 'temporal-polyfill';
+
+export function localDateLabel(date: Temporal.PlainDate): string {
+  return `Сегодня, ${date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}`;
+}
+
 export function taskCountPhrase(value: number): string {
   const remainder = value % 100;
   const lastDigit = value % 10;

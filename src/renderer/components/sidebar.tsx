@@ -20,6 +20,11 @@ const views: readonly { id: View; label: string; icon: string }[] = [
     label: 'Все задачи',
     icon: 'M5 6h14M5 12h14M5 18h14M2 6h.01M2 12h.01M2 18h.01',
   },
+  {
+    id: 'chat',
+    label: 'Чат с AI',
+    icon: 'M21 11a8 8 0 0 1-8 8H7l-4 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8ZM8 9h8M8 13h5',
+  },
 ];
 
 interface SidebarProps {

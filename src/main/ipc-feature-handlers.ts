@@ -5,6 +5,7 @@ import type { AiRunner } from './ai/ai-runner';
 import {
   cancelAiRequest,
   getManualPrompt,
+  listManualExchanges,
   runAiRequest,
   submitManualReply,
 } from './ai/ipc';
@@ -65,6 +66,9 @@ export function registerFeatureIpcHandlers(
   );
   ipc.handle(ipcChannels.aiPrompt, (_event, request: unknown) =>
     getManualPrompt(request, deps.manualProvider),
+  );
+  ipc.handle(ipcChannels.aiPending, () =>
+    listManualExchanges(deps.manualProvider),
   );
   ipc.handle(ipcChannels.aiReply, (_event, request: unknown) =>
     submitManualReply(request, deps.manualProvider),

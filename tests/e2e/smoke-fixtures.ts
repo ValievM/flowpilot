@@ -50,6 +50,7 @@ export async function launchSmokeApp(
   now: string,
   verifyDate = true,
   beforeWindowLoad?: (context: BrowserContext) => Promise<void>,
+  extraEnv: Readonly<Record<string, string>> = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     args: [
@@ -63,6 +64,7 @@ export async function launchSmokeApp(
       FLOWPILOT_TEST: '1',
       FLOWPILOT_TEST_NOW: now,
       FLOWPILOT_TEST_PROFILE: profilePath,
+      ...extraEnv,
     },
   });
   if (beforeWindowLoad) await beforeWindowLoad(app.context());

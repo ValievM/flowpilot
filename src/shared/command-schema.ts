@@ -107,13 +107,15 @@ const nonEmptyWorkdays = z
   .min(1)
   .refine((days) => new Set(days).size === days.length);
 const themeChoice = z.enum(['system', 'light', 'dark']);
+const aiModeChoice = z.enum(['auto', 'confirm']);
 const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
   theme: themeChoice,
-  aiMode: z.enum(['auto', 'confirm']),
+  aiMode: aiModeChoice,
 };
 const genericSettingValueSchemas: Readonly<Record<string, z.ZodType>> = {
   workdays: nonEmptyWorkdays,
+  aiMode: aiModeChoice,
 };
 export const settingFields = {
   key: z.string().min(1),

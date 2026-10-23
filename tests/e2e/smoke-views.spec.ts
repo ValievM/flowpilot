@@ -57,7 +57,7 @@ test('shows a saved task and keyboard accessible navigation', async () => {
 test('follows the visual Today navigation order with Tab', async () => {
   const navigation = page.getByRole('navigation', { name: 'Представления' });
   await navigation.getByRole('button', { name: 'Сегодня' }).focus();
-  for (const name of ['Сейчас', 'Доска', 'Все задачи']) {
+  for (const name of ['Сейчас', 'Доска', 'Все задачи', 'Чат с AI']) {
     await page.keyboard.press('Tab');
     await expect(navigation.getByRole('button', { name })).toBeFocused();
   }

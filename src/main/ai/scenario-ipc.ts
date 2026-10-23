@@ -2,9 +2,18 @@ import {
   aiScenarioRequestSchema,
   type AiScenarioResult,
 } from '../../shared/contracts';
+import { toPlain } from '../../shared/to-plain';
 import type { AiUseCases } from './usecases';
 
 export async function runAiScenario(
+  input: unknown,
+  useCases: AiUseCases,
+): Promise<AiScenarioResult> {
+  const result = await runScenario(input, useCases);
+  return result.ok ? { ok: true, value: toPlain(result.value) } : result;
+}
+
+async function runScenario(
   input: unknown,
   useCases: AiUseCases,
 ): Promise<AiScenarioResult> {
@@ -25,5 +34,10 @@ export async function runAiScenario(
       return useCases.editRule(parsed.data.instruction, parsed.data.document);
     case 'confirm':
       return { ok: true, value: useCases.confirm(parsed.data.proposalId) };
+    case 'cancel':
+      useCases.cancel();
+      return { ok: true, value: null };
+    case 'reject':
+      return { ok: true, value: useCases.reject(parsed.data.proposalId) };
   }
 }

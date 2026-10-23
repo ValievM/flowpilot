@@ -152,6 +152,10 @@ const api: FlowPilotApi = Object.freeze({
       ipcRenderer.invoke(ipcChannels.aiPrompt, request) as Promise<
         Result<string>
       >,
+    pending: () =>
+      ipcRenderer.invoke(ipcChannels.aiPending) as Promise<
+        Result<{ operationId: string; prompt: string }[]>
+      >,
     reply: (request: { operationId: string; text: string }) =>
       ipcRenderer.invoke(
         ipcChannels.aiReply,

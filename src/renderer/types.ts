@@ -1,1 +1,1 @@
-export type View = 'today' | 'now' | 'board' | 'all' | 'settings';
+export type View = 'today' | 'now' | 'board' | 'all' | 'chat' | 'settings';

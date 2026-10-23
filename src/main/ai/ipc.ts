@@ -162,3 +162,9 @@ export function submitManualReply(
     ? { ok: true, value: null }
     : { ok: false, error: 'NotFound' };
 }
+
+export function listManualExchanges(
+  provider: ManualExchangeProvider,
+): Result<{ operationId: string; prompt: string }[]> {
+  return { ok: true, value: provider.pending() };
+}

@@ -114,6 +114,7 @@ export const ipcChannels = {
   aiRun: 'ai.run',
   aiCancel: 'ai.cancel',
   aiPrompt: 'ai.prompt',
+  aiPending: 'ai.pending',
   aiReply: 'ai.reply',
   appearanceSetTheme: 'appearance.set-theme',
   aiScenario: 'ai.scenario',
@@ -209,6 +210,7 @@ export const aiScenarioRequestSchema = z.discriminatedUnion('scenario', [
     .object({ scenario: z.literal('createFromText'), text: z.string() })
     .strict(),
   z.object({ scenario: z.literal('replan') }).strict(),
+  z.object({ scenario: z.literal('cancel') }).strict(),
   z
     .object({
       scenario: z.literal('editRule'),
@@ -218,6 +220,9 @@ export const aiScenarioRequestSchema = z.discriminatedUnion('scenario', [
     .strict(),
   z
     .object({ scenario: z.literal('confirm'), proposalId: z.string().min(1) })
+    .strict(),
+  z
+    .object({ scenario: z.literal('reject'), proposalId: z.string().min(1) })
     .strict(),
 ]);
 export type AiScenarioRequest = z.infer<typeof aiScenarioRequestSchema>;

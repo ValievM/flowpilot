@@ -1,33 +1,26 @@
 import React from 'react';
 import type { ThemeChoice } from '../shared/contracts';
-import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
 import { TaskCard } from './components/task-card';
 import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
 import { useSidebarVisibility } from './use-sidebar-visibility';
-import { ScreenContent } from './screen-content';
-import type { ScreenProps } from './screen-content';
+import { ScreenContent, type ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
-import { useCurrentTime } from './use-current-time';
-import type { LocalClock } from './use-current-time';
-import { useReducedMotion } from './use-reduced-motion';
+import { useCurrentTime, type LocalClock } from './use-current-time';
+import { useReducedMotion, type MotionChoice } from './use-reduced-motion';
 import { usePersistedTasks } from './use-persisted-tasks';
-import type { MotionChoice } from './use-reduced-motion';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
+import { useAppChat } from './chat/chat-bridge';
+import { localDateLabel } from './today-copy';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
 import { HistoryPanel } from './components/history-panel';
-import type { HistoryState } from './use-history';
-import { useHistory } from './use-history';
+import { useHistory, type HistoryState } from './use-history';
 import { RepeatSchedule } from './screens/repeat-schedule';
 import { createSeries } from './create-series';
-
-function localDateLabel(date: TemporalTypes.PlainDate): string {
-  return `Сегодня, ${date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}`;
-}
 
 interface AppModel {
   readonly theme: ThemeChoice;
@@ -41,6 +34,7 @@ interface AppModel {
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly historyButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly history: HistoryState;
+  readonly chat: ReturnType<typeof useAppChat>;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
   readonly clock: LocalClock;
@@ -64,6 +58,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   const clock = useCurrentTime();
   const state = usePersistedTasks();
   const history = useHistory(() => state.refresh());
+  const chat = useAppChat(state, history);
   const views = taskViews(state.tasks, clock);
   useQuickAddShortcut(quickAddOpen, setQuickAddOpen);
   const cycleTheme = (): void => {
@@ -91,6 +86,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     addButtonRef,
     historyButtonRef,
     history,
+    chat,
     state,
     views,
     clock,
@@ -217,6 +213,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onSnapshotRefresh: () => state.refresh(),
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
+    allTasks: views.all,
+    chat: model.chat,
   };
   return (
     <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>

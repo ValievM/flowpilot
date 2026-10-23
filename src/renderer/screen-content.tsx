@@ -2,6 +2,7 @@ import React from 'react';
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import type { Task } from '../domain';
 import { AllTasksScreen } from './screens/all-tasks-screen';
+import { ChatScreen } from './screens/chat-screen';
 import { BoardScreen } from './screens/board-screen';
 import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
@@ -10,6 +11,7 @@ import type { MotionChoice } from './use-reduced-motion';
 import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
+import type { ChatModel } from './chat/use-chat';
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -35,6 +37,8 @@ export interface ScreenProps {
   readonly onSnapshotRefresh: () => Promise<IpcSnapshot | undefined>;
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
+  readonly allTasks: readonly Task[];
+  readonly chat: ChatModel;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -66,6 +70,8 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         onStart={props.onStart}
       />
     );
+  if (props.view === 'chat')
+    return <ChatScreen tasks={props.allTasks} chat={props.chat} />;
   if (props.view === 'board')
     return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')

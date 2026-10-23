@@ -3,6 +3,7 @@
 @import url('./board.css');
 @import url('./screens.css');
 @import url('./history.css');
+@import url('./chat.css');
 
 *,
 *::before,
