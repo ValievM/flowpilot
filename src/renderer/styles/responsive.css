@@ -41,6 +41,16 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* Narrow window or large text: keep only the current screen name, on one line. */
+  .crumb-root {
+    display: none;
+  }
+
+  .breadcrumbs {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
   .sidebar {
     position: static;
     min-height: 0;

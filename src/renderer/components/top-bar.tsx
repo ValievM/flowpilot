@@ -57,8 +57,10 @@ export function TopBar({
             <path d="M4 5h16v14H4zM9 5v14" />
           </svg>
         </button>
-        <span>Моё пространство</span>
-        <span aria-hidden="true">/</span>
+        <span className="crumb-root">Моё пространство</span>
+        <span className="crumb-root" aria-hidden="true">
+          /
+        </span>
         <span aria-current="page">{labels[view]}</span>
       </div>
       <div className="top-actions">

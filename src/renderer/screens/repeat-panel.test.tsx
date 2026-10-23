@@ -250,4 +250,24 @@ describe('repeat schedule UI', () => {
       screen.queryByRole('heading', { name: 'Повторы сейчас' }),
     ).not.toBeInTheDocument();
   });
+  it('keeps a row short: the time is shown only when set, no filler words, no repeated date', () => {
+    const timed = series({ time: Temporal.PlainTime.from('18:00') });
+    const plain = series({ id: 'reading', title: 'Чтение' });
+    renderPanel({ series: [timed, plain] });
+    const rows = screen.getAllByRole('listitem');
+    const training = rows.find((row) => row.textContent.includes('Тренировка'));
+    const reading = rows.find((row) => row.textContent.includes('Чтение'));
+    expect(training).toHaveTextContent('18:00');
+    expect(reading).not.toHaveTextContent('Без времени');
+    expect(screen.queryByText('○ Запланировано')).not.toBeInTheDocument();
+    expect(screen.queryByText('5 октября')).not.toBeInTheDocument();
+  });
+
+  it('still names a finished instance so it is clear why the actions are gone', () => {
+    renderPanel({ outcomes: [outcome('done', today)] });
+    expect(screen.getByText(/Выполнено/)).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Пропустить' }),
+    ).not.toBeInTheDocument();
+  });
 });

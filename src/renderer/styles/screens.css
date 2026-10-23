@@ -349,7 +349,17 @@
   list-style: none;
 }
 
-.repeat-instance,
+.repeat-instance {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8) var(--space-16);
+  padding: var(--space-12) 0;
+  border-top: var(--stroke) solid var(--line);
+}
+
 .missed-repeat-group,
 .missed-repeat-date {
   display: grid;
@@ -369,9 +379,27 @@
   border-top: 0;
 }
 
-.repeat-instance-heading,
+.repeat-instance:last-child {
+  padding-bottom: 0;
+}
+
+.repeat-main {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 50%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4) var(--space-12);
+}
+
+.repeat-meta {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .repeat-actions {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-8);
@@ -418,6 +446,7 @@
 .repeat-reschedule,
 .repeat-editor {
   display: grid;
+  flex: 1 1 100%;
   gap: var(--space-8);
 }
 

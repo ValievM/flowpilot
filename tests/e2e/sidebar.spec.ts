@@ -113,3 +113,16 @@ test('the sticky next-step panel stays below the fixed top bar', async () => {
     (topbar?.y ?? 0) + (topbar?.height ?? 0),
   );
 });
+
+test('at the width of a 200% zoom the top bar stays one line and Now keeps its main action in view', async () => {
+  await page.setViewportSize({ width: 450, height: 400 });
+  await page
+    .getByRole('navigation', { name: 'Представления' })
+    .getByRole('button', { name: 'Сейчас' })
+    .click();
+  const topbar = await page.locator('.topbar').boundingBox();
+  expect(topbar?.height).toBeLessThanOrEqual(72);
+  await expect(
+    page.getByRole('button', { name: 'Взять в работу' }),
+  ).toBeInViewport();
+});

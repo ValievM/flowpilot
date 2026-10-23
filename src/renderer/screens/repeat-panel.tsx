@@ -71,7 +71,7 @@ function RepeatInstance({
   };
   return (
     <li className="repeat-instance">
-      <div className="repeat-instance-heading">
+      <div className="repeat-main">
         <button
           className="repeat-title-button"
           type="button"
@@ -79,18 +79,16 @@ function RepeatInstance({
         >
           {series.title}
         </button>
-        <span>
-          {time
-            ? ` · ${time.toString({ smallestUnit: 'minute' })}`
-            : ' · Без времени'}
-        </span>
-        <span className="repeat-state">
-          {state === 'pending'
-            ? '○ Запланировано'
-            : state === 'done'
-              ? '✓ Выполнено'
-              : '↷ Пропуск'}
-        </span>
+        {time && (
+          <span className="repeat-meta">
+            {time.toString({ smallestUnit: 'minute' })}
+          </span>
+        )}
+        {state !== 'pending' && (
+          <span className="repeat-state">
+            {state === 'done' ? '✓ Выполнено' : '↷ Пропуск'}
+          </span>
+        )}
       </div>
       {state === 'pending' && (
         <div className="repeat-actions">
@@ -145,9 +143,6 @@ function RepeatInstance({
           </button>
         </details>
       )}
-      <span className="repeat-date">
-        {date.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })}
-      </span>
     </li>
   );
 }

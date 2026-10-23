@@ -251,7 +251,10 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
           addButtonRef={model.addButtonRef}
           historyButtonRef={model.historyButtonRef}
         />
-        <main className="main-content" aria-busy={state.isLoading}>
+        <main
+          className={`main-content${view === 'now' ? ' is-focus' : ''}`}
+          aria-busy={state.isLoading}
+        >
           <MainContent model={model} screenProps={screenProps} />
           <RepeatSchedule state={state} clock={model.clock} view={view} />
         </main>
