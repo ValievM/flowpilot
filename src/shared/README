@@ -74,9 +74,17 @@ catalogs are persisted by the storage repository and remain main-process-only;
 the provider boundary rejects unknown catalog references. `task.move.status.until`
 is serialized to an ISO date string at the IPC boundary.
 
-`FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded proposal in an unpackaged
-test build with `FLOWPILOT_TEST=1`; the startup fake returns it through
-`ai.run`. Missing or invalid test replies return `ProviderUnavailable`.
+`FLOWPILOT_TEST_AI_REPLY` may provide a JSON-encoded reply in an unpackaged
+test build with `FLOWPILOT_TEST=1`; the startup fake returns it once, through
+`ai.run` (a proposal) or `ai.scenario` (a scenario answer, e.g. cards for
+`createFromText`). Missing or non-JSON test replies return `ProviderUnavailable`.
+
+The chat uses `ai.scenario`: `createFromText`, `confirm`, `reject` and `cancel`
+(cancels whatever the AI is running). Scenario results are plain JSON: Temporal
+values are turned into strings in main (`toPlain`). `ai.pending()` lists the
+manual-exchange requests that wait for a pasted reply, with their prompt text.
+The manual exchange waits up to 10 minutes, long enough to copy and paste. The
+renderer may set the `aiMode` setting (`auto` or `confirm`) like `workdays`.
 
 Test variables `FLOWPILOT_TEST`, `FLOWPILOT_TEST_NOW`, `FLOWPILOT_TEST_PROFILE`,
 and `FLOWPILOT_TEST_AI_REPLY` are honored only for unpackaged applications with

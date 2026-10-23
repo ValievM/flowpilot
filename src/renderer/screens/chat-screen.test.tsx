@@ -139,7 +139,7 @@ describe('AI chat', () => {
     chat.answer(ok(proposal));
     expect(await screen.findByText('Предложение AI')).toBeVisible();
     expect(screen.getAllByText('Подготовить доклад').length).toBeGreaterThan(0);
-    expect(screen.getByText('2026-10-09')).toBeVisible();
+    expect(screen.getByText('09.10.2026')).toBeVisible();
     expect(chat.onApplied).not.toHaveBeenCalled();
   });
 

@@ -1,8 +1,8 @@
 import React from 'react';
 import type { Task } from '../../domain';
 import {
+  describeChanges,
   errorText,
-  fieldLabel,
   formatValue,
   rejectedReasonText,
 } from '../chat/chat-copy';
@@ -63,23 +63,21 @@ function Diff({
             <h4>
               {known ??
                 (created ? formatValue(created.after) : 'Новая карточка')}
+              {!known && <span className="chat-new">Новая карточка</span>}
             </h4>
             <dl>
-              {list.map((change) => (
-                <div
-                  className="chat-diff-row"
-                  key={`${change.commandIndex.toString()}-${change.field}`}
-                >
-                  <dt>{fieldLabel(change.field)}</dt>
+              {describeChanges(list).map((row) => (
+                <div className="chat-diff-row" key={row.key}>
+                  <dt>{row.label}</dt>
                   <dd>
-                    <span className="chat-before">
-                      {formatValue(change.before)}
-                    </span>
-                    <span aria-hidden="true"> → </span>
-                    <span className="sr-only"> стало </span>
-                    <span className="chat-after">
-                      {formatValue(change.after)}
-                    </span>
+                    {row.before !== '—' && (
+                      <>
+                        <span className="chat-before">{row.before}</span>
+                        <span aria-hidden="true"> → </span>
+                        <span className="sr-only"> стало </span>
+                      </>
+                    )}
+                    <span className="chat-after">{row.after}</span>
                   </dd>
                 </div>
               ))}

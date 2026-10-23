@@ -119,6 +119,16 @@
   text-decoration: line-through;
 }
 
+.chat-new {
+  margin-left: var(--space-8);
+  padding: 0 var(--space-8);
+  border-radius: var(--r1);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--type-secondary);
+  font-weight: var(--type-weight-medium);
+}
+
 .chat-after {
   font-weight: var(--type-weight-strong);
 }

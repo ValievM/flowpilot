@@ -70,7 +70,7 @@ test('confirm mode shows the diff, changes nothing until Apply, then keeps the c
   await ask();
   await expect(page.getByText('Предложение AI')).toBeVisible();
   await expect(page.locator('.chat-diff')).toContainText('Подготовить доклад');
-  await expect(page.locator('.chat-diff')).toContainText('2026-10-09');
+  await expect(page.locator('.chat-diff')).toContainText('09.10.2026');
   expect(await taskCount()).toBe(0);
 
   await page.getByRole('button', { name: 'Применить' }).click();
