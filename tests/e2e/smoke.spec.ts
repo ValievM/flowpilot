@@ -118,7 +118,9 @@ for (const width of [900, 1280]) {
       const content = await page.locator('.workspace').boundingBox();
       if (!sidebar || !content)
         throw new Error('Боковая панель или содержимое не отображается.');
-      expect(sidebar.height).toBeGreaterThanOrEqual(content.height);
+      // D-42: the sidebar is fixed to the window, it does not stretch with the page.
+      expect(sidebar.height).toBe(800);
+      expect(content.height).toBeGreaterThan(800);
       await expect(page).toHaveScreenshot(
         `settings-${theme}-${width.toString()}.png`,
         { fullPage: true, maxDiffPixelRatio: 0.00001 },

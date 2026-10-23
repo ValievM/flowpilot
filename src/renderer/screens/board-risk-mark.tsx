@@ -38,7 +38,7 @@ export function BoardRiskMark({
       <span className="risk-icon" aria-hidden="true">
         {isRisk ? '!' : 'i'}
       </span>
-      {title && <strong>{title}: </strong>}
+      {title && <strong>{title}</strong>}
       {message}
     </p>
   );
