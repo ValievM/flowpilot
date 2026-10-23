@@ -7,6 +7,7 @@ import { deadlineMessage, deadlineTitle } from '../deadline-copy';
 import type { PersistedState } from '../use-persisted-tasks';
 import { TaskAttachments } from './task-attachments';
 import { TaskCardActivity } from './task-card-activity';
+import { TaskCardClassification } from './task-card-classification';
 import { TaskCardScheduleFields } from './task-card-schedule-fields';
 import { TaskCardStatusFields } from './task-card-status-fields';
 import { TaskCardTextFields } from './task-card-text-fields';
@@ -145,6 +146,7 @@ export function TaskCard({
             columns={state.columns}
             onApply={applyCard}
           />
+          <TaskCardClassification task={task} onApply={applyCard} />
           <TaskCardScheduleFields
             task={task}
             today={today}

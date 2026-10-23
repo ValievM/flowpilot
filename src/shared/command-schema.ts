@@ -300,6 +300,7 @@ export const ipcCommandSchema = z.discriminatedUnion('kind', [
   seriesStopSchema,
   seriesRecordOutcomeSchema,
   genericSettingCommandSchema,
+  taskClassifySchema,
   taskTypeCreateSchema,
   taskTypeRenameSchema,
   taskTypeDeleteSchema,

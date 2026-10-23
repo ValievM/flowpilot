@@ -1,6 +1,7 @@
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import React from 'react';
+import { DisciplineTag } from '../catalog/catalog-context';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardRiskMark } from './board-risk-mark';
 import {
@@ -230,6 +231,7 @@ function BoardTaskCard({
           {task.title}
         </button>
       </h3>
+      <DisciplineTag id={task.disciplineId} />
       {task.deadline && (
         <p className="task-summary-meta">Срок: {task.deadline}</p>
       )}

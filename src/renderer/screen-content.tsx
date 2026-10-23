@@ -8,7 +8,11 @@ import { NowScreen } from './screens/now-screen';
 import { SettingsScreen } from './screens/settings-screen';
 import { TodayScreen } from './screens/today-screen';
 import type { MotionChoice } from './use-reduced-motion';
-import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
+import type {
+  CommandsApplyRequest,
+  IpcSnapshot,
+  ThemeChoice,
+} from '../shared/contracts';
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
 import type { AppAi } from './chat/chat-bridge';
@@ -40,6 +44,9 @@ export interface ScreenProps {
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
   readonly allTasks: readonly Task[];
   readonly ai: AppAi;
+  readonly onApply: (
+    commands: CommandsApplyRequest['commands'],
+  ) => Promise<boolean>;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -112,6 +119,8 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
       saveError={props.saveError}
       backup={props.backup}
       onSnapshotRefresh={props.onSnapshotRefresh}
+      tasks={props.allTasks}
+      onApply={props.onApply}
     />
   );
 }
