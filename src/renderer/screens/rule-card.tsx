@@ -173,16 +173,7 @@ export function RuleCard({
         >
           Привязать
         </button>
-        {rule.status === 'active' ? (
-          <button
-            className="button"
-            type="button"
-            aria-label={`Отключить: ${title}`}
-            onClick={() => void model.deactivate(rule.id)}
-          >
-            Отключить
-          </button>
-        ) : (
+        {rule.status === 'draft' && rule.errors.length === 0 && (
           <button
             className="button button-primary"
             type="button"
@@ -190,6 +181,16 @@ export function RuleCard({
             onClick={() => void model.activate(rule.id)}
           >
             Активировать
+          </button>
+        )}
+        {rule.activeDocument && (
+          <button
+            className="button"
+            type="button"
+            aria-label={`Отключить: ${title}`}
+            onClick={() => void model.deactivate(rule.id)}
+          >
+            Отключить
           </button>
         )}
         {rule.activeDocument && (

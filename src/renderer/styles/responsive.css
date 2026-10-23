@@ -18,6 +18,13 @@
   }
 }
 
+@media (width <= 1000px) {
+  /* A long screen name leaves no room for the root crumb: drop it before it breaks letter by letter. */
+  .breadcrumbs[data-long='true'] .crumb-root {
+    display: none;
+  }
+}
+
 @media (width <= 900px) {
   /* The top bar is full: the "saved" mark gives way, a save error still shows. */
   .saved-status:not(.has-error) {

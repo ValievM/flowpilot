@@ -94,7 +94,7 @@ test('an imported document is a draft, can be bound, activated and exported, wit
   await page.getByRole('checkbox', { name: 'Лабораторная' }).check();
   await page.getByRole('button', { name: 'Сохранить привязку' }).click();
   await expect(card).toContainText('Курсовая, Лабораторная');
-  await expect(card).toContainText('Отключено');
+  await expect(card).toContainText('Активно · есть черновик');
   await page
     .getByRole('button', { name: 'Активировать: Учебные проекты' })
     .click();
