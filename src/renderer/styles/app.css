@@ -173,6 +173,9 @@ svg {
   border-bottom: var(--stroke) solid var(--line);
   background: var(--chrome);
   transition: padding-left var(--motion-panel) var(--motion-curve);
+  position: sticky;
+  z-index: 5;
+  top: 0;
 }
 
 /* Hidden sidebar: the column collapses smoothly, the panel fades and leaves the tab order (inert). */

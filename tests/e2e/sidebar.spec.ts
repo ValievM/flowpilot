@@ -85,3 +85,19 @@ test('the sidebar hides and returns smoothly and leaves the tab order while hidd
     page.getByRole('button', { name: 'Скрыть боковую панель' }),
   ).toHaveAttribute('aria-expanded', 'true');
 });
+
+test('the top bar with status, undo, history and add stays visible while the page scrolls', async () => {
+  const topbar = page.locator('.topbar');
+  await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  });
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
+  const box = await topbar.boundingBox();
+  expect(box?.y).toBe(0);
+  await expect(
+    page.getByRole('button', { name: 'Задача', exact: true }),
+  ).toBeInViewport();
+  await expect(
+    page.getByRole('button', { name: 'История', exact: true }),
+  ).toBeInViewport();
+});
