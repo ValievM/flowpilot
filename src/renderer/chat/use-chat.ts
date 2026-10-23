@@ -3,6 +3,7 @@ import type { AiScenarioResult } from '../../shared/contracts';
 import type { UndoOutcome } from '../use-history';
 import type { WhatNowView } from '../what-now/what-now-outcome';
 import { requestWhatNow } from '../what-now/use-what-now';
+import { callScenario as call } from './scenario-call';
 import { errorText } from './chat-copy';
 import {
   parseChatOutcome,
@@ -88,16 +89,6 @@ function resultState(result: AiScenarioResult): ChatTurn['state'] {
       ? { phase: 'cancelled' }
       : { phase: 'error', message: errorText(result.error.kind) };
   return outcomeState(parseChatOutcome(result.value));
-}
-
-async function call(
-  scenario: Parameters<typeof window.flowpilot.ai.scenario>[0],
-): Promise<AiScenarioResult> {
-  try {
-    return await window.flowpilot.ai.scenario(scenario);
-  } catch {
-    return { ok: false, error: { kind: 'ProviderUnavailable', message: '' } };
-  }
 }
 
 async function saveMode(mode: AiMode): Promise<boolean> {

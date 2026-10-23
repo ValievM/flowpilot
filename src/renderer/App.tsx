@@ -13,7 +13,7 @@ import { useReducedMotion, type MotionChoice } from './use-reduced-motion';
 import { usePersistedTasks } from './use-persisted-tasks';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
-import { useAppChat } from './chat/chat-bridge';
+import { useAppAi } from './chat/chat-bridge';
 import { localDateLabel } from './today-copy';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
@@ -34,7 +34,7 @@ interface AppModel {
   readonly addButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly historyButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly history: HistoryState;
-  readonly chat: ReturnType<typeof useAppChat>;
+  readonly ai: ReturnType<typeof useAppAi>;
   readonly state: ReturnType<typeof usePersistedTasks>;
   readonly views: ReturnType<typeof taskViews>;
   readonly clock: LocalClock;
@@ -58,7 +58,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
   const clock = useCurrentTime();
   const state = usePersistedTasks();
   const history = useHistory(() => state.refresh());
-  const chat = useAppChat(state, history);
+  const ai = useAppAi(state, history, setView);
   const views = taskViews(state.tasks, clock);
   useQuickAddShortcut(quickAddOpen, setQuickAddOpen);
   const cycleTheme = (): void => {
@@ -86,7 +86,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
     addButtonRef,
     historyButtonRef,
     history,
-    chat,
+    ai,
     state,
     views,
     clock,
@@ -214,7 +214,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
     allTasks: views.all,
-    chat: model.chat,
+    ai: model.ai,
   };
   return (
     <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>
@@ -238,6 +238,7 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
             )
           }
           error={state.commandError ?? state.settingsError}
+          replan={model.ai.replanButton}
           onAddTask={() => {
             model.setQuickAddOpen(true);
           }}

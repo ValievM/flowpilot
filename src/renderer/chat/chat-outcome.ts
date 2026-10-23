@@ -16,6 +16,7 @@ const outcomeSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('confirmation-required'),
     proposalId: z.string(),
+    rationale: z.string().optional(),
     diff: z.object({ changes: z.array(changeSchema) }),
     rejectedCommands: z.array(rejectedCommandSchema),
   }),

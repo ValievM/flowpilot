@@ -72,6 +72,10 @@ test('follows the visual Today navigation order with Tab', async () => {
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'История' })).toBeFocused();
   await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('button', { name: 'Перестроить', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Задача' })).toBeFocused();
 });
 

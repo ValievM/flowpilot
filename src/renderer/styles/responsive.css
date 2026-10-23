@@ -19,6 +19,15 @@
 }
 
 @media (width <= 900px) {
+  /* The top bar is full: the "saved" mark gives way, a save error still shows. */
+  .saved-status:not(.has-error) {
+    display: none;
+  }
+
+  .breadcrumbs [aria-current='page'] {
+    white-space: nowrap;
+  }
+
   .today-layout,
   .board-columns {
     grid-template-columns: minmax(0, 1fr);
@@ -37,13 +46,13 @@
 }
 
 @media (width <= 760px) {
-  .app-shell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   /* Narrow window or large text: keep only the current screen name, on one line. */
   .crumb-root {
     display: none;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .breadcrumbs {
@@ -83,6 +92,14 @@
 
   .saved-status {
     display: none;
+  }
+
+  .top-actions {
+    gap: var(--space-8);
+  }
+
+  .top-actions .button {
+    padding-inline: var(--space-8);
   }
 
   .main-content {
