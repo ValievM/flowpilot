@@ -7,21 +7,18 @@ import { QuickAddDialog } from './components/quick-add-dialog';
 import { Sidebar } from './components/sidebar';
 import { TopBar } from './components/top-bar';
 import { useSidebarVisibility } from './use-sidebar-visibility';
-import { ScreenContent } from './screen-content';
-import type { ScreenProps } from './screen-content';
+import { ScreenContent, type ScreenProps } from './screen-content';
 import { taskViews } from './task-views';
-import { useCurrentTime } from './use-current-time';
-import type { LocalClock } from './use-current-time';
-import { useReducedMotion } from './use-reduced-motion';
+import { useCurrentTime, type LocalClock } from './use-current-time';
+import { useReducedMotion, type MotionChoice } from './use-reduced-motion';
 import { usePersistedTasks } from './use-persisted-tasks';
-import type { MotionChoice } from './use-reduced-motion';
 import { useTheme } from './theme/use-theme';
 import type { View } from './types';
+import { chatBridge } from './chat/chat-bridge';
 import { addTask, startTask } from './task-commands';
 import { useQuickAddShortcut } from './use-quick-add-shortcut';
 import { HistoryPanel } from './components/history-panel';
-import type { HistoryState } from './use-history';
-import { useHistory } from './use-history';
+import { useHistory, type HistoryState } from './use-history';
 import { RepeatSchedule } from './screens/repeat-schedule';
 import { createSeries } from './create-series';
 
@@ -217,6 +214,8 @@ function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
     onSnapshotRefresh: () => state.refresh(),
     onStart: (task) => void model.startTask(task),
     onOpenTask: model.openTask,
+    allTasks: views.all,
+    ...chatBridge(state, model.history),
   };
   return (
     <div className={`app-shell${sidebar.hidden ? ' is-sidebar-hidden' : ''}`}>

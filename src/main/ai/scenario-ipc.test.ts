@@ -6,7 +6,7 @@ import { runAiScenario } from './scenario-ipc';
 import type { AiUseCases } from './usecases';
 
 function fakeUseCases(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
+  const spies = {
     whatNow: vi.fn(),
     createFromText: vi.fn(),
     replan: vi.fn(),
@@ -18,19 +18,20 @@ function fakeUseCases(overrides: Partial<Record<string, unknown>> = {}) {
       error: { kind: 'Declined', message: 'Предложение отклонено.' },
     })),
     ...overrides,
-  } as unknown as AiUseCases;
+  };
+  return { useCases: spies as unknown as AiUseCases, spies };
 }
 
 describe('AI scenario IPC', () => {
   it('declines a pending proposal without touching data', async () => {
-    const useCases = fakeUseCases();
+    const { useCases, spies } = fakeUseCases();
 
     const result = await runAiScenario(
       { scenario: 'reject', proposalId: 'proposal-1' },
       useCases,
     );
 
-    expect(useCases.reject).toHaveBeenCalledWith('proposal-1');
+    expect(spies.reject).toHaveBeenCalledWith('proposal-1');
     expect(result).toEqual({
       ok: true,
       value: {
@@ -41,7 +42,7 @@ describe('AI scenario IPC', () => {
   });
 
   it('sends only plain data over IPC: Temporal values become strings', async () => {
-    const useCases = fakeUseCases({
+    const { useCases } = fakeUseCases({
       createFromText: vi.fn(() =>
         Promise.resolve({
           ok: true,
@@ -78,16 +79,16 @@ describe('AI scenario IPC', () => {
   });
 
   it('cancels whatever the AI is running right now', async () => {
-    const useCases = fakeUseCases();
+    const { useCases, spies } = fakeUseCases();
 
     const result = await runAiScenario({ scenario: 'cancel' }, useCases);
 
-    expect(useCases.cancel).toHaveBeenCalledTimes(1);
+    expect(spies.cancel).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: true, value: null });
   });
 
   it('rejects a malformed request without calling any use case', async () => {
-    const useCases = fakeUseCases();
+    const { useCases, spies } = fakeUseCases();
 
     const result = await runAiScenario({ scenario: 'reject' }, useCases);
 
@@ -95,7 +96,7 @@ describe('AI scenario IPC', () => {
       ok: false,
       error: { kind: 'ValidationFailed' },
     });
-    expect(useCases.reject).not.toHaveBeenCalled();
+    expect(spies.reject).not.toHaveBeenCalled();
   });
 });
 

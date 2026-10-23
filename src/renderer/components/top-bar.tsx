@@ -6,6 +6,7 @@ const labels: Record<View, string> = {
   now: 'Сейчас',
   board: 'Доска',
   all: 'Все задачи',
+  chat: 'Чат с AI',
   settings: 'Настройки',
 };
 

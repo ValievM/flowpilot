@@ -48,7 +48,11 @@ describe('startup AI runner scripted reply', () => {
     ).run(request);
     const settled = await Promise.race([
       pending.then(() => 'answered'),
-      new Promise((resolve) => setTimeout(() => resolve('waiting'), 20)),
+      new Promise((resolve) =>
+        setTimeout(() => {
+          resolve('waiting');
+        }, 20),
+      ),
     ]);
 
     expect(settled).toBe('waiting');
