@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Task } from '../../domain/task';
 import type { AiScenarioResult } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
+import { useChat } from '../chat/use-chat';
 import { ChatScreen } from './chat-screen';
 
 afterEach(cleanup);
@@ -79,8 +80,11 @@ function setup(aiMode: 'auto' | 'confirm' = 'confirm') {
   } as unknown as FlowPilotApi;
   const onApplied = vi.fn(() => Promise.resolve());
   const undo = vi.fn(() => Promise.resolve('ok' as const));
-  const view = (tasks: Task[] = []) =>
-    render(<ChatScreen tasks={tasks} onApplied={onApplied} undo={undo} />);
+  function Harness({ tasks }: { tasks: Task[] }) {
+    const chat = useChat({ onApplied, undo });
+    return <ChatScreen tasks={tasks} chat={chat} />;
+  }
+  const view = (tasks: Task[] = []) => render(<Harness tasks={tasks} />);
   const answer = (result: AiScenarioResult): void => {
     waiting.shift()?.(result);
   };

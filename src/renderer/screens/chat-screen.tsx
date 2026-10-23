@@ -1,18 +1,19 @@
 import React from 'react';
 import type { Task } from '../../domain';
-import { useChat, type AiMode, type ChatDeps } from '../chat/use-chat';
+import type { AiMode, ChatModel } from '../chat/use-chat';
 import { ChatTurnView } from './chat-turn';
 
-interface ChatScreenProps extends ChatDeps {
+interface ChatScreenProps {
   readonly tasks: readonly Task[];
+  readonly chat: ChatModel;
 }
 
 export function ChatScreen({
   tasks,
-  onApplied,
-  undo,
+  chat,
 }: ChatScreenProps): React.JSX.Element {
-  const chat = useChat({ onApplied, undo });
+  const { loadMode } = chat;
+  React.useEffect(loadMode, [loadMode]);
   const [text, setText] = React.useState('');
   const submit = (): void => {
     if (text.trim() === '' || chat.running) return;

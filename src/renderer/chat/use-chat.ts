@@ -51,6 +51,7 @@ export interface ChatModel {
   readonly decline: (turnId: number) => void;
   readonly undo: (turnId: number) => void;
   readonly setMode: (mode: AiMode) => void;
+  readonly loadMode: () => void;
   readonly replyManually: (turnId: number, text: string) => Promise<boolean>;
 }
 
@@ -109,10 +110,13 @@ async function saveMode(mode: AiMode): Promise<boolean> {
   }
 }
 
-function useAiMode(): Pick<ChatModel, 'mode' | 'modeError' | 'setMode'> {
+function useAiMode(): Pick<
+  ChatModel,
+  'mode' | 'modeError' | 'setMode' | 'loadMode'
+> {
   const [mode, setModeState] = React.useState<AiMode>('auto');
   const [modeError, setModeError] = React.useState<string>();
-  React.useEffect(() => {
+  const loadMode = React.useCallback((): void => {
     void window.flowpilot.snapshot.load().then((result) => {
       if (!result.ok) return;
       const stored = (result.value.settings as { aiMode?: string }).aiMode;
@@ -127,7 +131,7 @@ function useAiMode(): Pick<ChatModel, 'mode' | 'modeError' | 'setMode'> {
       );
     });
   };
-  return { mode, modeError, setMode };
+  return { mode, modeError, setMode, loadMode };
 }
 
 type PatchTurn = (id: number, change: Partial<ChatTurn>) => void;

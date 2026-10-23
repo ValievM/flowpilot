@@ -225,6 +225,31 @@ describe('IPC handlers', () => {
     repository.close();
   });
 
+  it('lets the renderer choose the AI mode, and only one of the two known modes', () => {
+    const repository = openRepository();
+    expect(
+      applyCommands(
+        {
+          commands: [{ kind: 'setting.set', key: 'aiMode', value: 'confirm' }],
+          expectedRevision: 0,
+        },
+        { repository },
+      ).ok,
+    ).toBe(true);
+    expect(repository.getAiMode()).toBe('confirm');
+    const revision = repository.load().revision;
+    for (const value of ['sometimes', 1, null]) {
+      expect(
+        setSetting(
+          { key: 'aiMode', value, expectedRevision: revision },
+          { repository },
+        ),
+      ).toEqual({ ok: false, error: 'ValidationFailed' });
+    }
+    expect(repository.getAiMode()).toBe('confirm');
+    repository.close();
+  });
+
   it('rejects duplicate and out-of-range workdays through both IPC channels', () => {
     const repository = openRepository();
     for (const value of [[], [1, 1], [8]]) {

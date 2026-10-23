@@ -11,7 +11,7 @@ import type { MotionChoice } from './use-reduced-motion';
 import type { IpcSnapshot, ThemeChoice } from '../shared/contracts';
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
-import type { UndoOutcome } from './use-history';
+import type { ChatModel } from './chat/use-chat';
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -38,8 +38,7 @@ export interface ScreenProps {
   readonly onStart: (task: Task) => void;
   readonly onOpenTask: (taskId: string, trigger: HTMLElement) => void;
   readonly allTasks: readonly Task[];
-  readonly onChatApplied: () => Promise<void>;
-  readonly onChatUndo: () => Promise<UndoOutcome>;
+  readonly chat: ChatModel;
 }
 
 export function ScreenContent(props: ScreenProps): React.JSX.Element {
@@ -72,13 +71,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
       />
     );
   if (props.view === 'chat')
-    return (
-      <ChatScreen
-        tasks={props.allTasks}
-        onApplied={props.onChatApplied}
-        undo={props.onChatUndo}
-      />
-    );
+    return <ChatScreen tasks={props.allTasks} chat={props.chat} />;
   if (props.view === 'board')
     return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')
