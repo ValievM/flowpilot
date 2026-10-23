@@ -4,12 +4,14 @@ import type { DeadlineRiskResult } from '../../domain/risk/risk';
 import type { Task } from '../../domain/task';
 import { deadlineRisk } from '../../domain/risk/risk';
 import { deadlineMessage, deadlineTitle } from '../deadline-copy';
+import { WhatNowPanel } from './what-now-panel';
 
 const SELECTION_RULE =
   'Выбрано по ближайшему сроку, затем по порядку добавления.';
 
 interface NowScreenProps {
   readonly task: Task | undefined;
+  readonly allTasks: readonly Task[];
   readonly today: Temporal.PlainDate;
   readonly workdays: ReadonlySet<number>;
   readonly isLoading: boolean;
@@ -101,6 +103,7 @@ function WhyThisTask({
 
 export function NowScreen({
   task,
+  allTasks,
   today,
   workdays,
   isLoading,
@@ -111,11 +114,14 @@ export function NowScreen({
 }: NowScreenProps): React.JSX.Element {
   if (!task)
     return (
-      <NoAvailableTask
-        isLoading={isLoading}
-        hasTasks={hasTasks}
-        hasUndatedTasks={hasUndatedTasks}
-      />
+      <>
+        <NoAvailableTask
+          isLoading={isLoading}
+          hasTasks={hasTasks}
+          hasUndatedTasks={hasUndatedTasks}
+        />
+        <WhatNowPanel tasks={allTasks} onStart={onStart} />
+      </>
     );
   const risk = deadlineRisk(task, today, workdays);
   return (
@@ -147,6 +153,7 @@ export function NowScreen({
         </button>
         <WhyThisTask risk={risk} />
       </article>
+      <WhatNowPanel tasks={allTasks} onStart={onStart} />
     </section>
   );
 }

@@ -27,6 +27,7 @@ function renderNow(current: Task | undefined, onStart = vi.fn()) {
   render(
     <NowScreen
       task={current}
+      allTasks={current ? [current] : []}
       today={today}
       workdays={workdays}
       isLoading={false}

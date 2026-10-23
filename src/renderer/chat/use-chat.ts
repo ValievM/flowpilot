@@ -1,6 +1,8 @@
 import React from 'react';
 import type { AiScenarioResult } from '../../shared/contracts';
 import type { UndoOutcome } from '../use-history';
+import type { WhatNowView } from '../what-now/what-now-outcome';
+import { requestWhatNow } from '../what-now/use-what-now';
 import { errorText } from './chat-copy';
 import {
   parseChatOutcome,
@@ -30,6 +32,7 @@ export type ChatTurn = {
         readonly rejected: readonly ChatRejectedCommand[];
         readonly undone: boolean;
       }
+    | { readonly phase: 'whatNow'; readonly view: WhatNowView }
     | { readonly phase: 'declined' }
     | { readonly phase: 'cancelled' }
     | { readonly phase: 'error'; readonly message: string };
@@ -46,6 +49,7 @@ export interface ChatModel {
   readonly modeError: string | undefined;
   readonly running: boolean;
   readonly send: (text: string) => void;
+  readonly askWhatNow: () => void;
   readonly cancel: () => void;
   readonly confirm: (turnId: number) => void;
   readonly decline: (turnId: number) => void;
@@ -224,10 +228,51 @@ function useProposalActions(
   };
 }
 
+function useRequests(
+  running: boolean,
+  setTurns: Setter,
+  patch: PatchTurn,
+  finish: (id: number, result: AiScenarioResult) => Promise<void>,
+): Pick<ChatModel, 'send' | 'askWhatNow'> {
+  const nextId = React.useRef(1);
+  const start = (text: string): number => {
+    const id = nextId.current++;
+    setTurns((current) => [
+      ...current,
+      { id, text, state: { phase: 'running' } },
+    ]);
+    return id;
+  };
+  return {
+    send: (text) => {
+      const trimmed = text.trim();
+      if (!trimmed || running) return;
+      const id = start(trimmed);
+      void call({ scenario: 'createFromText', text: trimmed }).then((result) =>
+        finish(id, result),
+      );
+    },
+    askWhatNow: () => {
+      if (running) return;
+      const id = start('Что делать сейчас?');
+      void requestWhatNow().then((next) => {
+        patch(id, {
+          state:
+            next.phase === 'answer'
+              ? { phase: 'whatNow', view: next.view }
+              : {
+                  phase: 'error',
+                  message: next.phase === 'error' ? next.message : '',
+                },
+        });
+      });
+    },
+  };
+}
+
 export function useChat(deps: ChatDeps): ChatModel {
   const { turns, setTurns, patch } = useTurns();
   const modeModel = useAiMode();
-  const nextId = React.useRef(1);
   const { finish, confirm, decline } = useProposalActions(
     deps,
     turns,
@@ -237,22 +282,11 @@ export function useChat(deps: ChatDeps): ChatModel {
   const running = turns.some((turn) => turn.state.phase === 'running');
   return {
     ...modeModel,
+    ...useRequests(running, setTurns, patch, finish),
     turns,
     running,
     confirm,
     decline,
-    send: (text) => {
-      const trimmed = text.trim();
-      if (!trimmed || running) return;
-      const id = nextId.current++;
-      setTurns((current) => [
-        ...current,
-        { id, text: trimmed, state: { phase: 'running' } },
-      ]);
-      void call({ scenario: 'createFromText', text: trimmed }).then((result) =>
-        finish(id, result),
-      );
-    },
     cancel: () => void call({ scenario: 'cancel' }),
     undo: (id) => {
       void deps.undo().then((outcome) => {

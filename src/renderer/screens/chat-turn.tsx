@@ -8,6 +8,7 @@ import {
 } from '../chat/chat-copy';
 import type { ChatChange, ChatRejectedCommand } from '../chat/chat-outcome';
 import type { ChatModel, ChatTurn } from '../chat/use-chat';
+import { WhatNowCard } from './what-now-card';
 
 function Rejected({
   rejected,
@@ -164,10 +165,12 @@ export function ChatTurnView({
   turn,
   tasks,
   chat,
+  onStart,
 }: {
   readonly turn: ChatTurn;
   readonly tasks: readonly Task[];
   readonly chat: ChatModel;
+  readonly onStart: (task: Task) => void;
 }): React.JSX.Element {
   const { state } = turn;
   return (
@@ -230,6 +233,14 @@ export function ChatTurnView({
               </button>
             )}
           </>
+        )}
+        {state.phase === 'whatNow' && (
+          <WhatNowCard
+            view={state.view}
+            tasks={tasks}
+            onStart={onStart}
+            onAgain={chat.askWhatNow}
+          />
         )}
         {state.phase === 'declined' && (
           <p role="status">Предложение отклонено. Данные не изменены.</p>

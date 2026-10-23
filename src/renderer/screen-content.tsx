@@ -61,6 +61,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
     return (
       <NowScreen
         task={props.available[0]}
+        allTasks={props.allTasks}
         today={props.today}
         hasTasks={props.hasTasks}
         hasUndatedTasks={props.hasUndatedTasks}
@@ -71,7 +72,13 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
       />
     );
   if (props.view === 'chat')
-    return <ChatScreen tasks={props.allTasks} chat={props.chat} />;
+    return (
+      <ChatScreen
+        tasks={props.allTasks}
+        chat={props.chat}
+        onStart={props.onStart}
+      />
+    );
   if (props.view === 'board')
     return <BoardScreen today={props.today} onOpenTask={props.onOpenTask} />;
   if (props.view === 'all')
