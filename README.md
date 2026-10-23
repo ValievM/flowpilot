@@ -44,6 +44,10 @@ Vite внедряет CSP в renderer HTML отдельно для разраб�
 
 `npm run package` собирает приложение для macOS arm64; `npm run make` создаёт артефакт выпуска.
 
-Проверка macOS arm64: `npm run make` завершился успешно; запуск `out/flowpilot-darwin-arm64/flowpilot.app` создал main- и renderer-процессы. CSP в упакованном HTML не содержит `localhost`, `ws:` или `unsafe-inline`.
+`npm run smoke:packaged` собирает приложение и запускает **упакованную** сборку (`out/flowpilot-darwin-arm64/flowpilot.app`) с чистым профилем (`--user-data-dir`): окно открывается, нативное хранилище работает, задача переживает перезапуск, переменные `FLOWPILOT_TEST*` в упакованной сборке игнорируются, CSP без `localhost`, `ws:` и `unsafe-inline`/`unsafe-eval` для скриптов. Во время прогона на секунду появляются окна приложения, поэтому в обычный `npm run e2e` этот набор не входит.
+
+Forge Vite plugin кладёт в сборку только `.vite`; модули, которые main-бандл подключает во время работы (`better-sqlite3`, `@flowpilot/openat`, `ajv` и их зависимости), перечисляет `forge.runtime-modules.ts`, а `.node`-файлы распаковываются из asar. Если добавить в main новый внешний модуль, дополните `RUNTIME_ROOTS` и прогоните `npm run smoke:packaged`: без этого упакованное приложение не стартует (до #65 именно так и было).
+
+Подпись и нотаризация не делаются: нужны реквизиты владельца.
 
 Документация: [спецификация](docs/spec/01-vision.md), [дизайн](docs/design/d-screens/index.html), [ADR стека](docs/adr/0001-stack.md), [правила для агентов](AGENTS.md), [процесс](docs/process/pipeline.md).
