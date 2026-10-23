@@ -17,6 +17,7 @@ import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type { View } from './types';
 import type { AppAi } from './chat/chat-bridge';
 import { ReplanScreen } from './screens/replan-screen';
+import { RulesScreen } from './screens/rules-screen';
 export interface ScreenProps {
   readonly view: View;
   readonly tasks: readonly Task[];
@@ -87,6 +88,7 @@ export function ScreenContent(props: ScreenProps): React.JSX.Element {
         onStart={props.onStart}
       />
     );
+  if (props.view === 'rules') return <RulesScreen />;
   if (props.view === 'replan')
     return (
       <ReplanScreen
