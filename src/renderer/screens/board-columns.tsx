@@ -4,6 +4,7 @@ import React from 'react';
 import { DisciplineTag } from '../catalog/catalog-context';
 import type { IpcSnapshot } from '../../shared/contracts';
 import { BoardRiskMark } from './board-risk-mark';
+import { formatDate } from '../date-copy';
 import {
   BoardDraggableTask,
   BoardDragContext,
@@ -218,7 +219,6 @@ function BoardTaskCard({
       className="task-summary board-task"
       label={`Задача: ${task.title}`}
     >
-      <BoardRiskMark task={task} snapshot={snapshot} today={today} />
       <h3>
         <button
           className="task-title-button"
@@ -233,8 +233,9 @@ function BoardTaskCard({
       </h3>
       <DisciplineTag id={task.disciplineId} />
       {task.deadline && (
-        <p className="task-summary-meta">Срок: {task.deadline}</p>
+        <p className="task-summary-meta">Срок: {formatDate(task.deadline)}</p>
       )}
+      <BoardRiskMark task={task} snapshot={snapshot} today={today} />
       {task.status.kind === 'waiting' && (
         <p className="board-waiting-reason">
           Причина ожидания: {task.status.reason}

@@ -1,6 +1,7 @@
 import type { Temporal as TemporalTypes } from 'temporal-polyfill';
 import { deadlineRisk } from '../domain/risk/risk';
 import type { Task } from '../domain';
+import { formatDate } from './date-copy';
 import { deadlineMessage, deadlineTitle } from './deadline-copy';
 import type { TodayTask } from './fixtures/today';
 
@@ -20,7 +21,7 @@ export function taskSummaryData(
     id: task.id,
     title: task.title,
     subject: 'Без категории',
-    due: task.deadline?.toLocaleString('ru-RU') ?? 'Без срока',
+    due: task.deadline ? formatDate(task.deadline) : 'Без срока',
     estimate: task.estimate
       ? `Около ${task.estimate.value.toString()} рабочих дней`
       : 'Объём неизвестен',
