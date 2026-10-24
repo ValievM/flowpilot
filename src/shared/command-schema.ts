@@ -2,6 +2,10 @@ import { Temporal } from 'temporal-polyfill';
 import { z } from 'zod';
 import { scheduleManualCommandSchemas } from './schedule-command-schema';
 import {
+  genericSettingValueSchemas,
+  settingValueSchemas,
+} from './setting-schemas';
+import {
   attachmentAddSchema,
   attachmentRemoveSchema,
   catalogCommandSchemas,
@@ -104,21 +108,6 @@ const columnSchema = z
     builtIn: z.boolean(),
   })
   .strict();
-const nonEmptyWorkdays = z
-  .array(z.number().int().min(1).max(7))
-  .min(1)
-  .refine((days) => new Set(days).size === days.length);
-const themeChoice = z.enum(['system', 'light', 'dark']);
-const aiModeChoice = z.enum(['auto', 'confirm']);
-const settingValueSchemas: Readonly<Record<string, z.ZodType>> = {
-  workdays: nonEmptyWorkdays,
-  theme: themeChoice,
-  aiMode: aiModeChoice,
-};
-const genericSettingValueSchemas: Readonly<Record<string, z.ZodType>> = {
-  workdays: nonEmptyWorkdays,
-  aiMode: aiModeChoice,
-};
 export const settingFields = {
   key: z.string().min(1),
   value: z.unknown(),

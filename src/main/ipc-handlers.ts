@@ -13,11 +13,13 @@ import type { AiUseCases } from './ai/usecases';
 import { registerFeatureIpcHandlers } from './ipc-feature-handlers';
 import type { RuleFileDependencies } from './rules-handlers';
 import type { ScheduleDependencies } from './schedule-handlers';
+import type { ReminderDeps } from './notifications/reminder-service';
 
 export type RegistrationDependencies = {
   repository: Repository;
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly scheduleDialogs: ScheduleDependencies['dialogs'];
+  readonly reminders: Pick<ReminderDeps, 'adapter' | 'openTarget'>;
   readonly appInfo: {
     getName(): string;
     getVersion(): string;

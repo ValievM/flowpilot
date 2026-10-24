@@ -31,11 +31,17 @@ import {
   previewIcsFile,
   type ScheduleDependencies,
 } from './schedule-handlers';
+import {
+  configureNotifications,
+  getNotificationsStatus,
+} from './notifications/handlers';
+import type { ReminderDeps } from './notifications/reminder-service';
 
 type FeatureDependencies = {
   readonly repository: Repository;
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly scheduleDialogs: ScheduleDependencies['dialogs'];
+  readonly reminders: Pick<ReminderDeps, 'adapter' | 'openTarget'>;
   readonly clock: Clock;
   readonly appInfo: {
     getName(): string;
@@ -87,6 +93,7 @@ export function registerFeatureIpcHandlers(
     runAiScenario(request, deps.aiUseCases),
   );
   registerScheduleHandlers(ipc, deps);
+  registerNotificationHandlers(ipc, deps);
 }
 function registerRulesHandlers(
   ipc: Pick<IpcMain, 'handle'>,
@@ -136,5 +143,26 @@ function registerScheduleHandlers(
   );
   ipc.handle(ipcChannels.scheduleConfirmImport, (_event, request: unknown) =>
     confirmIcsImport(request, scheduleDeps),
+  );
+}
+
+function registerNotificationHandlers(
+  ipc: Pick<IpcMain, 'handle'>,
+  deps: FeatureDependencies,
+): void {
+  const reminderDeps: ReminderDeps = {
+    get repository() {
+      return deps.repository;
+    },
+    adapter: deps.reminders.adapter,
+    clock: deps.clock,
+    timeZone: Temporal.Now.timeZoneId(),
+    openTarget: deps.reminders.openTarget,
+  };
+  ipc.handle(ipcChannels.notificationsStatus, (_event, request: unknown) =>
+    getNotificationsStatus(request, reminderDeps),
+  );
+  ipc.handle(ipcChannels.notificationsConfigure, (_event, request: unknown) =>
+    configureNotifications(request, reminderDeps),
   );
 }

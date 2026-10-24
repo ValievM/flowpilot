@@ -6,6 +6,7 @@ import {
 import {
   app,
   BrowserWindow,
+  Notification,
   dialog,
   ipcMain,
   nativeTheme,
@@ -25,6 +26,8 @@ import {
   type WindowStartupGate,
 } from './window-startup';
 import { reportStartupFailure } from './startup-error';
+import { createStartupReminders } from './notifications/startup';
+import { ipcChannels } from '../shared/contracts';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -67,10 +70,15 @@ if (!app.requestSingleInstanceLock()) {
         manualProvider,
       );
       const aiUseCases = createAiUseCases(repository, aiRunner, runtime.clock);
+      const reminders = startupReminders();
       registerIpcHandlers(ipcMain, {
         repository,
         ruleDialogs: createRuleDialogs(dialog),
         scheduleDialogs: createScheduleDialogs(dialog),
+        reminders: {
+          adapter: reminders.adapter,
+          openTarget: openNotificationTarget,
+        },
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
@@ -87,6 +95,11 @@ if (!app.requestSingleInstanceLock()) {
         shell: { open: (filePath) => shell.openPath(filePath) },
         profilePath: path.join(runtime.profilePath, 'flowpilot.db'),
         clock: runtime.clock,
+      });
+      reminders.start({
+        repository: () => repository,
+        clock: runtime.clock,
+        openTarget: openNotificationTarget,
       });
       createWindow();
       app.on('activate', activateWindow);
@@ -116,6 +129,15 @@ app.on('window-all-closed', () => {
 
 function activateWindow(): void {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+}
+
+function startupReminders(): ReturnType<typeof createStartupReminders> {
+  return createStartupReminders(app.isPackaged, process.env, Notification);
+}
+
+function openNotificationTarget(target: unknown): void {
+  mainWindow?.show();
+  mainWindow?.webContents.send(ipcChannels.notificationsOpen, target);
 }
 
 function createWindow(): void {

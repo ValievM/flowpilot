@@ -17,6 +17,7 @@ import type { View } from './types';
 import { useAppAi } from './chat/chat-bridge';
 import { CatalogProvider } from './catalog/catalog-context';
 import { useReferenceSync } from './use-reference-sync';
+import { useNotificationOpen } from './use-notification-open';
 import { ScheduleProvider } from './schedule/schedule-context';
 import { useRuleProblems } from './rules/use-rule-problems';
 import { localDateLabel } from './today-copy';
@@ -83,6 +84,7 @@ function useAppModel(initialTheme: ThemeChoice): AppModel {
 function AppLayout({ model }: { readonly model: AppModel }): React.JSX.Element {
   const sidebar = useSidebarVisibility();
   useReferenceSync(model.state.revision);
+  useNotificationOpen(model.setView, model.openTask);
   const { state, view, views } = model;
   const taskCard = state.tasks.find((task) => task.id === model.taskCardId);
   const screenProps: ScreenProps = {

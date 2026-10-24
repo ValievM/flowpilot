@@ -99,6 +99,7 @@ describe('column undo regressions', () => {
       DROP TABLE series;
       DROP TABLE schedule_events;
       DROP TABLE schedule_snapshots;
+      DROP TABLE reminder_ledger;
     `);
     legacyDatabase.pragma('user_version = 5');
     legacyDatabase.close();

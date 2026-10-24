@@ -1,3 +1,4 @@
+import type { NotificationsApi } from './notification-contracts';
 import type { ScheduleApi } from './schedule-contracts';
 import type {
   AiCancelResult,
@@ -37,6 +38,7 @@ export type FlowPilotApi = {
   };
   catalog: CatalogApi;
   schedule: ScheduleApi;
+  notifications: NotificationsApi;
   rules: RulesApi;
   settings: {
     get(): Promise<Result<Readonly<Record<string, unknown>>>>;

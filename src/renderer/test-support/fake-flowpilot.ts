@@ -7,6 +7,7 @@ import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { Result } from '../../shared/ipc-result';
 import {
   fakeCatalogApi,
+  fakeNotificationsApi,
   fakeRulesApi,
   fakeScheduleApi,
 } from './fake-catalog-rules';
@@ -163,6 +164,7 @@ function fakeApiFor(
     commands: { apply: (request) => apiApply(state, request) },
     catalog: fakeCatalogApi,
     schedule: fakeScheduleApi,
+    notifications: fakeNotificationsApi,
     rules: fakeRulesApi,
     settings: {
       get: () => Promise.resolve({ ok: true, value: state.current.settings }),

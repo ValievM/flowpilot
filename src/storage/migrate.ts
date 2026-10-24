@@ -13,6 +13,7 @@ import rulesStorage from './migrations/0010_rules_storage.sql?raw';
 import seriesStorage from './migrations/0011_series_storage.sql?raw';
 import commentCreatedAtNullable from './migrations/0012_comment_created_at_nullable.sql?raw';
 import scheduleStorage from './migrations/0013_schedule_storage.sql?raw';
+import reminderLedger from './migrations/0014_reminder_ledger.sql?raw';
 
 const MIGRATIONS = [
   { version: 1, sql: initialSchema },
@@ -28,6 +29,7 @@ const MIGRATIONS = [
   { version: 11, sql: seriesStorage },
   { version: 12, sql: commentCreatedAtNullable },
   { version: 13, sql: scheduleStorage },
+  { version: 14, sql: reminderLedger },
 ] as const;
 export class ForeignDatabaseError extends Error {
   constructor() {

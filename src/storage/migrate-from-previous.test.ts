@@ -71,7 +71,7 @@ describe('upgrading databases with previous-version data', () => {
     repository.close();
     const database = new Database(path);
     try {
-      expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
+      expect(database.pragma('user_version')).toEqual([{ user_version: 14 }]);
       expect(database.prepare('PRAGMA table_info(tasks)').all()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'type_id' }),

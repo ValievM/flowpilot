@@ -2,6 +2,7 @@ import React from 'react';
 import type { IpcSnapshot, ThemeChoice } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import { CatalogSettings } from './catalog-settings';
+import { RemindersSettings } from './reminders-settings';
 import { ScheduleSources } from './schedule-sources';
 import type { Temporal } from 'temporal-polyfill';
 import type { Task } from '../../domain';
@@ -153,6 +154,7 @@ export function SettingsScreen({
         onApply={onApply}
         onChanged={onSnapshotRefresh}
       />
+      <RemindersSettings onApply={onApply} />
       <CatalogSettings tasks={tasks} onApply={onApply} />
       <BackupRestorePanel backup={backup} onRestored={onSnapshotRefresh} />
     </section>

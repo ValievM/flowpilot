@@ -14,6 +14,7 @@ import { readRuleSnapshot } from './rules-snapshot';
 import { loadOutcomes, loadSeries } from './series-persistence';
 import { findInvalidCommand } from './command-validation';
 import { ScheduleStore } from './schedule-store';
+import { ReminderStore } from './reminder-store';
 import type { TaskColumn } from '../domain';
 import type {
   AiMode,
@@ -50,6 +51,7 @@ export class Repository {
   private readonly database: Database.Database;
   private readonly attachments: AttachmentStore;
   readonly schedule: ScheduleStore;
+  readonly reminders: ReminderStore;
 
   constructor(
     path: string,
@@ -69,6 +71,7 @@ export class Repository {
       );
       this.attachments.recoverInterruptedRemovals();
       this.schedule = new ScheduleStore(this, this.database, this.clock);
+      this.reminders = new ReminderStore(this.database);
     } catch (error) {
       this.database.close();
       throw error;

@@ -1,5 +1,9 @@
 import type { FlowPilotApi } from '../shared/flowpilot-api';
 import type {
+  NotificationOpenTarget,
+  NotificationsStatus,
+} from '../shared/notification-contracts';
+import type {
   SchedulePreview,
   ScheduleResult,
   ScheduleSnapshots,
@@ -64,6 +68,28 @@ const api: FlowPilotApi = Object.freeze({
       ipcRenderer.invoke(ipcChannels.catalogList, {}) as Promise<
         IpcRuleResult<IpcCatalog>
       >,
+  },
+  notifications: {
+    status: () =>
+      ipcRenderer.invoke(ipcChannels.notificationsStatus, {}) as Promise<
+        Result<NotificationsStatus>
+      >,
+    configure: () =>
+      ipcRenderer.invoke(ipcChannels.notificationsConfigure, {}) as Promise<
+        Result<NotificationsStatus>
+      >,
+    onOpen: (listener: (target: NotificationOpenTarget) => void) => {
+      const handler = (
+        _event: unknown,
+        target: NotificationOpenTarget,
+      ): void => {
+        listener(target);
+      };
+      ipcRenderer.on(ipcChannels.notificationsOpen, handler);
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.notificationsOpen, handler);
+      };
+    },
   },
   schedule: {
     list: () =>
