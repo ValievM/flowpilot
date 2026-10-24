@@ -454,6 +454,10 @@ describe('IPC handlers', () => {
           saveRulesFile: () => Promise.resolve(undefined),
         },
         scheduleDialogs: { openIcsFile: () => Promise.resolve(undefined) },
+        reminders: {
+          adapter: { show: () => Promise.resolve('shown' as const) },
+          openTarget: () => undefined,
+        },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
@@ -502,6 +506,8 @@ describe('IPC handlers', () => {
       'schedule.list',
       'schedule.importFile',
       'schedule.confirmImport',
+      'notifications.status',
+      'notifications.configure',
       'history.list',
       'history.undo',
       'attachments.add',
@@ -578,6 +584,10 @@ describe('IPC handlers', () => {
           saveRulesFile: () => Promise.resolve(undefined),
         },
         scheduleDialogs: { openIcsFile: () => Promise.resolve(undefined) },
+        reminders: {
+          adapter: { show: () => Promise.resolve('shown' as const) },
+          openTarget: () => undefined,
+        },
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',

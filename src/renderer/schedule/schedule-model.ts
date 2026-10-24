@@ -6,11 +6,12 @@ import {
   overlappingEvents,
   type ScheduleSnapshot,
 } from '../../domain/schedule/fixed-events';
-import type {
-  ManualScheduleEvent,
-  ScheduleEvent,
-  ScheduleSourceSnapshot,
-} from '../../shared/schedule-contracts';
+import type { ScheduleSourceSnapshot } from '../../shared/schedule-contracts';
+import {
+  importedFixedEvent,
+  isManualEvent,
+  manualFixedEvents,
+} from '../../domain/schedule/stored-events';
 
 /** A snapshot older than this no longer proves the person is free. */
 const MAX_AGE = Temporal.Duration.from({ hours: 24 * 7 });
@@ -34,72 +35,19 @@ export interface SchedulePlan {
   readonly free: boolean;
 }
 
-function isManual(
-  event: ScheduleEvent | ManualScheduleEvent,
-): event is ManualScheduleEvent {
-  return 'weekdays' in event;
-}
-
-function importedEvent(event: ScheduleEvent): FixedEvent {
-  return {
-    key: event.key,
-    source: event.source,
-    title: event.title,
-    start: Temporal.Instant.from(event.startUtc).toZonedDateTimeISO(
-      event.timeZone,
-    ),
-    end: Temporal.Instant.from(event.endUtc).toZonedDateTimeISO(event.timeZone),
-    ...(event.place ? { place: event.place } : {}),
-    ...(event.cancelled ? { cancelled: true } : {}),
-  };
-}
-
-function manualOccurrences(
-  event: ManualScheduleEvent,
-  from: Temporal.PlainDate,
-  to: Temporal.PlainDate,
-): FixedEvent[] {
-  const first = Temporal.PlainDate.from(event.fromDate);
-  const last = Temporal.PlainDate.from(event.throughDate);
-  const occurrences: FixedEvent[] = [];
-  let day = Temporal.PlainDate.compare(from, first) > 0 ? from : first;
-  const end = Temporal.PlainDate.compare(to, last) < 0 ? to : last;
-  for (
-    ;
-    Temporal.PlainDate.compare(day, end) <= 0;
-    day = day.add({ days: 1 })
-  ) {
-    if (!event.weekdays.includes(day.dayOfWeek)) continue;
-    const at = (time: string) =>
-      day.toZonedDateTime({
-        timeZone: event.timeZone,
-        plainTime: Temporal.PlainTime.from(time),
-      });
-    occurrences.push({
-      key: `${event.id}:${day.toString()}`,
-      source: 'manual',
-      title: event.title,
-      start: at(event.startTime),
-      end: at(event.endTime),
-      ...(event.place ? { place: event.place } : {}),
-    });
-  }
-  return occurrences;
-}
-
 function sourceView(
   snapshot: ScheduleSourceSnapshot,
   zone: string,
   today: Temporal.PlainDate,
 ): SourceView {
   const events = snapshot.events.flatMap((event) =>
-    isManual(event)
-      ? manualOccurrences(
+    isManualEvent(event)
+      ? manualFixedEvents(
           event,
           today.subtract({ days: 1 }),
           today.add({ days: MANUAL_WINDOW_DAYS }),
         )
-      : [importedEvent(event)],
+      : [importedFixedEvent(event)],
   );
   return {
     source: snapshot.source,

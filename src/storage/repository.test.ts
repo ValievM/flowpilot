@@ -30,7 +30,7 @@ describe('Repository', () => {
     const { repository, path } = openRepository();
     repository.close();
     const database = new Database(path);
-    expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
+    expect(database.pragma('user_version')).toEqual([{ user_version: 14 }]);
     database.close();
     const before = readFileSync(path);
     const reopened = new Repository(path, clock);

@@ -25,3 +25,17 @@ export const fakeScheduleApi: FlowPilotApi['schedule'] = {
   confirmImport: () =>
     Promise.resolve({ ok: false, error: { kind: 'NotFound' } }),
 };
+
+export const fakeNotificationsApi: FlowPilotApi['notifications'] = {
+  status: () =>
+    Promise.resolve({
+      ok: true,
+      value: { enabled: false, leadMinutes: 10, permission: 'unknown' },
+    }),
+  configure: () =>
+    Promise.resolve({
+      ok: true,
+      value: { enabled: false, leadMinutes: 10, permission: 'granted' },
+    }),
+  onOpen: () => () => undefined,
+};

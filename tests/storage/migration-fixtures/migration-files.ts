@@ -11,6 +11,7 @@ import rulesStorage from '../../../src/storage/migrations/0010_rules_storage.sql
 import seriesStorage from '../../../src/storage/migrations/0011_series_storage.sql?raw';
 import commentCreatedAtNullable from '../../../src/storage/migrations/0012_comment_created_at_nullable.sql?raw';
 import scheduleStorage from '../../../src/storage/migrations/0013_schedule_storage.sql?raw';
+import reminderLedger from '../../../src/storage/migrations/0014_reminder_ledger.sql?raw';
 
 export const migrationFiles = [
   { version: 1, filename: '0001_init.sql', sql: initialSchema },
@@ -65,6 +66,11 @@ export const migrationFiles = [
     version: 13,
     filename: '0013_schedule_storage.sql',
     sql: scheduleStorage,
+  },
+  {
+    version: 14,
+    filename: '0014_reminder_ledger.sql',
+    sql: reminderLedger,
   },
 ] as const;
 

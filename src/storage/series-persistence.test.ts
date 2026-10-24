@@ -52,7 +52,7 @@ describe('series persistence migration', () => {
     migrate(database, path);
 
     try {
-      expect(database.pragma('user_version')).toEqual([{ user_version: 13 }]);
+      expect(database.pragma('user_version')).toEqual([{ user_version: 14 }]);
       expect(
         database
           .prepare(

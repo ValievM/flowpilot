@@ -34,6 +34,20 @@ function scheduleMocks() {
   };
 }
 
+function notificationMocks() {
+  const status = {
+    ok: true as const,
+    value: { enabled: false, leadMinutes: 10, permission: 'unknown' as const },
+  };
+  return {
+    notifications: {
+      status: vi.fn(() => Promise.resolve(status)),
+      configure: vi.fn(() => Promise.resolve(status)),
+      onOpen: vi.fn(() => () => undefined),
+    },
+  };
+}
+
 function ruleMocks() {
   return {
     rules: {
@@ -118,6 +132,7 @@ export function featureMocks(getCurrent: () => IpcSnapshot) {
     ...catalogMocks(),
     ...ruleMocks(),
     ...scheduleMocks(),
+    ...notificationMocks(),
     ...historyFileMocks(getCurrent),
   };
 }
