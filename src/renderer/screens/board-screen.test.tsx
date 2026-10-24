@@ -263,6 +263,25 @@ describe('board task movement', () => {
     expect(unknownRisk).not.toHaveClass('is-risk');
   });
 
+  it('writes the deadline like the other screens and keeps title, deadline, risk in that order', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T12:00:00Z'));
+    renderBoard(
+      createBoardApi(snapshot([{ ...task(), deadline: '2026-10-09' }])),
+    );
+    const deadline = await screen.findByText('Срок: 09.10.2026');
+    const risk = screen.getByText(
+      'Срок есть, объём неизвестен. По приблизительной оценке.',
+    );
+    const title = screen.getByRole('button', {
+      name: new RegExp(`Открыть задачу: ${task().title}`),
+    });
+    const before = (a: Node, b: Node): boolean =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(title, deadline)).toBe(true);
+    expect(before(deadline, risk)).toBe(true);
+  });
+
   it('renders a retryable error if the real snapshot cannot load', async () => {
     const value = createBoardApi();
     value.loadMock.mockResolvedValue({
