@@ -5,6 +5,7 @@ import type {
 } from '../../shared/contracts';
 import type { FlowPilotApi } from '../../shared/flowpilot-api';
 import type { Result } from '../../shared/ipc-result';
+import { fakeAiApi } from './fake-ai-api';
 import {
   fakeCatalogApi,
   fakeNotificationsApi,
@@ -171,21 +172,7 @@ function fakeApiFor(
       set: (request) => apiSetSetting(state, request),
     },
     ...createFakeHistoryFileApi(() => state.current),
-    ai: {
-      scenario: () =>
-        Promise.resolve({
-          ok: false,
-          error: {
-            kind: 'ProviderUnavailable',
-            message: 'AI is unavailable in this test.',
-          },
-        }),
-      run: () => Promise.resolve({ ok: false, error: 'ProviderUnavailable' }),
-      cancel: () => Promise.resolve({ ok: false, error: 'ValidationFailed' }),
-      prompt: () => Promise.resolve({ ok: false, error: 'NotFound' }),
-      pending: () => Promise.resolve({ ok: true, value: [] }),
-      reply: () => Promise.resolve({ ok: false, error: 'NotFound' }),
-    },
+    ai: fakeAiApi,
     app: createFakeAppApi(clock),
   };
 }

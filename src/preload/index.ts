@@ -1,4 +1,5 @@
 import type { FlowPilotApi } from '../shared/flowpilot-api';
+import type { AiProviderStatus } from '../shared/ai-provider-contracts';
 import type {
   NotificationOpenTarget,
   NotificationsStatus,
@@ -196,6 +197,10 @@ const api: FlowPilotApi = Object.freeze({
     prompt: (request: { operationId: string }) =>
       ipcRenderer.invoke(ipcChannels.aiPrompt, request) as Promise<
         Result<string>
+      >,
+    providerStatus: () =>
+      ipcRenderer.invoke(ipcChannels.aiProviderStatus, {}) as Promise<
+        Result<AiProviderStatus>
       >,
     pending: () =>
       ipcRenderer.invoke(ipcChannels.aiPending) as Promise<

@@ -9,6 +9,10 @@ import { AiRunner } from './ai-runner';
 import type { AiProvider } from './ai-provider';
 import { FakeAiProvider, type FakeAiStep } from './fake-ai-provider';
 import { selectAiProvider } from './provider-selection';
+import {
+  createSwitchableProvider,
+  type AiProviderChoice,
+} from './switchable-provider';
 
 // Copying the request out and pasting the reply back takes minutes, not seconds.
 const MANUAL_EXCHANGE_TIMEOUT_MS = 10 * 60_000;
@@ -17,6 +21,10 @@ export function createStartupAiRunner(
   isPackaged: boolean,
   environment: RuntimeEnvironment,
   manualProvider: AiProvider,
+  codex?: {
+    readonly provider: AiProvider;
+    readonly choice: () => AiProviderChoice;
+  },
 ): AiRunner {
   const testEnabled = !isPackaged && environment.FLOWPILOT_TEST === '1';
   const fakeProvider = new FakeAiProvider(
@@ -26,7 +34,18 @@ export function createStartupAiRunner(
   if (testEnabled)
     Reflect.set(globalThis, '__FLOWPILOT_TEST_AI_CALLS__', fakeProvider.calls);
   return new AiRunner(
-    selectAiProvider({ isPackaged, environment, manualProvider, fakeProvider }),
+    selectAiProvider({
+      isPackaged,
+      environment,
+      manualProvider: codex
+        ? createSwitchableProvider({
+            manual: manualProvider,
+            codex: codex.provider,
+            choice: codex.choice,
+          })
+        : manualProvider,
+      fakeProvider,
+    }),
     MANUAL_EXCHANGE_TIMEOUT_MS,
   );
 }

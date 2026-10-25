@@ -12,6 +12,7 @@ import {
 } from './ai/ipc';
 import type { ManualExchangeProvider } from './ai/manual-exchange-provider';
 import { runAiScenario } from './ai/scenario-ipc';
+import { getAiProviderStatus } from './ai/provider-status';
 import type { AiUseCases } from './ai/usecases';
 import {
   activateRule,
@@ -42,6 +43,10 @@ type FeatureDependencies = {
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly scheduleDialogs: ScheduleDependencies['dialogs'];
   readonly reminders: Pick<ReminderDeps, 'adapter' | 'openTarget'>;
+  readonly checkCodex: () => Promise<{
+    installed: boolean;
+    loggedIn: boolean;
+  }>;
   readonly clock: Clock;
   readonly appInfo: {
     getName(): string;
@@ -91,6 +96,12 @@ export function registerFeatureIpcHandlers(
   );
   ipc.handle(ipcChannels.aiScenario, (_event, request: unknown) =>
     runAiScenario(request, deps.aiUseCases),
+  );
+  ipc.handle(ipcChannels.aiProviderStatus, (_event, request: unknown) =>
+    getAiProviderStatus(request, {
+      repository: deps.repository,
+      checkCodex: deps.checkCodex,
+    }),
   );
   registerScheduleHandlers(ipc, deps);
   registerNotificationHandlers(ipc, deps);

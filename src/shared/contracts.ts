@@ -118,6 +118,7 @@ export const ipcChannels = {
   aiReply: 'ai.reply',
   appearanceSetTheme: 'appearance.set-theme',
   aiScenario: 'ai.scenario',
+  aiProviderStatus: 'ai.providerStatus',
   notificationsStatus: 'notifications.status',
   notificationsConfigure: 'notifications.configure',
   notificationsOpen: 'notifications.open',

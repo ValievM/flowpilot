@@ -27,6 +27,13 @@ import {
 } from './window-startup';
 import { reportStartupFailure } from './startup-error';
 import { createStartupReminders } from './notifications/startup';
+import {
+  checkCodexStatus,
+  createCodexProvider,
+  findCodexBinary,
+  runCodexExec,
+} from './ai/codex-exec-provider';
+import { codexCheckFor, currentChoice } from './ai/provider-status';
 import { ipcChannels } from '../shared/contracts';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -64,12 +71,7 @@ if (!app.requestSingleInstanceLock()) {
       nativeTheme.themeSource = initialAppearanceTheme(
         repository.load().settings,
       );
-      const aiRunner = createStartupAiRunner(
-        app.isPackaged,
-        process.env,
-        manualProvider,
-      );
-      const aiUseCases = createAiUseCases(repository, aiRunner, runtime.clock);
+      const { aiRunner, aiUseCases } = startupAi(repository);
       const reminders = startupReminders();
       registerIpcHandlers(ipcMain, {
         repository,
@@ -79,6 +81,9 @@ if (!app.requestSingleInstanceLock()) {
           adapter: reminders.adapter,
           openTarget: openNotificationTarget,
         },
+        checkCodex: codexCheckFor(app.isPackaged, process.env, () =>
+          checkCodexStatus(findCodexBinary()),
+        ),
         appInfo: {
           getName: () => app.getName(),
           getVersion: () => app.getVersion(),
@@ -129,6 +134,28 @@ app.on('window-all-closed', () => {
 
 function activateWindow(): void {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+}
+
+function startupAi(current: Repository): {
+  aiRunner: ReturnType<typeof createStartupAiRunner>;
+  aiUseCases: ReturnType<typeof createAiUseCases>;
+} {
+  const aiRunner = createStartupAiRunner(
+    app.isPackaged,
+    process.env,
+    manualProvider,
+    {
+      provider: createCodexProvider({
+        run: runCodexExec,
+        findBinary: findCodexBinary,
+      }),
+      choice: () => currentChoice(repository),
+    },
+  );
+  return {
+    aiRunner,
+    aiUseCases: createAiUseCases(current, aiRunner, runtime.clock),
+  };
 }
 
 function startupReminders(): ReturnType<typeof createStartupReminders> {
