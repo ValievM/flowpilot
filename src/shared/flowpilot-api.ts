@@ -1,3 +1,4 @@
+import type { AiProviderStatus } from './ai-provider-contracts';
 import type { NotificationsApi } from './notification-contracts';
 import type { ScheduleApi } from './schedule-contracts';
 import type {
@@ -67,6 +68,7 @@ export type FlowPilotApi = {
     cancel(request: { operationId: string }): Promise<AiCancelResult>;
     prompt(request: { operationId: string }): Promise<Result<string>>;
     pending(): Promise<Result<{ operationId: string; prompt: string }[]>>;
+    providerStatus(): Promise<Result<AiProviderStatus>>;
     reply(request: {
       operationId: string;
       text: string;

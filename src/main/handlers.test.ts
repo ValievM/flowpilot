@@ -458,6 +458,8 @@ describe('IPC handlers', () => {
           adapter: { show: () => Promise.resolve('shown' as const) },
           openTarget: () => undefined,
         },
+        checkCodex: () =>
+          Promise.resolve({ installed: false, loggedIn: false }),
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',
@@ -503,6 +505,7 @@ describe('IPC handlers', () => {
       'ai.pending',
       'ai.reply',
       'ai.scenario',
+      'ai.providerStatus',
       'schedule.list',
       'schedule.importFile',
       'schedule.confirmImport',
@@ -588,6 +591,8 @@ describe('IPC handlers', () => {
           adapter: { show: () => Promise.resolve('shown' as const) },
           openTarget: () => undefined,
         },
+        checkCodex: () =>
+          Promise.resolve({ installed: false, loggedIn: false }),
         appInfo: {
           getName: () => 'FlowPilot',
           getVersion: () => '0.1.0',

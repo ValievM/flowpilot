@@ -20,6 +20,10 @@ export type RegistrationDependencies = {
   readonly ruleDialogs: RuleFileDependencies['dialogs'];
   readonly scheduleDialogs: ScheduleDependencies['dialogs'];
   readonly reminders: Pick<ReminderDeps, 'adapter' | 'openTarget'>;
+  readonly checkCodex: () => Promise<{
+    installed: boolean;
+    loggedIn: boolean;
+  }>;
   readonly appInfo: {
     getName(): string;
     getVersion(): string;
